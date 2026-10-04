@@ -9,7 +9,7 @@ import { Editor } from './editor.js';
 let GameAudio;
 try { ({ GameAudio } = await import('./audio.js')); } catch (e) { console.warn('audio.js unavailable, using silent audio', e); }
 if (typeof GameAudio !== 'function') ({ GameAudio } = await import('./audio_stub.js'));
-import { safeStorage, clamp } from './util.js';
+import { safeStorage, clamp, readSave } from './util.js';
 import { STYLE, setStyle } from './style.js';
 import { installToonChunks, LOOKS } from './toon.js';
 import { INTRO, introPlan, droneAt, coverFov, IntroFlight } from './intro.js';
@@ -33,7 +33,7 @@ async function loadMapData() {
 
 function defaultQuality(store) {
   let saved = null;
-  try { saved = JSON.parse(store?.getItem('guarena_save') || '{}').quality; } catch (e) { /* ignore */ }
+  try { saved = JSON.parse(readSave(store)).quality; } catch (e) { /* ignore */ }
   if (saved && QUALITY[saved]) return saved;
   const touch = matchMedia('(pointer: coarse)').matches;
   if (touch) return 'baja';
@@ -75,7 +75,7 @@ async function boot(hot = {}) {
   const q = defaultQuality(store);
   // the look (anime unless the player chose the photographic one): it has to be set before anything is built
   let style = null;
-  try { style = JSON.parse(store?.getItem('guarena_save') || '{}').style; } catch (e) { /* ignore */ }
+  try { style = JSON.parse(readSave(store)).style; } catch (e) { /* ignore */ }
   try { const u = new URLSearchParams(location.search).get('estilo'); if (u) style = u; } catch (e) { /* (?estilo=real: a look for this visit only) */ }
   setStyle(style || 'anime');
   if (STYLE.anime) installToonChunks();
@@ -476,7 +476,7 @@ function renderMulti() {
 // online, browser to browser (the page on GitHub): a public room everybody shares, or a private one with its own link
 function renderOnline() {
   const net = game.net, yes = net.connected;
-  const home = (typeof window !== 'undefined' && window.GUARENA_ONLINE_URL) || 'https://nestorguerra.github.io/guarena/';
+  const home = (typeof window !== 'undefined' && window.GUARENA_ONLINE_URL) || 'https://nestorguerra.github.io/guarena-evolucion/';
   $('mpOnline').hidden = true; $('mpNo').hidden = true; $('mpInvite').hidden = true;
   // could not reach the meeting servers: from a page that blocks them (the published copy), send people to GitHub
   $('mpGo').hidden = !(net.onlineError && !location.href.startsWith(home));

@@ -7,7 +7,7 @@
 
 const BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://broker-cn.emqx.io:8084/mqtt'];
 const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }, { urls: 'stun:stun.cloudflare.com:3478' }];
-const PROTO = 'guarena/p1/';     // a new protocol gets a new prefix, so different versions never mix
+const PROTO = 'guarena-evo/p1/';     // a new protocol gets a new prefix, so different versions never mix
 export const ONLINE_MAX = 16;    // everyone talks to everyone: a room is a few friends, not a stadium
 const HELLO_EVERY = 7000, GONE_AFTER = 30000, AWAY_GONE = 150000, RELAY_AFTER = 7000, RELAY_ST_DT = 0.2;
 // (a page in a background tab gets its timers slowed down to one a minute: «away», the others wait longer for it)

@@ -3,7 +3,7 @@ GUAREÑA · VEGAS ALTAS — juego de mundo abierto en el Guareña real (Badajoz)
 
 JUGAR
 -----
-- Abre dist/guarena.html con Chrome, Edge, Safari o Firefox (con WebGL2).
+- Abre dist/guarena-evolucion.html con Chrome, Edge, Safari o Firefox (con WebGL2).
   Es un único archivo con todo dentro; la primera vez necesita internet para
   descargar la librería 3D (three.js).
 - Versión publicada: https://claude.ai/artifact/9qCdppEARAj9U9BAdtZFHc
@@ -25,7 +25,7 @@ Hace falta Python 3.
 
   python3 tools/build.py
       Empaqueta index.html + src/ + data/map.json + assets/ en un solo archivo:
-      dist/guarena.html (el juego) y dist/test.html.
+      dist/guarena-evolucion.html (el juego) y dist/test.html.
 
   python3 tools/build_map.py
       Regenera data/map.json a partir de OpenStreetMap (data/guarena.osm) y del

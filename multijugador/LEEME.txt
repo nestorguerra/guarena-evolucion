@@ -1,9 +1,9 @@
-GUAREÑA · MULTIJUGADOR
-======================
+GUAREÑA EVOLUCIÓN · MULTIJUGADOR
+================================
 
 Lo más fácil: online, sin instalar nada
 ----------------------------------------
-Abre https://nestorguerra.github.io/guarena/ en el navegador, entra en «Multijugador» (o en
+Abre https://nestorguerra.github.io/guarena-evolucion/ en el navegador, entra en «Multijugador» (o en
 la pausa, «Jugar online») y pulsa «¡Entrar en Guareña!». Verás a todos los que estén jugando
 online. Para jugar solo con tus amigos: «Crear sala privada» y mándales ese enlace.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bundle index.html + src/*.js + data/map.json + assets/ into one self-contained artifact page (dist/guarena.html).
+"""Bundle index.html + src/*.js + data/map.json + assets/ into one self-contained artifact page (dist/guarena-evolucion.html).
 With --split the map data and the assets ship as separate files next to the page instead.
 
 Each ES module becomes a scoped factory (so top-level names never collide); local imports turn into
@@ -182,7 +182,7 @@ def main():
         assert re.match(r'^https://[\w.-]+(:\d+)?/?$', mp_url), 'GUARENA_MP_URL debe ser https://servidor'
         page += f'<script>window.GUARENA_MP_URL = {json.dumps(mp_url.rstrip("/"))};</script>\n'
     page += '<script type="module">\n' + js + '\n</script>\n'
-    fn = os.path.join(ROOT, 'dist', 'guarena.html')
+    fn = os.path.join(ROOT, 'dist', 'guarena-evolucion.html')  # (dist/guarena.html was the fixed version's page)
     with open(fn, 'w', encoding='utf-8') as f:
         # declare UTF-8 first thing: without it a host that sends no charset shows «GuareÃ±a» instead of «Guareña»
         f.write('<meta charset="utf-8">\n' + page)

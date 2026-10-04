@@ -233,6 +233,13 @@ export function fmtMoney(v) {
   return (v < 0 ? '-' : '') + s + ' €';
 }
 
+// Guareña Evolución keeps its own save: on the same site as the fixed version (GitHub Pages) the two would share it.
+// The first time it starts from the fixed version's progress (read, never written)
+export const SAVE_KEY = 'guarena_evo_save', SAVE_KEY_FIXED = 'guarena_save';
+export function readSave(store) {
+  return (store && (store.getItem(SAVE_KEY) || store.getItem(SAVE_KEY_FIXED))) || '{}';
+}
+
 export function safeStorage() {
   try {
     const k = '__t';

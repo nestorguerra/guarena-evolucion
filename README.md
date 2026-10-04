@@ -1,4 +1,10 @@
-# Guareña · Vegas Altas
+# Guareña · Evolución
+
+Copia de [Guareña · Vegas Altas](https://github.com/nestorguerra/guarena) para seguir evolucionando el juego. Aquella
+queda **fija en su versión 42** (la etiqueta `v42-fija` de este repositorio es ese mismo punto); los cambios nuevos van
+aquí. Las dos versiones no se pisan: cada una guarda su partida (la primera vez, esta empieza desde la partida de la
+fija, sin tocarla), su caché de personajes y sus salas online, y el servidor multijugador propio de esta usa el
+puerto 8921.
 
 Juego de mundo abierto en el Guareña real (Badajoz, Extremadura), en el navegador: sus calles de
 OpenStreetMap, los edificios del Catastro con su número de plantas, la Iglesia de Santa María, la Plaza de
@@ -21,11 +27,11 @@ grano, el pigmento acumulado donde se tocan dos colores, el papel en blanco para
 
 ## Jugar
 
-- **En el navegador:** https://nestorguerra.github.io/guarena/
+- **En el navegador:** https://nestorguerra.github.io/guarena-evolucion/ (la versión fija sigue en https://nestorguerra.github.io/guarena/)
 - **Multijugador online, sin servidor:** en esa misma página, *Multijugador* (o *Pausa › Jugar online*). Entras en
   la sala pública: ves por la calle a todos los que estén jugando online en ese momento, con su nombre encima, en el
   radar y en el mapa, y podéis hablar por el chat (T). Con *Crear sala privada* tienes un enlace propio
-  (`…/guarena/#sala-XXXXX`) que solo conoce quien tú se lo mandes. Ver [Cómo funciona el online](#cómo-funciona-el-online).
+  (`…/guarena-evolucion/#sala-XXXXX`) que solo conoce quien tú se lo mandes. Ver [Cómo funciona el online](#cómo-funciona-el-online).
 
 Funciona en Chrome, Edge, Safari y Firefox con WebGL2, en ordenador y en móvil (con teclado y ratón, mando o
 pantalla táctil). La primera vez necesita internet para descargar la librería 3D (three.js).
@@ -64,14 +70,14 @@ copia publicada en claude.ai no puede conectar con ellas y usa las tres emisoras
 `python3 multijugador/servidor.py --nube`, que sirve el juego y conecta a los jugadores (WebSocket, o sondeo HTTP
 si algo corta los WebSocket). Solo usa la biblioteca estándar de Python; caben 8 jugadores por sala.
 
-Para montarlo en tu cuenta: [Desplegar en Render](https://dashboard.render.com/blueprint/new?repo=https://github.com/nestorguerra/guarena)
+Para montarlo en tu cuenta: [Desplegar en Render](https://dashboard.render.com/blueprint/new?repo=https://github.com/nestorguerra/guarena-evolucion)
 (plan gratuito). Cada vez que se sube algo a `main` se vuelve a desplegar solo.
 
 ## Desarrollar
 
 ```bash
 python3 tools/devserver.py 8918     # http://localhost:8918/index.html · el código fuente, sin empaquetar
-python3 tools/build.py              # dist/guarena.html: el juego en un solo archivo
+python3 tools/build.py              # dist/guarena-evolucion.html: el juego en un solo archivo
 python3 tools/build_map.py          # regenera data/map.json desde OpenStreetMap y el Catastro
 ```
 

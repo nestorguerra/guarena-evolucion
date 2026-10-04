@@ -6,7 +6,7 @@
 </head>
 <body>
 <!--ARTIFACT-START-->
-<title>Guareña Vegas Altas</title>
+<title>Guareña Evolución</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&family=Dela+Gothic+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
@@ -697,7 +697,7 @@ body.contemplar #hud .tr, body.contemplar #hud .radarWrap, body.contemplar #hud 
   // the look, before anything shows; in the anime one the drone's picture of Guareña covers the screen and starts
   // drifting closer at once (a CSS transition, smooth while the page loads and builds the town)
   var look = 'anime';
-  try { look = JSON.parse(localStorage.getItem('guarena_save') || '{}').style === 'real' ? 'real' : 'anime'; } catch (e) { /* ignore */ }
+  try { look = JSON.parse(localStorage.getItem('guarena_evo_save') || localStorage.getItem('guarena_save') || '{}').style === 'real' ? 'real' : 'anime'; } catch (e) { /* ignore */ }
   document.body.dataset.look = look;
   if (look !== 'anime') return;
   var box = document.getElementById('intro'), img = document.getElementById('introImg');
@@ -708,14 +708,14 @@ body.contemplar #hud .tr, body.contemplar #hud .radarWrap, body.contemplar #hud 
   if (img.complete && img.naturalWidth) go(); else img.addEventListener('load', go);
 })();</script>
 <div id="loading" class="screen">
-  <div class="brand"><span class="big">Guareña</span><span class="sub"><i></i>Vegas Altas · Extremadura</span></div>
+  <div class="brand"><span class="big">Guareña</span><span class="sub"><i></i>Evolución · Vegas Altas · Extremadura</span></div>
   <div id="loadBar"><b></b></div>
   <div id="loadText">Preparando el pueblo…</div>
   <p class="tip">Las 87 calles reales de OpenStreetMap y los 4.563 edificios del Catastro, con su número de plantas. Todo el pueblo, de la Plaza de España al Pantano de San Roque.</p>
 </div>
 
 <div id="menu" class="screen" hidden>
-  <div class="brand"><span class="big">Guareña</span><span class="sub"><i></i>Vegas Altas · Extremadura</span></div>
+  <div class="brand"><span class="big">Guareña</span><span class="sub"><i></i>Evolución · Vegas Altas · Extremadura</span></div>
   <div class="modeSel">
     <span class="ml">Modo de juego</span>
     <div class="seg" id="modeSeg">
@@ -760,7 +760,7 @@ body.contemplar #hud .tr, body.contemplar #hud .radarWrap, body.contemplar #hud 
     <div class="mpCard" id="mpGo" hidden>
       <b class="t">Partida online</b>
       <p style="margin:6px 0 10px">Desde aquí no se puede conectar. Abre Guareña en su página de GitHub: allí cualquiera puede entrar en la partida y ver a los demás jugadores.</p>
-      <a class="btn" id="mpGoLink" href="https://nestorguerra.github.io/guarena/" target="_blank" rel="noopener">Abrir Guareña online</a>
+      <a class="btn" id="mpGoLink" href="https://nestorguerra.github.io/guarena-evolucion/" target="_blank" rel="noopener">Abrir Guareña online</a>
     </div>
     <div class="mpCard" id="mpOnline" hidden>
       <b class="t">Multijugador en internet</b>

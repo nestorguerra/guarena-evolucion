@@ -1089,7 +1089,7 @@ if (gHairK > 0.0) {
 }
 
 // ---------------------------------------------------------------- shape cache in IndexedDB (instant second visits)
-const DB_NAME = 'guarena-chars', STORE = 'shapes';
+const DB_NAME = 'guarena-evo-chars', STORE = 'shapes'; // (not the fixed version's cache: same site on GitHub Pages)
 function idbOpen() {
   return new Promise((res) => {
     try {

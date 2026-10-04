@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Servidor multijugador de Guareña · Vegas Altas.
+"""Servidor multijugador de Guareña Evolución.
 
     python3 servidor.py                  (o doble clic en «Jugar multijugador»)
-    python3 servidor.py --puerto 8920 --sin-navegador
+    python3 servidor.py --puerto 8921 --sin-navegador
     python3 servidor.py --nube           en un servidor de internet (Render…): puerto de $PORT, sin túneles
 
 Sirve el juego (guarena.html) y conecta a los jugadores entre sí. Solo usa la biblioteca estándar de Python 3.
@@ -34,7 +34,7 @@ DEV = '--dev' in sys.argv                # serve the source tree (index.html + s
 # on a hosting service (Render and the like): the port it gives in $PORT, its public address, no tunnels, no browser
 CLOUD = '--nube' in sys.argv or bool(os.environ.get('RENDER'))
 OPEN_BROWSER = '--sin-navegador' not in sys.argv and not CLOUD
-PORT0 = int(arg('--puerto', os.environ.get('PORT') if CLOUD and os.environ.get('PORT') else os.environ.get('GUARENA_PUERTO', '8920')))
+PORT0 = int(arg('--puerto', os.environ.get('PORT') if CLOUD and os.environ.get('PORT') else os.environ.get('GUARENA_PUERTO', '8921')))
 PUBLIC_URL = (os.environ.get('GUARENA_URL') or os.environ.get('RENDER_EXTERNAL_URL') or '').rstrip('/')
 
 
@@ -67,7 +67,7 @@ def game_bytes():
 
 # a small first page with a progress bar while the game itself downloads (it can take a while through a free link)
 LOADER = '''<!doctype html><html lang="es"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Guareña Vegas Altas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Guareña Evolución</title>
 <style>html,body{height:100%;margin:0;background:#0d1117;color:#fbfaf6;font:600 17px system-ui,-apple-system,Segoe UI,sans-serif}
 body{display:grid;place-items:center}.w{width:min(440px,84vw)}.t{font:800 40px/1 Impact,'Arial Narrow',sans-serif;letter-spacing:.02em;text-transform:uppercase}
 .s{margin-top:10px;color:rgba(251,250,246,.75)}.b{height:8px;margin-top:16px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden}

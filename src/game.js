@@ -45,7 +45,7 @@ import { HomeSafe } from './home.js';
 import { Zombies } from './zombies.js';
 import { Input } from './input.js';
 import { Net } from './net.js';
-import { clamp, lerp, ringCentroid, safeStorage } from './util.js';
+import { clamp, lerp, ringCentroid, safeStorage, readSave, SAVE_KEY } from './util.js';
 
 export const QUALITY = {
   alta: { name: 'Alta', texSize: 512, photo: 1024, aniso: 8, shadows: 2, trees: 6500, traffic: 13, peds: 30, bloom: true, pr: 1.5, parkRadius: 220, carCapacity: 150, facade3d: 120 },
@@ -69,7 +69,7 @@ export class Game {
     this.labels = [];
   }
   load() {
-    try { return JSON.parse(this.store?.getItem('guarena_save') || '{}'); } catch (e) { return {}; }
+    try { return JSON.parse(readSave(this.store)); } catch (e) { return {}; }
   }
   persist() {
     try {
@@ -77,7 +77,7 @@ export class Game {
       if (this.weapons) this.save.weapons = this.weapons.toJSON();
       if (this.player) this.save.armor = Math.round(this.player.armor || 0);
       if (this.player) this.save.bag = this.player.bag || [];
-      this.store && this.store.setItem('guarena_save', JSON.stringify(this.save));
+      this.store && this.store.setItem(SAVE_KEY, JSON.stringify(this.save));
     } catch (e) { /* storage unavailable */ }
   }
 
