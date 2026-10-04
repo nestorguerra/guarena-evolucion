@@ -1,8 +1,9 @@
 # Guareña · Evolución
 
 Copia de [Guareña · Vegas Altas](https://github.com/nestorguerra/guarena) para seguir evolucionando el juego. Aquella
-queda **fija en su versión 42** (la etiqueta `v42-fija` de este repositorio es ese mismo punto); los cambios nuevos van
-aquí. Las dos versiones no se pisan: cada una guarda su partida (la primera vez, esta empieza desde la partida de la
+queda **fija** (la versión 42, con Annie de protagonista desde su puerta en la calle Malfeitos); esta sigue con
+**Álex** y los cambios nuevos van aquí. La etiqueta `v42-fija` de este repositorio es el punto de partida. Las dos
+versiones no se pisan: cada una guarda su partida (la primera vez, esta empieza desde la partida de la
 fija, sin tocarla), su caché de personajes y sus salas online, y el servidor multijugador propio de esta usa el
 puerto 8921.
 
