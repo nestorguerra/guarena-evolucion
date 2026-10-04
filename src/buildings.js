@@ -205,13 +205,22 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
     part.pi = partIndex.add(p.ring, part);
     parts.push(part);
   }
-  // building heights for collisions: max part height per building
+  // collisions: what stands is what is drawn — each part to its own height. A building's Catastro outline can be larger
+  // than its parts (a petrol station's canopy, a porch, a yard registered with it): walls nobody can see stop nobody
   const bH = new Float32Array(map.buildings.length);
   for (const p of parts) if (p.b >= 0) bH[p.b] = Math.max(bH[p.b], p.H + 1.5);
+  const kept = new Uint8Array(map.buildings.length);
   for (const b of map.buildings) {
     if (onBuilding && onBuilding(b) === false) continue;
-    map.addBuildingCollider(b, bH[b.id] || b.floors * FLOOR_H);
+    kept[b.id] = 1;
+    b.height = bH[b.id] || b.floors * FLOOR_H;
   }
+  for (const p of parts) {
+    if (p.b >= 0 && !kept[p.b]) continue;
+    map.collider.addRing(p.ring, p.H + 1.5, p.b);
+    if (p.holes) for (const h of p.holes) map.collider.addRing(h, p.H + 1.5, p.b);
+  }
+  map.useDrawnParts(parts.filter((p) => p.b < 0 || kept[p.b]));
 
   // does a facade run look onto a street or a square? (backyards and inner courtyards keep the light painted facade)
   const squares = map.areas.filter((a) => ['place:square', 'highway:pedestrian', 'amenity:marketplace', 'leisure:park'].includes(a.kind)).map((a) => ({ ring: a.ring, bb: ringBounds(a.ring) }));

@@ -317,6 +317,13 @@ export class MapData {
     if (b.holes) for (const h of b.holes) this.collider.addRing(h, height, b.id);
   }
   buildingAt(x, z) { const p = this.bIndex.find(x, z); return p ? p.data : null; }
+  // once the town is built, "inside a building" means inside what is drawn of it (its parts), not its whole outline
+  useDrawnParts(parts) {
+    const { x0, z0, x1, z1 } = this.bounds;
+    const ix = new PolyIndex(x0 - 400, z0 - 400, x1 + 400, z1 + 400, 16);
+    for (const p of parts) if (p.b >= 0) ix.add(p.ring, this.buildings[p.b]);
+    this.bIndex = ix;
+  }
 
   // ---------------------------------------------------------------- areas
   buildAreaIndex() {

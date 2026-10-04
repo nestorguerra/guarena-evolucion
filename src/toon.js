@@ -42,9 +42,10 @@ export function installToonChunks() {
   // the sky's light (IBL) mostly from above too, whichever way the surface faces
   C.lights_fragment_maps = swap(C.lights_fragment_maps, 'iblIrradiance += getIBLIrradiance( geometryNormal );', 'iblIrradiance += getIBLIrradiance( toonAmbN( geometryNormal ) );', 'ibl');
 }
-// the lens of the last pass (a fish-eye, like the reference's little planet: the horizon and the roofs bow): where a
-// point of the rendered picture (uv 0..1) ends up on the screen — for what is drawn over it (speech bubbles, marks)
-export const LENS = { k: 0.2 };
+// the lens of the last pass: where a point of the rendered picture (uv 0..1) ends up on the screen — for what is drawn
+// over it (speech bubbles, marks). It was a fish-eye (k 0.2, the reference's little planet); players found that it bent
+// whatever was ahead as they moved or turned, so it is flat now
+export const LENS = { k: 0 };
 export function lensMap(u, v) {
   const sx = u - 0.5, sy = v - 0.5;
   let ox = sx, oy = sy;

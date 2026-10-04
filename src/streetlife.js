@@ -327,6 +327,21 @@ export function buildStreetLife(world, map, q) {
   const rnd = mulberry32(90210);
   const pick = (a) => a[Math.floor(rnd() * a.length) % a.length];
   const free = (x, z, r = 0.3) => !map.buildingAt(x, z) && !map.buildingAt(x + r, z) && !map.buildingAt(x - r, z) && !map.buildingAt(x, z + r) && !map.buildingAt(x, z - r);
+  // how far a point is from the carriageway of the nearest road cars use (negative: on it)
+  const offRoad = (x, z) => {
+    let best = 99;
+    for (const id of map.edgesNear(x, z, 9)) {
+      const e = map.edges[id];
+      if (!e.drive) continue;
+      const P = e.pts;
+      for (let i = 0; i + 3 < P.length; i += 2) {
+        const ax = P[i], az = P[i + 1], vx = P[i + 2] - ax, vz = P[i + 3] - az, l2 = vx * vx + vz * vz || 1;
+        const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / l2));
+        best = Math.min(best, Math.hypot(x - ax - vx * t, z - az - vz * t) - e.w / 2);
+      }
+    }
+    return best;
+  };
   const litterKinds = ['papel', 'papel', 'papel', 'periodico', 'periodico', 'lata', 'lata', 'lata', 'botella', 'bolsaPlastico', 'vaso'];
   const litter = (x, z, rr = 0) => {
     const k = pick(litterKinds);
@@ -360,7 +375,7 @@ export function buildStreetLife(world, map, q) {
       for (let i = 0; i < n; i++) {
         const along = side * (1.05 + i * 0.66), out = 0.5 + (i === n - 1 && n > 2 ? 0.35 : 0);
         const [x, z] = P(along, out);
-        if (!free(x, z, 0.3) || nearOpening(x - nx * out, z - nz * out, 0.05)) { ok = false; break; }
+        if (!free(x, z, 0.3) || nearOpening(x - nx * out, z - nz * out, 0.05) || offRoad(x, z) < 0.45) { ok = false; break; }
         seats.push({ x, z, ang: ang + side * (i === n - 1 && n > 2 ? -0.7 : -0.12) });
       }
       if (ok && seats.length >= 2) { frescoSpots.push({ x: d.x, z: d.z, seats, kind: r() < 0.55 ? 'sillaPlastico' : r() < 0.6 ? 'sillaEnea' : 'sillaEneaVerde', seed: h, used: false }); stats.fresco++; continue; }

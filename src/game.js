@@ -412,6 +412,8 @@ export class Game {
   }
   onEnterVehicle(v) {
     const dev = this.input.device, K = (k, p, t) => this.input.key(k, p, t);
+    // first person on foot stays first person: the cabin, or the rider's eyes on two wheels and on a tractor
+    if (this.cam.fp && !this.cam.carFP) { this.cam.carFP = true; this.cam.fpYaw = 0; this.cam.fpPitch = v.spec.twoWheel || v.spec.shape === 'tractor' ? -0.3 : -0.05; } // (a look down at the handlebars)
     // two wheels: no car radio, and a hint of their own
     if (v.spec.twoWheel) {
       const bici = v.spec.shape === 'bici' || /bici/i.test(v.model || '');
@@ -511,9 +513,8 @@ export class Game {
           const c = this.cam, tw = this.player.vehicle && (this.player.vehicle.spec.twoWheel || this.player.vehicle.spec.shape === 'tractor');
           if (c.carFP) { c.carFP = false; c.dist = 6.2; }
           else if (c.dist > 5) c.dist = 3.2;
-          else if (!tw) { c.carFP = true; c.fpYaw = 0; c.fpPitch = -0.05; }
-          else c.dist = 6.2;
-          this.hud.notify(c.carFP ? `Vista desde dentro del coche (${input.keyText('V', 13)} para cambiar)` : c.dist > 5 ? 'Cámara lejana' : 'Cámara cercana', 'info', 1.6);
+          else { c.carFP = true; c.fpYaw = 0; c.fpPitch = tw ? -0.3 : -0.05; }
+          this.hud.notify(c.carFP ? (tw ? `Primera persona (${input.keyText('V', 13)} para cambiar)` : `Vista desde dentro del coche (${input.keyText('V', 13)} para cambiar)`) : c.dist > 5 ? 'Cámara lejana' : 'Cámara cercana', 'info', 1.6);
         }
         else { this.cam.setFirstPerson(!this.cam.fp); this.cam.fpPref = this.cam.fp; this.hud.notify(`Cámara en ${this.cam.fp ? 'primera' : 'tercera'} persona (${input.keyText('V', 13)} para cambiar)`, 'info', 2); }
       }

@@ -622,6 +622,10 @@ export class CameraRig {
     const rideV = p.mode === 'passenger' && p.ride ? p.ride.v : null;
     // inside the car (driver or passenger): the cabin view
     const inV = (p.mode === 'car' && p.vehicle) || rideV;
+    // on two wheels or a tractor there is no cabin: the rider always shows, and first person is the rider's own eyes
+    const open = inV && (inV.spec.twoWheel || inV.spec.shape === 'tractor');
+    if (open && p.char && !p.char.object.visible) p.char.object.visible = true; // (first person on foot hides the body)
+    if (open && this.carFP) return this.updateRideFP(dt, inV, ldx, ldy, s);
     const cabin = inV && this.carFP && !inV.spec.twoWheel && inV.spec.shape !== 'tractor';
     if (!cabin && this.game.carInterior && this.game.carInterior.v) this.game.carInterior.set(null);
     if (cabin) return this.updateCarFP(dt, inV, rideV ? -1 : 1, ldx, ldy, s);
@@ -641,7 +645,7 @@ export class CameraRig {
       const L = v.spec.L;
       dist = L * 0.95 + 3.2 + Math.min(2.5, v.vel * 0.05);
       tx = v.x; ty = v.spec.H * 0.75 + 0.9; tz = v.z;
-      fovT = 62 + clamp((v.vel - 12) * 0.4, 0, 12);
+      fovT = 62 + clamp((v.vel - 12) * 0.22, 0, 6); // (a little wider at speed: more distorts what is ahead)
     } else {
       const aim = g.weapons && g.weapons.aiming && !p.knock;
       const sk = aim ? 0.65 : 1; // finer mouse while aiming
@@ -752,6 +756,27 @@ export class CameraRig {
     this.fov = damp(this.fov, 70, 6, dt);
     if (Math.abs(this.camera.fov - this.fov) > 0.05) { this.camera.fov = this.fov; this.camera.updateProjectionMatrix(); }
     this.yaw = yaw + Math.PI; // so leaving the car keeps the direction you were looking
+  }
+  // riding (bike, motorbike, tractor): the eyes just in front of the rider's face — the near plane keeps the head out
+  // of sight — the handlebars and the hands below, looking round with the mouse and back ahead when you let go
+  updateRideFP(dt, v, ldx, ldy, s) {
+    const ch = this.game.player.char;
+    this.fpYaw = clamp((this.fpYaw || 0) - ldx * s * 0.8, -2.0, 2.0);
+    this.fpPitch = clamp((this.fpPitch || 0) - ldy * s * 0.8, -0.9, 0.6);
+    if (Math.abs(ldx) + Math.abs(ldy) < 0.5) { this.fpIdle = (this.fpIdle || 0) + dt; if (this.fpIdle > 2) { this.fpYaw = damp(this.fpYaw, 0, 1.5, dt); this.fpPitch = damp(this.fpPitch, -0.3, 1.5, dt); } } else this.fpIdle = 0;
+    const h = v.heading, fx = Math.sin(h), fz = Math.cos(h), e = this._eye || (this._eye = new THREE.Vector3());
+    const head = ch && ch.bones && ch.bones.head;
+    if (head) head.getWorldPosition(e); else e.set(v.x, (v.y || 0) + (v.spec.shape === 'tractor' ? 2.3 : 1.55), v.z);
+    const ex = e.x + fx * 0.16, ey = e.y + 0.08, ez = e.z + fz * 0.16;
+    const yaw = h + this.fpYaw, cp = Math.cos(this.fpPitch);
+    this.pos.set(ex, ey, ez);
+    this.target.set(ex + Math.sin(yaw) * cp, ey + Math.sin(this.fpPitch), ez + Math.cos(yaw) * cp);
+    if (this.shakeAmt > 0.001) { const a = this.shakeAmt * 0.04; this.target.x += (Math.random() - 0.5) * a; this.target.y += (Math.random() - 0.5) * a; this.shakeAmt *= Math.exp(-5 * dt); }
+    this.camera.position.copy(this.pos);
+    this.camera.lookAt(this.target);
+    this.fov = damp(this.fov, 74, 6, dt);
+    if (Math.abs(this.camera.fov - this.fov) > 0.05) { this.camera.fov = this.fov; this.camera.updateProjectionMatrix(); }
+    this.yaw = yaw + Math.PI;
   }
   // inside a container: eyes at the gap under the lid, looking round slowly
   updatePeek(dt, ldx, ldy, s) {

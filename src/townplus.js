@@ -305,8 +305,9 @@ function corbachoSign() {
   x.beginPath(); x.arc(130, 120, 34, 0, 6.283); x.stroke(); x.beginPath(); x.arc(130, 120, 10, 0, 6.283); x.fill();
   x.beginPath(); x.arc(62, 128, 22, 0, 6.283); x.stroke(); x.beginPath(); x.arc(62, 128, 6, 0, 6.283); x.fill();
   x.fillStyle = '#ffffff'; x.textBaseline = 'middle';
-  x.font = 'bold 92px "Arial Black", Arial, sans-serif'; x.fillText('AGRÍCOLA CORBACHO', 196, 84);
-  x.font = 'bold 34px Arial, sans-serif'; x.fillStyle = '#e8f2dc'; x.fillText('TRACTORES  ·  TALLER  ·  RECAMBIOS', 200, 146);
+  const fit = (txt, px, maxW, face) => { let s = px; x.font = face(s); while (x.measureText(txt).width > maxW && s > 16) { s -= 2; x.font = face(s); } };
+  fit('AGRÍCOLA CORBACHO', 92, 1024 - 196 - 28, (s) => `bold ${s}px "Arial Black", Arial, sans-serif`); x.fillText('AGRÍCOLA CORBACHO', 196, 84);
+  fit('TRACTORES  ·  TALLER  ·  RECAMBIOS', 34, 1024 - 200 - 28, (s) => `bold ${s}px Arial, sans-serif`); x.fillStyle = '#e8f2dc'; x.fillText('TRACTORES  ·  TALLER  ·  RECAMBIOS', 200, 146);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
 }
@@ -348,7 +349,7 @@ export function corbacho(L) {
   // front of the workshop's door where yours waits
   const along = Math.atan2(tx, tz);
   L.vehicleSpots = L.vehicleSpots || [];
-  for (const [lx, col] of [[4.4, '#3f8f2a'], [10.0, '#3f8f2a']]) { const [px, pz] = W(lx, 2.7); L.vehicleSpots.push({ x: px, z: pz, heading: along, model: 'tractor', color: col }); }
+  for (const [lx, col] of [[8.7, '#3f8f2a'], [13.3, '#3f8f2a']]) { const [px, pz] = W(lx, 2.6); L.vehicleSpots.push({ x: px, z: pz, heading: along, model: 'tractor', color: col }); } // (past the showroom glass: the way in stays clear)
   const [yx, yz] = W(-7.4, 2.9);
   L.poi.corbacho = { x: res.v.x, z: res.v.z, yard: { x: yx, z: yz, heading: along + Math.PI } };
   palmRoad(L, res);

@@ -155,7 +155,7 @@ export class Input {
   get moveY() { const ar = !this.phoneOpen; return clamp((this.down('KeyW') || (ar && this.down('ArrowUp')) ? 1 : 0) - (this.down('KeyS') || (ar && this.down('ArrowDown')) ? 1 : 0) - this.gpAxis(1) - this.touch.my, -1, 1); }
   get sprint() { return this.down('ShiftLeft') || this.down('ShiftRight') || this.gpBtn(0) || this.touch.buttons.has('sprint'); }
   get jump() { return this.hit('Space') || (!this.gpAim && this.gpPressed(2)) || this.touch.pressed.has('jump'); }
-  get enter() { return this.hit('KeyF') || this.hit('Enter') || this.gpPressed(3) || this.touch.pressed.has('enter'); }
+  get enter() { return this.hit('KeyF') || (!this.phoneOpen && this.hit('Enter')) || this.gpPressed(3) || this.touch.pressed.has('enter'); } // (with the phone open, Intro is the phone's: it tunes the radio)
   get attack() { return this.mouse.leftPressed || (!this.phoneOpen && this.gpPressed(1)) || this.touch.pressed.has('attack'); }
   // combat
   get aim() { return this.mouse.right || (this.gp ? (this.gp.buttons[6]?.value || 0) > 0.4 : false); }

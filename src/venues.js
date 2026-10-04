@@ -65,7 +65,7 @@ function ayuntamiento(origin, seed) {
   for (const sx of [-1, 1]) { K.add(m.wood, boxGeo(1.08, 3.25, 0.07, 1), sx * 0.555, 1.625, 0.05); for (let k = 0; k < 3; k++) K.add(m.wood, boxGeo(0.8, 0.8, 0.02, 1), sx * 0.555, 0.6 + k * 1.05, 0.1); K.add(m.brass, new THREE.SphereGeometry(0.04, 8, 6), sx * 0.12, 1.1, 0.12); }
   // the information counter (right) and the clerk's chair behind it
   K.solid(panel, 3.6, 1.05, 0.6, 5.6, 0, 4.4); K.box(m.granite, 3.8, 0.05, 0.7, 5.6, 1.05, 4.4);
-  K.picture(textTexture('info', 'INFORMACIÓN · REGISTRO', { w: 512, h: 96, bg: '#1f3a5a', fg: '#ffffff', font: 'bold 40px Arial' }), 5.6, 2.6, D - 0.06, Math.PI, 2.6, 0.5, null);
+  K.picture(textTexture('info', 'INFORMACIÓN · REGISTRO', { w: 512, h: 96, bg: '#1f3a5a', fg: '#ffffff', font: 'bold 40px Arial' }), 5.6, 2.6, D - 0.09, Math.PI, 2.6, 0.5, null);
   K.chair(5.6, 5.3, Math.PI, m.wood, velvet);
   K.box(m.dark, 0.5, 0.35, 0.35, 4.8, 1.1, 4.45); K.box(m.dark, 0.48, 0.3, 0.02, 4.8, 1.5, 4.65); // a computer
   B.interact({ type: 'info', x: 5.6, z: 3.3, r: 1.3, label: 'Hablar con la funcionaria', text: '«Buenos días. Para el padrón, el registro o pedir cita, aquí mismo. El Salón de Plenos está arriba: hoy está abierto al público.»' });
@@ -86,12 +86,12 @@ function ayuntamiento(origin, seed) {
   K.plant(-hw + 0.5, 0.7); K.plant(hw - 0.5, 0.7); K.plant(-3.2, 7.8, 1.2); K.plant(3.2, 7.8, 1.2);
   [['Secretaría', hw, 8.0], ['Intervención', hw, 11.0], ['Urbanismo', hw, 13.6], ['Archivo', -hw, 12.5]].forEach(([t, x, z]) => {
     K.shutDoor(x - Math.sign(x) * 0.05, z, -Math.sign(x) * Math.PI / 2);
-    K.picture(textTexture('dp:' + t, t, { w: 256, h: 64, bg: '#f2ede2', fg: '#2a2a2a', font: 'bold 34px Arial' }), x - Math.sign(x) * 0.07, 2.45, z, -Math.sign(x) * Math.PI / 2, 0.6, 0.15, null);
+    K.picture(textTexture('dp:' + t, t, { w: 256, h: 64, bg: '#f2ede2', fg: '#2a2a2a', font: 'bold 34px Arial' }), x - Math.sign(x) * 0.09, 2.45, z, -Math.sign(x) * Math.PI / 2, 0.6, 0.15, null);
   });
   B.interact({ type: 'info', x: hw - 1.0, z: 11, r: 1.2, label: 'Despachos', text: 'Las puertas de Secretaría, Intervención y Urbanismo están cerradas: se atiende con cita previa.' });
   // the coat of arms over the stairs, a plaque
-  K.picture(escudoTex(), 0, 3.3, D - 0.06, Math.PI, 1.3, 1.3, null);
-  K.picture(textTexture('casa', 'CASA CONSISTORIAL', { w: 512, h: 96, bg: '#d8c8a0', fg: '#3a2a18', font: 'bold 44px Georgia' }), -4.6, 2.6, D - 0.06, Math.PI, 1.8, 0.34, m.brass);
+  K.picture(escudoTex(), 0, 3.3, D - 0.09, Math.PI, 1.3, 1.3, null);
+  K.picture(textTexture('casa', 'CASA CONSISTORIAL', { w: 512, h: 96, bg: '#d8c8a0', fg: '#3a2a18', font: 'bold 44px Georgia' }), -4.6, 2.6, D - 0.09, Math.PI, 1.8, 0.34, m.brass);
   // ---- the staircase: up from the hall (left flight), the landing at the back, the second flight back (right)
   const sx0 = -2.6, sx1 = 2.6, z0 = 8.5, zl = 12.9, z2 = 14.8, yl = F2 / 2;
   K.stairs(m.granite, sx0, -0.6, z0, zl, 0, yl, 1);
@@ -126,7 +126,7 @@ function ayuntamiento(origin, seed) {
   for (const z of [2.6, 3.6, 4.6, 5.6]) K.chair(-hw + 1.1, z, Math.PI / 2, panel, velvet, z === 4.6 || z === 3.6);
   K.add(m.brass, new THREE.CylinderGeometry(0.06, 0.08, 0.04, 10), -hw + 2.2, F2 + 1.05, 4.1); K.add(m.brass, new THREE.CylinderGeometry(0.008, 0.008, 0.3, 4), -hw + 2.2, F2 + 1.22, 4.1); // the microphone
   K.yAt = F2;
-  K.picture(escudoTex(), -hw + 0.06, F2 + 2.6, 4.1, Math.PI / 2, 1.5, 1.5, null);
+  K.picture(escudoTex(), -hw + 0.09, F2 + 2.6, 4.1, Math.PI / 2, 1.5, 1.5, null);
   for (const [k, z] of [['es', 5.9], ['ex', 6.5], ['eu', 7.1]]) K.flag(-hw + 0.6, z, k);
   K.add(panel, boxGeo(0.06, 1.2, 8.2, 1), -hw + 0.03, F2 + 0.6, 4.15);
   // the councillors: two rows of desks facing each other along the room
@@ -141,14 +141,14 @@ function ayuntamiento(origin, seed) {
   // the walls: a dado of wood, portraits of mayors gone, a big painting of the Vegas
   for (const [ax, az, bx, bz] of [[-hw + 0.05, 8.25, hw - 0.05, 8.25], [hw - 0.05, 0.1, hw - 0.05, 8.2]]) { const L = Math.hypot(bx - ax, bz - az), g = boxGeo(L, 1.1, 0.04, 1); g.rotateY(Math.atan2(-(bz - az), bx - ax)); K.add(panel, g, (ax + bx) / 2, F2 + 0.55, (az + bz) / 2); }
   for (let i = 0; i < 5; i++) K.picture(paintingTexture('retrato', { w: 192, h: 240, seed: 70 + i }), -5.4 + i * 2.3, F2 + 2.4, 8.22, Math.PI, 0.7, 0.88, B.mat('a_gilt', () => std(0xc8a050, { roughness: 0.35, metalness: 0.7 })));
-  K.picture(paintingTexture('vegas', { w: 384, h: 192, seed: 3 }), hw - 0.06, F2 + 2.4, 4.2, -Math.PI / 2, 3.4, 1.7, B.mat('a_gilt', () => std(0xc8a050, { roughness: 0.35, metalness: 0.7 })));
+  K.picture(paintingTexture('vegas', { w: 384, h: 192, seed: 3 }), hw - 0.09, F2 + 2.4, 4.2, -Math.PI / 2, 3.4, 1.7, B.mat('a_gilt', () => std(0xc8a050, { roughness: 0.35, metalness: 0.7 })));
   K.chandelier(-2.4, F2 + H2 - 1.0, 4.1, 0.8, 10); K.chandelier(3.2, F2 + H2 - 1.0, 4.1, 0.8, 10);
   // up here: the mayor's chair, the corridor's doors (the Alcaldía), the plaques
   B.interact({ type: 'alcalde', x: -hw + 2.1, z: 4.1, y: F2, r: 1.2, label: 'Sentarte en el sillón del alcalde', sx: K.ox - hw + 1.1, sz: K.oz + 4.1, sy: F2 + 0.25, h: Math.PI / 2 });
   B.interact({ type: 'info', x: -2.0, z: 6.0, y: F2, r: 2.2, label: 'El Salón de Plenos', text: 'Aquí se reúne la Corporación municipal: el alcalde y los concejales, de cara al pueblo, bajo el escudo de Guareña. Por los balcones se ve la Plaza de España.' });
   K.yAt = F2;
   K.shutDoor(4.6, D - 0.05, Math.PI, 1.6, 2.4, panel);
-  K.picture(textTexture('alc', 'ALCALDÍA', { w: 256, h: 64, bg: '#2a2a2a', fg: '#e8d090', font: 'bold 36px Georgia' }), 4.6, F2 + 2.75, D - 0.07, Math.PI, 0.8, 0.2, null);
+  K.picture(textTexture('alc', 'ALCALDÍA', { w: 256, h: 64, bg: '#2a2a2a', fg: '#e8d090', font: 'bold 36px Georgia' }), 4.6, F2 + 2.75, D - 0.09, Math.PI, 0.8, 0.2, null);
   B.interact({ type: 'info', x: 4.6, z: D - 1.0, y: F2, r: 1.2, label: 'Alcaldía', text: 'La puerta del despacho del alcalde está cerrada. Dentro se oye el teléfono.' });
   K.plant(-hw + 0.6, D - 0.6); K.plant(hw - 0.6, 9.0);
   K.chandelier(0, H1 - 0.9, 4.0, 0.6, 8);
@@ -196,7 +196,7 @@ function teatro(origin, seed) {
   K.box(B.mat('t_glass', () => std(0x9ab0b8, { roughness: 0.1, transparent: true, opacity: 0.35 })), 2.6, 0.9, 0.03, -hw + 1.6, 1.15, 3.3);
   K.picture(textTexture('taquilla', 'TAQUILLA', { w: 512, h: 96, bg: '#2a1a1c', fg: '#e8c070', font: 'bold 54px Georgia' }), -hw + 1.6, 2.6, 3.95, Math.PI, 1.8, 0.34, null);
   const plays = [['ESCÉNICAS', 'Festival de teatro\ny danza de Guareña\nJULIO', '#1e2a44', '#ffffff', '#c8402e'], ['LA VIDA\nES SUEÑO', 'Calderón de la Barca\nEscuela Municipal\nde Teatro', '#2a1a10', '#f2e0b0', '#8a2a1a'], ['DON JUAN\nTENORIO', 'José Zorrilla\nNoviembre\nCasa de la Cultura', '#101a2a', '#e8e0d0', '#5a6a8a'], ['CINE DE\nVERANO', 'Todos los viernes\na las 22:30 h\nen el patio', '#0e2a2a', '#f2f0d8', '#d89a2a']];
-  plays.forEach(([t, sub, bg, fg, ac], i) => K.picture(posterTex('pl' + i, t, sub, bg, fg, ac), hw - 0.07, 1.8, 1.2 + i * 1.15, -Math.PI / 2, 0.75, 1.05, m.metal));
+  plays.forEach(([t, sub, bg, fg, ac], i) => K.picture(posterTex('pl' + i, t, sub, bg, fg, ac), hw - 0.09, 1.8, 1.2 + i * 1.15, -Math.PI / 2, 0.75, 1.05, m.metal));
   B.interact({ type: 'info', x: hw - 1.0, z: 2.9, r: 1.6, label: 'Mirar la cartelera', text: 'Escénicas, el festival de teatro y danza de julio; «La vida es sueño» por la Escuela Municipal de Teatro; el Tenorio de noviembre; el cine de verano en el patio.' });
   B.interact({ type: 'taquilla', x: -hw + 1.6, z: 2.6, r: 1.2, label: 'Comprar una entrada <small>(5 €)</small>' });
   K.bench(hw - 0.5, 4.9, -Math.PI / 2, 1.6, m.wood);
@@ -473,8 +473,8 @@ function pabellon(origin, seed) {
   // the scoreboard on the far wall, the doors of the changing rooms, a banner
   K.picture(canvasTexture('marcador', 512, 192, (x, w, hh) => { x.fillStyle = '#0c0c0e'; x.fillRect(0, 0, w, hh); x.font = 'bold 30px Arial'; x.fillStyle = '#f2f2f2'; x.textAlign = 'center'; x.fillText('LOCAL', 110, 40); x.fillText('VISITANTE', 402, 40); x.font = 'bold 96px "Courier New", monospace'; x.fillStyle = '#ff3b2a'; x.fillText('3', 110, 140); x.fillText('2', 402, 140); x.fillStyle = '#f2c230'; x.font = 'bold 60px "Courier New", monospace'; x.fillText('14:37', 256, 120); x.font = 'bold 22px Arial'; x.fillStyle = '#9ad0f0'; x.fillText('2º TIEMPO', 256, 170); }), 0, 6.4, D - 0.06, Math.PI, 3.6, 1.35, m.iron);
   for (const [z, tx] of [[8, 'VESTUARIO 1'], [14, 'VESTUARIO 2'], [30, 'ALMACÉN'], [36, 'ÁRBITROS']]) { K.shutDoor(-hw + 0.05, z, Math.PI / 2, 1.0, 2.15); K.picture(textTexture('pd:' + tx, tx, { w: 384, h: 96, bg: '#f2f2ee', fg: '#1f3f6a', font: 'bold 44px Arial' }), -hw + 0.06, 2.55, z, Math.PI / 2, 0.9, 0.22, null); }
-  K.picture(textTexture('pab_banner', 'PABELLÓN MUNICIPAL LA ENCINA', { w: 1024, h: 128, bg: '#1f5fa8', fg: '#ffffff', font: 'bold 64px Arial' }), -hw + 0.06, 5.0, D / 2, Math.PI / 2, 10, 1.25, null);
-  K.picture(textTexture('pab_fair', 'JUEGO LIMPIO · RESPETO · DEPORTE', { w: 1024, h: 128, bg: '#f2c230', fg: '#1f3f6a', font: 'bold 60px Arial' }), 0, 4.6, 0.07, 0, 8, 1.0, null);
+  K.picture(textTexture('pab_banner', 'PABELLÓN MUNICIPAL LA ENCINA', { w: 1024, h: 128, bg: '#1f5fa8', fg: '#ffffff', font: 'bold 64px Arial' }), -hw + 0.09, 5.0, D / 2, Math.PI / 2, 10, 1.25, null);
+  K.picture(textTexture('pab_fair', 'JUEGO LIMPIO · RESPETO · DEPORTE', { w: 1024, h: 128, bg: '#f2c230', fg: '#1f3f6a', font: 'bold 60px Arial' }), 0, 4.6, 0.09, 0, 8, 1.0, null);
   const h = K.finish({ kind: 'pabellon', daylight: { sun: 0.15, hemi: 0.6 } });
   h.ceilY = () => H;
   h.spots.entrada = { x: K.ox, z: K.oz + 1.6, h: 0 };
@@ -543,18 +543,26 @@ function corbacho(origin, seed) {
   B.segs.push([K.ox - 1.2, K.oz + 0.06, K.ox + 1.2, K.oz + 0.06, 3]);
   for (const sx of [-1, 1]) K.window(sx * 3.75, 0.02, 0, 4.2, 2.7, 0.3);
   K.wall(wall, -hw, 0, -hw, ZW, H); K.wall(wall, hw, 0, hw, ZW, H);
-  K.wall(wallW, -hw, ZW, -hw, D, H, [[3, 7, 0, 4.2]]); K.wall(wallW, hw, ZW, hw, D, H); K.wall(wallW, -hw, D, hw, D, H);
+  K.wall(wallW, -hw, ZW, -hw, D, H); K.wall(wallW, hw, ZW, hw, D, H); K.wall(wallW, -hw, D, hw, D, H);
+  // the workshop's side gate, its roller shutter down (an opening there would show the street at the front: every
+  // opening of an interior looks out from its street door)
+  K.picture(canvasTexture('corb_roll', 128, 256, (x, w, hh) => {
+    x.fillStyle = '#9da3a6'; x.fillRect(0, 0, w, hh);
+    for (let i = 0; i < hh; i += 8) { x.fillStyle = (i / 8) % 2 ? '#aeb4b7' : '#8f9598'; x.fillRect(0, i, w, 5); x.fillStyle = 'rgba(0,0,0,0.18)'; x.fillRect(0, i + 6, w, 1); }
+    x.fillStyle = '#5d6366'; x.fillRect(0, 0, 6, hh); x.fillRect(w - 6, 0, 6, hh); x.fillRect(0, hh - 10, w, 10);
+    x.fillStyle = '#3a3e40'; x.fillRect(w / 2 - 10, hh - 26, 20, 6);
+  }), -hw + 0.09, 2.1, ZW + 5, Math.PI / 2, 4.0, 4.2, null);
   K.wall(wall, -hw, ZW, hw, ZW, H, [[hw - 3.2, hw + 3.2, 0, 4.4]]);
   for (const [ax, az, bx2, bz] of [[-hw + 0.05, 0, -hw + 0.05, ZW], [hw - 0.05, 0, hw - 0.05, ZW], [-hw, ZW - 0.05, -3.2, ZW - 0.05], [3.2, ZW - 0.05, hw, ZW - 0.05]]) { const L2 = Math.hypot(bx2 - ax, bz - az), g = boxGeo(L2, 0.35, 0.03, 1); g.rotateY(Math.atan2(-(bz - az), bx2 - ax)); K.add(green, g, (ax + bx2) / 2, 2.75, (az + bz) / 2); } // the green band round the showroom
   K.ceiling(ceil, -hw, 0, hw, ZW, H, 2);
   K.ceiling(wallW, -hw, ZW, hw, D, H, 4);
   for (let i = 0; i < 4; i++) K.add(steel, boxGeo(W, 0.3, 0.2, 1), 0, H - 0.4, ZW + 1.5 + i * 3); // the workshop's steel trusses
   // ---- the big sign over the opening (our own lettering) and the posters
-  K.picture(canvasTexture('corb_sign', 1024, 200, (x, w, hh) => { x.fillStyle = '#2f7a2e'; x.fillRect(0, 0, w, hh); x.fillStyle = '#f2c230'; x.fillRect(0, hh - 30, w, 12); x.fillStyle = '#ffffff'; x.font = 'bold 92px "Arial Black", Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('AGRÍCOLA CORBACHO', w / 2, 82); x.font = 'bold 32px Arial'; x.fillStyle = '#e8f2dc'; x.fillText('TRACTORES · TALLER · RECAMBIOS · GUAREÑA', w / 2, 146); }), 0, 5.0, ZW - 0.08, Math.PI, 7.5, 1.45, null);
+  K.picture(canvasTexture('corb_sign', 1024, 200, (x, w, hh) => { x.fillStyle = '#2f7a2e'; x.fillRect(0, 0, w, hh); x.fillStyle = '#f2c230'; x.fillRect(0, hh - 30, w, 12); x.fillStyle = '#ffffff'; x.textAlign = 'center'; x.textBaseline = 'middle'; const fit = (t, px, face) => { let s2 = px; x.font = face(s2); while (x.measureText(t).width > w - 60 && s2 > 16) { s2 -= 2; x.font = face(s2); } }; fit('AGRÍCOLA CORBACHO', 92, (s2) => `bold ${s2}px "Arial Black", Arial, sans-serif`); x.fillText('AGRÍCOLA CORBACHO', w / 2, 82); fit('TRACTORES · TALLER · RECAMBIOS · GUAREÑA', 32, (s2) => `bold ${s2}px Arial`); x.fillStyle = '#e8f2dc'; x.fillText('TRACTORES · TALLER · RECAMBIOS · GUAREÑA', w / 2, 146); }), 0, 5.0, ZW - 0.09, Math.PI, 7.5, 1.45, null);
   const poster = (key, title, sub, bg) => canvasTexture('cp:' + key, 256, 360, (x, w, hh) => { x.fillStyle = bg; x.fillRect(0, 0, w, hh); x.fillStyle = '#f2c230'; x.fillRect(0, 0, w, 28); x.fillStyle = '#ffffff'; x.textAlign = 'center'; x.font = 'bold 30px Arial'; title.split('\n').forEach((t, i) => x.fillText(t, w / 2, 90 + i * 36)); x.font = '18px Arial'; sub.split('\n').forEach((t, i) => x.fillText(t, w / 2, 210 + i * 26)); x.font = 'bold 14px Arial'; x.fillText('AGRÍCOLA CORBACHO', w / 2, hh - 16); });
-  K.picture(poster('nuevos', 'TRACTORES\nNUEVOS Y\nDE OCASIÓN', 'Financiación\na tu medida', '#2f7a2e'), -hw + 0.04, 1.9, 4.0, Math.PI / 2, 0.9, 1.26);
-  K.picture(poster('taller', 'TALLER\nOFICIAL', 'Revisiones · Averías\nPreparación ITV', '#24602a'), -hw + 0.04, 1.9, 7.0, Math.PI / 2, 0.9, 1.26);
-  K.picture(poster('riego', 'CAMPAÑA\nDEL TOMATE', 'Pon a punto tu\ntractor antes de julio', '#b8562a'), hw - 0.04, 1.9, 10.2, -Math.PI / 2, 0.9, 1.26);
+  K.picture(poster('nuevos', 'TRACTORES\nNUEVOS Y\nDE OCASIÓN', 'Financiación\na tu medida', '#2f7a2e'), -hw + 0.09, 1.9, 4.0, Math.PI / 2, 0.9, 1.26);
+  K.picture(poster('taller', 'TALLER\nOFICIAL', 'Revisiones · Averías\nPreparación ITV', '#24602a'), -hw + 0.09, 1.9, 7.0, Math.PI / 2, 0.9, 1.26);
+  K.picture(poster('riego', 'CAMPAÑA\nDEL TOMATE', 'Pon a punto tu\ntractor antes de julio', '#b8562a'), hw - 0.09, 1.9, 10.2, -Math.PI / 2, 0.9, 1.26);
   // ---- the two new tractors on display, a little turned towards the door
   tractorMesh(K, -4.2, 6.2, 0.55, paint);
   tractorMesh(K, 4.0, 5.6, -0.6, paint);
