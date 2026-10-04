@@ -795,7 +795,7 @@ function makeCharMaterial(uniforms) {
     #endif
     vHairT = normalize((modelViewMatrix * vec4(g, 0.0)).xyz);
   }`);
-    sh.fragmentShader = sh.fragmentShader
+    sh.fragmentShader = (STYLE.miniatura ? '#define CLAY_SCALE 2.5\n' : '') + sh.fragmentShader
       .replace('#include <common>', '#include <common>' + CHAR_FS_HEAD + CHAR_FS_CLOTH)
       .replace('#include <color_fragment>', `#include <color_fragment>
 {
@@ -1041,7 +1041,7 @@ function makeCharMaterial(uniforms) {
         'reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );',
         'reflectedLight.directDiffuse += (gSkin > 0.5 ? cSkinIrr(dot(geometryNormal, directLight.direction)) * directLight.color : irradiance) * BRDF_Lambert( material.diffuseColor );'))
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-roughnessFactor = gRough;`)
+roughnessFactor = ${STYLE.miniatura ? 'mix(gRough, 0.5, 0.6); diffuseColor.rgb *= 1.0 - gClayDark' : 'gRough'};`) // (the miniature: figures of modelling clay, a waxy sheen, its prints over the clothes' own colours)
       .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
 metalnessFactor = gMetal;`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>

@@ -11,7 +11,8 @@ try { ({ GameAudio } = await import('./audio.js')); } catch (e) { console.warn('
 if (typeof GameAudio !== 'function') ({ GameAudio } = await import('./audio_stub.js'));
 import { safeStorage, clamp, readSave } from './util.js';
 import { applyDioramaPalette } from './textures.js';
-import { STYLE, setStyle } from './style.js';
+import { installClayChunks } from './diorama.js';
+import { STYLE, setStyle, LOOK_NAMES } from './style.js';
 import { installToonChunks, LOOKS } from './toon.js';
 import { INTRO, introPlan, droneAt, coverFov, IntroFlight } from './intro.js';
 
@@ -81,6 +82,7 @@ async function boot(hot = {}) {
   setStyle(style || 'anime');
   if (STYLE.anime) installToonChunks();
   if (STYLE.diorama) applyDioramaPalette(); // (the façades in the diorama's palette, before the town is painted)
+  if (STYLE.miniatura) installClayChunks(); // (the miniature: modelling clay on every lit surface, before anything is made)
   document.body.dataset.look = STYLE.name;
   // the anime look comes in without a menu: the drone's picture of the town drifts closer while it is built
   const intro = STYLE.anime && !hot.resume ? introPicture() : null;
@@ -618,7 +620,8 @@ function settingsHtml() {
   const times = [['Mañana', 10], ['Tarde', 17], ['Atardecer', 19.9], ['Noche', 23]];
   return `
     <div class="setting"><span>Calidad gráfica <small style="opacity:.6">(se aplica al recargar)</small></span><span class="seg" id="sQ">${Object.entries(QUALITY).map(([k, v]) => `<button data-q="${k}" class="${k === q ? 'on' : ''}">${v.name}</button>`).join('')}</span></div>
-    <div class="setting"><span>Estética <small style="opacity:.6">(Manga y Acuarela al momento; Realista y Diorama al recargar)</small></span><span class="seg" id="sLook">${[...LOOKS.map((l) => [l.id, l.id === 'acuarela' ? 'Acuarela' : l.name]), ['real', 'Realista'], ['diorama', 'Diorama']].map(([id, n]) => `<button data-look="${id}" class="${(STYLE.anime ? (game.toon && game.toon.look) || 'manga' : STYLE.name) === id ? 'on' : ''}">${n}</button>`).join('')}</span></div>
+    <div class="setting"><span>Estética <small style="opacity:.6">(Manga y Acuarela al momento; las demás al recargar)</small></span><span class="seg" id="sLook">${[...LOOKS.map((l) => [l.id, l.id === 'acuarela' ? 'Acuarela' : l.name]), ['real', 'Realista'], ['diorama', 'Diorama'], ['miniatura', 'Miniatura']].map(([id, n]) => `<button data-look="${id}" class="${(STYLE.anime ? (game.toon && game.toon.look) || 'manga' : STYLE.name) === id ? 'on' : ''}">${n}</button>`).join('')}</span></div>
+    ${STYLE.miniatura ? `<div class="setting"><span>Stop motion <small style="opacity:.6">(la imagen cambia 12 veces por segundo, como la plastilina animada)</small></span><span class="seg" id="sSM"><button data-sm="on" class="${game.save.stopMotion !== false ? 'on' : ''}">Sí</button><button data-sm="off" class="${game.save.stopMotion === false ? 'on' : ''}">No</button></span></div>` : ''}
     <div class="setting"><span>Resolución <small style="opacity:.6">(automática: baja un poco solo si el juego va a tirones)</small></span><span class="seg" id="sR"><button data-r="auto" class="${game.save.dynRes !== false ? 'on' : ''}">Automática</button><button data-r="fija" class="${game.save.dynRes === false ? 'on' : ''}">Fija</button></span></div>
     <div class="setting"><span>Hora del día</span><span class="seg" id="sT">${times.map(([n, h]) => `<button data-h="${h}">${n}</button>`).join('')}</span></div>
     ${STYLE.anime ? `<div class="setting"><span>Música lo-fi <small style="opacity:.6">(suena bajito mientras paseas)</small></span><span class="seg" id="sL"><button data-l="on" class="${game.save.lofi !== false ? 'on' : ''}">Sí</button><button data-l="off" class="${game.save.lofi === false ? 'on' : ''}">No</button></span></div>` : ''}
@@ -645,9 +648,9 @@ function bindSettings() {
     } else if (rl) rl.remove();
   }));
   document.querySelectorAll('#sLook button').forEach((b) => (b.onclick = () => {
-    // Manga and Acuarela are the anime look's own (they change at once); Realista and Diorama are built differently
-    // from the start: those take a reload
-    const id = b.dataset.look, base = id === 'real' || id === 'diorama' ? id : 'anime';
+    // Manga and Acuarela are the anime look's own (they change at once); Realista, Diorama and Miniatura are built
+    // differently from the start: those take a reload
+    const id = b.dataset.look, base = LOOK_NAMES.includes(id) ? id : 'anime';
     if (base === 'anime') game.save.look = id;
     game.save.style = base; game.persist();
     document.querySelectorAll('#sLook button').forEach((x) => x.classList.toggle('on', x === b));
@@ -655,6 +658,7 @@ function bindSettings() {
     if (base === STYLE.name) { if (game.toon) game.toon.setLook(id); if (game.state !== 'play') game.render(); if (rl) rl.remove(); return; }
     if (!rl) { rl = document.createElement('button'); rl.id = 'sLookReload'; rl.className = 'btn ghost'; rl.style.cssText = 'margin-left:8px;padding:6px 12px;font-size:14px'; rl.textContent = 'Recargar ahora'; rl.onclick = () => { game.persist(); location.reload(); }; seg.after(rl); }
   }));
+  document.querySelectorAll('#sSM button').forEach((b) => (b.onclick = () => { game.save.stopMotion = b.dataset.sm === 'on'; game.persist(); document.querySelectorAll('#sSM button').forEach((x) => x.classList.toggle('on', x === b)); }));
   document.querySelectorAll('#sR button').forEach((b) => (b.onclick = () => { game.save.dynRes = b.dataset.r === 'auto'; game.persist(); document.querySelectorAll('#sR button').forEach((x) => x.classList.toggle('on', x === b)); }));
   document.querySelectorAll('#sL button').forEach((b) => (b.onclick = () => { game.save.lofi = b.dataset.l === 'on'; game.persist(); document.querySelectorAll('#sL button').forEach((x) => x.classList.toggle('on', x === b)); }));
   document.querySelectorAll('#sT button').forEach((b) => (b.onclick = () => { game.sky.hour = parseFloat(b.dataset.h); game.sky.update(0, game.camera.position, true); game.render(); }));

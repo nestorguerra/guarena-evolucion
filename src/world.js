@@ -68,8 +68,8 @@ export class World {
     await step('Colocando tejas árabes…', 0.34);
     // CC0 photo-scanned materials (Poly Haven) for plaster, brick, granite and clay tiles
     const dS = q.photo || (q.texSize >= 512 ? 512 : 256); // photo scans at 1K on high quality
-    // (the anime look paints its walls flat: no photographs)
-    const [dA, dN] = STYLE.anime ? [{ tex: null, mean: null, any: false }, null] : await Promise.all([
+    // (the anime look paints its walls flat, the miniature models them in clay: no photographs)
+    const [dA, dN] = STYLE.anime || STYLE.miniatura ? [{ tex: null, mean: null, any: false }, null] : await Promise.all([
       loadTextureArray(DETAIL_LAYERS, '_d', dS, { aniso: q.aniso }),
       q.shadows > 0 ? loadTextureArray(DETAIL_LAYERS, '_n', Math.min(dS, 512), { srgb: false, aniso: q.aniso, flat: [128, 128, 255, 255] }) : Promise.resolve(null),
     ]);
@@ -147,7 +147,7 @@ void main(){
     this.groundData = G;
     // CC0 photo-scanned ground (asphalt, concrete, dry earth, gravel, grass) + the zone map for the imperfections
     const gS = q.photo || (q.texSize >= 512 ? 512 : 256);
-    const [gA, gN] = STYLE.anime ? [{ tex: null, mean: null, any: false }, null] : await Promise.all([
+    const [gA, gN] = STYLE.anime || STYLE.miniatura ? [{ tex: null, mean: null, any: false }, null] : await Promise.all([
       loadTextureArray(GROUND_DETAIL, '_d', gS, { aniso: q.aniso }),
       q.shadows > 0 ? loadTextureArray(GROUND_DETAIL, '_n', Math.min(gS, 512), { srgb: false, aniso: q.aniso, flat: [128, 128, 255, 255] }) : Promise.resolve(null),
     ]);

@@ -20,10 +20,10 @@ Desde la versión 32 se ve **como un anime**, inspirado en la estética del jueg
 dibujados a partir de la profundidad, texturas repintadas en colores planos, cielo turquesa con nubes planas, árboles de
 copas redondeadas y caras de ojos grandes y piel lisa.
 
-En *Ajustes › Estética* hay cuatro formas de verlo: **Manga**, **Acuarela** (la Acuarela de dehesa: aguadas claras
+En *Ajustes › Estética* hay cinco formas de verlo: **Manga**, **Acuarela** (la Acuarela de dehesa: aguadas claras
 sobre papel de grano, el pigmento acumulado donde se tocan dos colores, el papel en blanco para las luces y un lápiz
-suave debajo), **Realista** (el aspecto fotográfico de antes) y **Diorama**. Manga y Acuarela cambian al momento;
-Realista y Diorama, al recargar.
+suave debajo), **Realista** (el aspecto fotográfico de antes), **Diorama** y **Miniatura**. Manga y Acuarela cambian al
+momento; las demás, al recargar.
 
 La **Diorama** sigue la especificación visual «realismo estilizado cálido con acabado de diorama artesanal»: cal marfil y
 crema con su grano, zócalos ocre tostado, tejas terracota, puertas verde profundo con jambas de piedra arenisca, rejas
@@ -34,6 +34,14 @@ rugosidades, oclusión, gradación final) y en las ramas `STYLE.diorama` del cie
 compararla con las otras: `tools/lookcompare.js` (las tres vistas de prueba —hacia Santa María, una calle estrecha y un
 cruce— con la cámara y la luz fijas, más plaza, atardecer, noche, un coche, el campo y el pueblo desde arriba, y la
 medida del tiempo por fotograma).
+
+La **Miniatura** es el pueblo como una maqueta artesanal de plastilina fotografiada con un objetivo macro: efecto
+tilt-shift (una franja estrecha nítida —la del personaje, a su distancia— y un desenfoque fuerte delante y detrás), luz
+de hora dorada todo el día con sombras largas y suaves, colores cálidos y saturados, todas las superficies de
+plastilina con huellas dactilares y un brillo céreo (las figuras, con huellas a su escala) y **stop motion a 12
+fotogramas por segundo**: la imagen cambia 12 veces por segundo, retocando la plastilina en cada una, mientras el juego
+sigue igual (cámara, personajes y acción). El stop motion se puede quitar en *Ajustes*. Está en `src/diorama.js`
+(`MINIATURA`, `TiltShift`, `installClayChunks`). `tools/lookcompare.js` graba también el paseo en vídeo (`walkVideo`).
 
 ![Guareña desde el aire: la Iglesia de Santa María y la Plaza de España con el Ayuntamiento](docs/portada.jpg)
 
