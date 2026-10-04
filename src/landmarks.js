@@ -9,6 +9,7 @@ import { makeFurnitureGeometries } from './props.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { westPortal, southPortal, northPortal } from './churchdoors.js';
 import { fountain, plazaDetails, updateWater, cultura, mercadoFront, corbacho, pabellonFront, entranceLetters, meridaRoad, avenida } from './townplus.js';
+import { buildSchools } from './schools.js';
 import { buildPools } from './pools.js';
 
 const toLocal = (lat, lon, origin) => {
@@ -284,6 +285,7 @@ class Landmarks {
     this.tanks();
     this.stadium();
     this.services();
+    buildSchools(this); // (src/schools.js: fences, gates, flags and yards of the schools)
     // traffic signs and the town entry boards now come from signs.js (built with the street furniture)
     this.terraces();
     this.plazaTrees();

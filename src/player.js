@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { STYLE } from './style.js';
 import { clamp, lerp, damp, dampAngle, wrapAngle, smoothstep, polyNearest, polySample, TAU } from './util.js';
 import { springCharacter, springAngle } from './springs.js';
-import { PERK, setPerk } from './perks.js';
+import { PERK, setPerk, applyFitness } from './perks.js';
 
 const WALK = 1.7, JOG = 3.6, SPRINT = 6.4, CROUCH = 1.15;
 // on foot you walk at everybody's pace; keep going for RUN_AFTER seconds and you break into a run; Shift sprints
@@ -31,9 +31,15 @@ export class Player {
   setCharacter(ch) {
     if (this.char) { this.game.scene.remove(this.char.object); this.char.dispose(); }
     this.char = ch;
-    setPerk(ch.desc && (ch.desc.perk || ch.desc.id));
+    this.applyPerks();
     this.game.scene.add(ch.object);
     ch.object.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+  // the character's edge, and what the gym has added
+  applyPerks() {
+    const ch = this.char;
+    setPerk(ch && ch.desc && (ch.desc.perk || ch.desc.id));
+    applyFitness(this.game.save && this.game.save.fitness);
   }
   spawnAt(x, z, heading = 0) {
     this.pos.set(x, 0, z);
@@ -60,6 +66,7 @@ export class Player {
     if (this.mode === 'passenger') return this.updatePassenger(dt, input);
     if (this.mode === 'hidden') return this.updateHidden(dt, input);
     if (this.mode === 'sit') return this.updateSit(dt, input);
+    if (this.mode === 'swim') return this.updateSwim(dt, input, camYaw);
     if (this.knock) return this.updateKnock(dt);
     // safety net: never stay trapped inside a building (bad save, glitchy push…)
     this.wallT = (this.wallT || 0) + dt;
@@ -214,6 +221,8 @@ export class Player {
     if (ch.rag) { ch.ragPos(this.pos); this.pos.y = ch.rag.floorY; return; }
     o.position.copy(this.pos);
     o.rotation.set(0, this.heading, 0);
+    // swimming: the body in the water up to the shoulders (a little higher when stretched out in the crawl)
+    if (this.mode === 'swim' && this.swim) o.position.y = this.swim.pool.y - (1.36 - 0.22 * smoothstep(0.12, 0.8, this.swim.sp)) * ((ch.isHero ? 1 : ch.scale) || 1);
     if (ch.afterMove) ch.afterMove(); // (the hero's feet locked to the ground, now that the body is where it goes)
   }
   // the floor and the walls a falling body meets (indoors too)
@@ -463,6 +472,77 @@ export class Player {
     this.char.update(dt, 0, { fidget: false });
     this.syncChar();
   }
+  // ---------------- swimming in the municipal pool: in the water up to the shoulders, inside its walls. You swim the
+  // way you face (a swimmer turns, it does not side-step); Mayús swims faster and tires; out by a ladder or the edge
+  startSwim(pool, x, z, dive = false) {
+    const g = this.game;
+    if (g.weapons) { g.weapons.aiming = false; if (g.weapons.cur !== 'punos') { g.weapons.select('punos'); if (g.weapons.syncModel) g.weapons.syncModel(this.char); } }
+    this.mode = 'swim'; this.swim = { pool, t: 0, stroke: 0, sp: dive ? 1.2 : 0 };
+    this.crouch = false; this.vel.set(0, 0, 0); this.pos.set(x, 0, z);
+    // facing along the water, away from the nearer end
+    const lx = (x - pool.cx) * pool.ux + (z - pool.cz) * pool.uz, sgn = lx > 0 ? -1 : 1;
+    this.heading = Math.atan2(pool.ux * sgn, pool.uz * sgn);
+    this.char.setBase('swim');
+    g.audio.sfx('splash', { x, z, vol: dive ? 1 : 0.7 });
+    g.hint('swim', `<b>Nadando</b>: ${g.input.device === 'touch' ? 'el joystick te lleva' : 'muévete como andando'}; ${g.input.device === 'touch' ? '' : '<kbd>Mayús</kbd> nada más rápido (cansa); '}para salir, ve a una escalera o al borde.`, 7);
+    this.syncChar();
+  }
+  leaveSwim(x, z) {
+    const g = this.game;
+    this.mode = 'foot'; this.swim = null;
+    this.char.setBase(null);
+    this.pos.set(x, 0, z); this.vel.set(0, 0, 0);
+    this.wetT = 40; // (dripping for a while)
+    const n = Math.min(100, this.health + 20) - this.health; this.health += n;
+    g.audio.sfx('splash', { x, z, vol: 0.35 });
+    g.hud.notify(`Sales chorreando${n > 0 ? ` · +${Math.round(n)} de salud` : ''}. ¡Qué gusto con este calor!`, 'ok', 3);
+    this.syncChar();
+  }
+  updateSwim(dt, input, camYaw) {
+    const g = this.game, s = this.swim, P = s.pool;
+    const mx = input.moveX, my = input.moveY, mag = Math.min(1, Math.hypot(mx, my));
+    let want = this.heading, target = 0;
+    const fast = input.sprint && this.stamina > 0.05 && mag > 0.05;
+    if (mag > 0.05) {
+      const fx = Math.sin(camYaw), fz = Math.cos(camYaw), rx = -fz, rz = fx;
+      want = Math.atan2(fx * my + rx * mx, fz * my + rz * mx);
+      target = mag * (fast ? 1.75 : 1.05) * Math.max(0.35, Math.cos(wrapAngle(want - this.heading))); // (turning first, then off)
+    }
+    if (fast) this.stamina = Math.max(0, this.stamina - dt * 0.16 * PERK.stamina);
+    else this.stamina = Math.min(1, this.stamina + dt * 0.12 * PERK.regen);
+    this.heading = dampAngle(this.heading, want, 2.6 * PERK.turn, dt);
+    s.sp = damp(s.sp, target, target > s.sp ? 1.6 : 2.4, dt);
+    let x = this.pos.x + Math.sin(this.heading) * s.sp * dt, z = this.pos.z + Math.cos(this.heading) * s.sp * dt;
+    // the walls of the pool
+    const dx = x - P.cx, dz = z - P.cz, ex = P.hl - 0.45, ez = P.hd - 0.45;
+    let lx = dx * P.ux + dz * P.uz, lz = -dx * P.uz + dz * P.ux;
+    if (Math.abs(lx) > ex || Math.abs(lz) > ez) s.sp *= Math.exp(-6 * dt);
+    lx = clamp(lx, -ex, ex); lz = clamp(lz, -ez, ez);
+    x = P.cx + lx * P.ux - lz * P.uz; z = P.cz + lx * P.uz + lz * P.ux;
+    this.vel.set((x - this.pos.x) / Math.max(dt, 1e-3), 0, (z - this.pos.z) / Math.max(dt, 1e-3));
+    this.pos.set(x, 0, z);
+    this.noise = 0.2;
+    // every stroke a splash
+    s.t += dt; s.stroke += dt * (0.5 + s.sp * 0.9);
+    if (s.sp > 0.3 && s.stroke > 1) { s.stroke = 0; g.audio.sfx('splash', { x, z, vol: 0.12 + 0.1 * Math.min(1, s.sp), pitch: 1.2 + Math.random() * 0.3 }); }
+    this.char.swimSpeed = s.sp;
+    this.char.update(dt, 0, { fidget: false, grounded: false, turn: 0 });
+    this.syncChar();
+  }
+  // where a swimmer can climb out: a ladder near, or the edge of the water
+  swimExit() {
+    const s = this.swim;
+    if (!s) return null;
+    const P = s.pool, lad = P.ladders.find((q) => Math.hypot(q.wx - this.pos.x, q.wz - this.pos.z) < 1.7);
+    if (lad) return { label: 'Salir por la escalera', x: lad.x, z: lad.z };
+    const dx = this.pos.x - P.cx, dz = this.pos.z - P.cz, lx = dx * P.ux + dz * P.uz, lz = -dx * P.uz + dz * P.ux;
+    const gx = P.hl - Math.abs(lx), gz = P.hd - Math.abs(lz);
+    if (Math.min(gx, gz) > 0.75) return null;
+    // out over the side nearest you, onto the deck
+    let ox = lx, oz = lz;
+    if (gx < gz) ox = Math.sign(lx) * (P.hl + P.cw + 0.9); else oz = Math.sign(lz) * (P.hd + P.cw + 0.9);
+    return { label: 'Salir por el borde', x: P.cx + ox * P.ux - oz * P.uz, z: P.cz + ox * P.uz + oz * P.ux };
+  }
   // ---------------- hiding in a rubbish container (the police cannot see you; they may open it)
   hideInContainer(c) {
     const g = this.game;
@@ -654,7 +734,7 @@ export class CameraRig {
       // (the anime look frames its courier as the reference does: lower and closer, over the shoulder of a child)
       const ks = (p.char && p.char.scale) || 1, an = STYLE.anime;
       if (p.knock) { tx = p.pos.x; ty = 0.9; tz = p.pos.z; }
-      else { tx = p.pos.x; ty = p.pos.y + (p.mode === 'sit' ? 1.15 : p.crouch ? 1.05 : an ? 1.42 : 1.55) * (an ? ks : 1); tz = p.pos.z; }
+      else { tx = p.pos.x; ty = p.pos.y + (p.mode === 'swim' ? 0.55 : p.mode === 'sit' ? 1.15 : p.crouch ? 1.05 : an ? 1.42 : 1.55) * (an && p.mode !== 'swim' ? ks : 1); tz = p.pos.z; }
       this.footDist = damp(this.footDist ?? this.dist, aim ? 2.2 : an ? this.dist * 0.8 : this.dist, 9, dt);
       dist = this.footDist;
       if (aim) fovT = 50;

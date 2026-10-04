@@ -224,7 +224,7 @@ export class Game {
       const c = ringCentroid(a.ring);
       if (a.kind === 'amenity:parking') continue; // the Pabellón's car park would sit on top of the Pabellón itself
       if (/Cooperativa/.test(a.name)) { L('Cooperativa', { x: c[0], z: c[1] }, 12, 0.45); continue; } // no business names
-      if (/Pantano|Polígono|Cementerio|Parque San|Parque del Pilar|Polideportivo|Eugenio Frutos|Pabellón/.test(a.name)) L(a.name, { x: c[0], z: c[1] }, 12, /Pantano|Polígono|Cementerio/.test(a.name) ? 0.15 : 0.45, /Pantano/.test(a.name) ? '#154a7a' : '#3a2a1a');
+      if (/Pantano|Polígono|Cementerio|Parque San|Parque del Pilar|Polideportivo|Eugenio Frutos|Pabellón|C\.P San Gregorio|Colegio|Escuela Infantil/.test(a.name)) L(a.name, { x: c[0], z: c[1] }, 12, /Pantano|Polígono|Cementerio/.test(a.name) ? 0.15 : 0.45, /Pantano/.test(a.name) ? '#154a7a' : '#3a2a1a');
     }
     const ch = this.map.pois.find((p) => /Luis Chamizo/.test(p.name));
     if (ch) L('Casa de Luis Chamizo', ch, 11, 0.9);

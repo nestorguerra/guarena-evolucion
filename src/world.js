@@ -6,6 +6,7 @@ import { FacadeDetails, CT } from './facades.js';
 import { PLAYER_PRESETS } from './characters.js';
 import { buildStreetLife } from './streetlife.js';
 import { buildBuildings, buildAOGeometry } from './buildings.js';
+import { infillGaps, placeStreetShops } from './infill.js';
 import { loadTextureArray, loadTexture, DETAIL_LAYERS, DETAIL_SIZE, GROUND_DETAIL, GROUND_DETAIL_SIZE } from './assets.js';
 import { buildGroundField, buildGroundRelief, placeGroundLife } from './groundfx.js';
 import { buildGround, buildMarkings } from './ground.js';
@@ -59,6 +60,9 @@ export class World {
     await step('Levantando la torre de Santa María…', 0.26);
     this.landmarks = buildLandmarks(this, map);
     const skipPart = (p) => this.landmarks.claims(p.c[0], p.c[1]);
+    // the street fronts the Catastro leaves open where the town has houses (src/infill.js)
+    this.infill = infillGaps(map, { claims: (x, z) => this.landmarks.claims(x, z) });
+    this.streetShops = placeStreetShops(map, { claims: (x, z) => this.landmarks.claims(x, z) });
 
     // ---------------- buildings
     await step('Colocando tejas árabes…', 0.34);

@@ -253,6 +253,7 @@ export class Activities {
       else if (p.mode === 'passenger') opt = { label: `${g.input.device === 'touch' ? 'Toca «Bajar»:' : g.input.key('F', 3)} bajarte del coche`, info: true };
       else if (p.mode === 'hidden') opt = { label: 'Salir del contenedor', run: () => p.leaveContainer() };
       else if (p.mode === 'sit') opt = g.seats && g.seats.menuOpen ? null : { label: 'Levantarse', run: () => g.seats.standUp() };
+      else if (p.mode === 'swim') { const ex = p.swimExit(); opt = ex ? { label: ex.label, run: () => p.leaveSwim(ex.x, ex.z) } : null; }
       else if (p.mode === 'foot') {
         // multiplayer: a friend's car right here
         const rc = g.net && g.net.active && g.net.rideCandidate(p.pos.x, p.pos.z);
@@ -294,7 +295,19 @@ export class Activities {
     if (vd && vd.venue) return { label: `Entrar: ${vd.name}`, run: () => g.interiors.enter(vd, { mode: 'visit' }) };
     // the municipal pool: in off the ladder
     const lad = ((g.world.landmarks && g.world.landmarks.poi.poolLadders) || []).find((q) => Math.hypot(q.x - p.pos.x, q.z - p.pos.z) < 1.4);
-    if (lad && p.mode === 'foot') return { label: lad.kids ? 'Mojarte los pies en la piscina pequeña' : 'Darte un chapuzón en la piscina', run: () => this.dip(lad) };
+    if (lad && p.mode === 'foot') return { label: lad.kids ? 'Mojarte los pies en la piscina pequeña' : 'Bajar a la piscina por la escalera', run: () => (lad.kids || !lad.pool ? this.dip(lad) : p.startSwim(lad.pool, lad.wx, lad.wz)) };
+    // on the edge of the big pool: in head first
+    const pl = p.mode === 'foot' && ((g.world.landmarks && g.world.landmarks.poi.pools) || []).find((q) => {
+      if (q.kids) return false;
+      const dx = p.pos.x - q.cx, dz = p.pos.z - q.cz, lx = Math.abs(dx * q.ux + dz * q.uz), lz = Math.abs(-dx * q.uz + dz * q.ux);
+      return lx < q.hl + q.cw + 1.0 && lz < q.hd + q.cw + 1.0 && (lx > q.hl - 0.2 || lz > q.hd - 0.2);
+    });
+    if (pl) return { label: 'Tirarte al agua', run: () => {
+      const dx = p.pos.x - pl.cx, dz = p.pos.z - pl.cz;
+      let lx = dx * pl.ux + dz * pl.uz, lz = -dx * pl.uz + dz * pl.ux;
+      lx = clamp(lx, -pl.hl + 1.2, pl.hl - 1.2); lz = clamp(lz, -pl.hd + 1.2, pl.hd - 1.2);
+      p.startSwim(pl, pl.cx + lx * pl.ux - lz * pl.uz, pl.cz + lx * pl.uz + lz * pl.ux, true);
+    } };
     const J = g.jobs;
     if (J && g.mode === 'normal') {
       const jo = J.option();

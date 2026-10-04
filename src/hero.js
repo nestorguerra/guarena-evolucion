@@ -58,7 +58,7 @@ const ARMS = ['clavL', 'clavR', 'armL', 'armR', 'foreL', 'foreR', 'handL', 'hand
 const HEADB = ['neck', 'head'];
 // actions done with the arms only (the legs go on with the capture)
 const ARM_ACTIONS = new Set(['jab', 'cross', 'hookL', 'upper', 'bat', 'push', 'wave', 'shrug', 'point', 'knock', 'cheer', 'clap', 'throw', 'wipe', 'enter']);
-const FULL_BASES = new Set(['sit', 'drive', 'lie', 'sitTalk', 'sitFan', 'moto', 'bici', 'dance']);
+const FULL_BASES = new Set(['sit', 'drive', 'lie', 'sitTalk', 'sitFan', 'moto', 'bici', 'dance', 'swim']);
 
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4(), _v = new THREE.Vector3();
 const _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3(), _t3 = new THREE.Vector3(), _t4 = new THREE.Vector3(), _h = new THREE.Vector3(), _k = new THREE.Vector3(), _a = new THREE.Vector3();
@@ -341,6 +341,7 @@ export class Hero extends Character {
       pk.vz += (k * (tz - pk.z) - c * pk.vz) * h; pk.z += pk.vz * h;
       pk.vy += (k * 1.6 * (clamp(-hv * 0.012, -0.015, 0.015) - pk.y) - c * pk.vy) * h; pk.y += pk.vy * h;
       B.pack.rotation.set(pk.x, 0, pk.z); B.pack.position.copy(this.rest.pack); B.pack.position.y += pk.y;
+      B.pack.scale.setScalar(this.base === 'swim' ? 1e-3 : 1); // (the backpack stays on the deck while you swim)
     }
     // (the feet are locked once the body has been put where it goes this frame: afterMove)
     this.lockW = grounded ? 1 - wAll : 0;

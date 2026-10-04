@@ -14,6 +14,11 @@ export const CATS = [
 // price in €. heal: health when eaten. place: how it stands in the house ('floor' | 'wall' | 'top': on a table or shelf)
 export const ITEMS = {
   // ---- food and drink
+  kebab: { name: 'Kebab', cat: 'comida', price: 5, heal: 40, ico: '🥙', txt: 'Pan de pita, carne del asador, ensalada y salsa de yogur.' },
+  durum: { name: 'Dürüm', cat: 'comida', price: 6, heal: 45, ico: '🌯', txt: 'Enrollado en pan fino, con todo y bien de salsa.' },
+  falafel: { name: 'Falafel', cat: 'comida', price: 4, heal: 30, ico: '🧆', txt: 'Bolitas de garbanzo con salsa de sésamo.' },
+  patatas: { name: 'Patatas fritas', cat: 'comida', price: 3, heal: 15, ico: '🍟', txt: 'Recién hechas, con sal.' },
+  isotonica: { name: 'Bebida isotónica', cat: 'comida', price: 2, heal: 8, stamina: true, ico: '🧃', txt: 'Para después de entrenar.' },
   bocadillo: { name: 'Bocadillo de jamón', cat: 'comida', price: 4, heal: 35, ico: '🥖', txt: 'Pan de pueblo y jamón de la dehesa.' },
   torta: { name: 'Torta del Casar', cat: 'comida', price: 9, heal: 45, ico: '🧀', txt: 'Se come a cucharadas, con pan.' },
   migas: { name: 'Tarrina de migas', cat: 'comida', price: 5, heal: 40, ico: '🍲', txt: 'Migas extremeñas con torreznos.' },

@@ -42,8 +42,13 @@ export const SHOP_TYPES = {
     stock: ['auriculares', 'cargador', 'radio', 'linterna', 'lamparita'] },
   armeria: { kinds: [], name: 'la armería', title: 'Armería y Caza Las Vegas', hours: [[9.5, 14], [17, 20.5]], floor: 'rock_tile_floor', wall: 0xd8c8b0,
     stock: ['cana', 'cebo', 'maiz', 'prismaticos', 'navaja', 'linterna'] },
+  // (these two are placed by the town itself: src/infill.js placeStreetShops)
+  kebab: { kinds: [], name: 'el kebab', title: 'Kebab', hours: [[12.5, 16.5], [19.5, 24]], floor: 'floor_tiles_06', wall: 0xf3e6cc,
+    stock: ['kebab', 'durum', 'falafel', 'patatas', 'refresco', 'agua'] },
+  gimnasio: { kinds: [], name: 'el gimnasio', title: 'Gimnasio', hours: [[7, 22.5]], floor: 'concrete_floor_damaged_01', wall: 0xe9eef0,
+    stock: ['isotonica', 'agua'] },
 };
-const ACCENT = { armeria: 0x3a5a2a, muebles: 0x7a4e2c, electro: 0x2a5a9a, flores: 0x4a8a3a, bazar: 0xc8202a, ferreteria: 0xd87a1a, libreria: 0x2a3a6a, jugueteria: 0xe8a33a, super: 0x2a8a4a, panaderia: 0xb8742a, fruteria: 0x5aa84a, informatica: 0x3a4a5a };
+const ACCENT = { kebab: 0xb83a24, gimnasio: 0x1f6fb2, armeria: 0x3a5a2a, muebles: 0x7a4e2c, electro: 0x2a5a9a, flores: 0x4a8a3a, bazar: 0xc8202a, ferreteria: 0xd87a1a, libreria: 0x2a3a6a, jugueteria: 0xe8a33a, super: 0x2a8a4a, panaderia: 0xb8742a, fruteria: 0x5aa84a, informatica: 0x3a4a5a };
 // invented names for the second, third… shop of the same kind
 const NAMES = {
   super: ['Supermercado La Espiga', 'Supermercado El Trigal', 'Alimentación La Vega', 'Supermercado Las Eras', 'Autoservicio El Cruce', 'Ultramarinos La Plaza'],
@@ -247,7 +252,9 @@ export function buildShop(type, seed = 1, origin = INTERIOR_ORIGIN, title = null
     armeriaFittings(B, { W, hw, D, H, mWood, mDark, mMetal, glass, tag, buyAt, r });
     // fishing and the rest on the shelves by the door
     shelfUnit(1, 2.1, ['cana', 'cebo', 'maiz']); shelfUnit(1, 3.55, ['prismaticos', 'navaja', 'linterna']);
-  } else {
+  } else if (type === 'kebab') kebabFittings(B, { W, hw, D, H, cx, cz, mDark, mMetal, mWhite, mWood, r });
+  else if (type === 'gimnasio') gymFittings(B, { W, hw, D, H, cx, cz, mDark, mMetal, mWhite, r });
+  else {
     const food = type === 'super' || (small.length && small.every((id) => ITEMS[id].cat === 'comida' || ITEMS[id].cat === 'pesca'));
     // the big pieces down the middle, facing the door (two columns in a wide shop); the rest against the walls
     const cols = W >= 9 ? [-1.65, 1.65] : [0];
@@ -330,6 +337,80 @@ export function buildShop(type, seed = 1, origin = INTERIOR_ORIGIN, title = null
 
 // the gun shop: wood panelling, the long guns racked on the back wall, pistols under the glass of the counter,
 // a mounted stag, boxes of cartridges, the vest on a dummy and the first-aid kits
+// the kebab: the meat turning on its upright spit behind the counter, its grill glowing, the drinks fridge, the menu
+// over it all, little tables down one side
+function kebabFittings(B, o) {
+  const { hw, D, cx, cz, mDark, mMetal, mWhite, mWood } = o;
+  const meat = B.mat('k_meat', () => std(0x8a5530, { roughness: 0.8 }));
+  const grill = B.mat('k_grill', () => std(0x3a1c10, { emissive: 0xff6a2a, emissiveIntensity: 0.7, roughness: 0.6 }));
+  const sx = cx - 0.55, sz = cz + 0.75;
+  B.add(mMetal, cylGeo(0.2, 0.2, 0.04), sx, 1.0, sz); B.add(mMetal, cylGeo(0.02, 0.02, 1.0), sx, 1.45, sz);
+  B.add(meat, cylGeo(0.13, 0.19, 0.62), sx, 1.36, sz); B.add(mMetal, cylGeo(0.05, 0.05, 0.05), sx, 1.72, sz);
+  B.add(grill, boxGeo(0.46, 0.8, 0.06, 1), sx, 1.4, sz + 0.3);
+  B.add(mMetal, boxGeo(0.56, 0.9, 0.04, 1), sx, 1.4, sz + 0.35);
+  // the drinks fridge against the back wall, lit
+  const fr = B.mat('k_fridge', () => std(0xdfe8ee, { emissive: 0xbfe0ff, emissiveIntensity: 0.35, roughness: 0.2, metalness: 0.2 }));
+  B.block(mWhite, 0.75, 1.9, 0.6, cx + 1.9, 0, D - 0.45);
+  B.add(fr, boxGeo(0.62, 1.6, 0.02, 1), cx + 1.9, 1.0, D - 0.76);
+  // the menu over the counter
+  const c = document.createElement('canvas'); c.width = 512; c.height = 288;
+  const x = c.getContext('2d');
+  x.fillStyle = '#1d1a18'; x.fillRect(0, 0, 512, 288);
+  x.fillStyle = '#f2c230'; x.font = 'bold 34px sans-serif'; x.textAlign = 'center'; x.fillText('MENÚ', 256, 42);
+  x.textAlign = 'left'; x.font = 'bold 26px sans-serif';
+  [['Kebab', 5], ['Dürüm', 6], ['Falafel', 4], ['Patatas fritas', 3], ['Refresco', 2], ['Agua', 1]].forEach(([n, pr], i) => {
+    x.fillStyle = '#f6f2ea'; x.fillText(n, 36, 86 + i * 34); x.fillStyle = '#f2c230'; x.textAlign = 'right'; x.fillText(pr + ' €', 476, 86 + i * 34); x.textAlign = 'left';
+  });
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  B.extraMesh(new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.96), new THREE.MeshStandardMaterial({ map: t, roughness: 0.6, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.25 })), cx + 0.15, 1.95, D - 0.09, Math.PI);
+  // little tables and stools down the right
+  for (let z = 1.9; z < cz - 1.4; z += 1.7) {
+    const tx = hw - 0.75;
+    B.block(mWood, 0.7, 0.04, 0.7, tx, 0.72, z, 0, 1, false);
+    B.add(mMetal, cylGeo(0.03, 0.03, 0.72), tx, 0.36, z);
+    B.footprint(0.7, 0.7, tx, z, 0, 0.75);
+    for (const dz of [-0.55, 0.55]) { B.add(mDark, cylGeo(0.17, 0.17, 0.05), tx, 0.47, z + dz); B.add(mMetal, cylGeo(0.025, 0.025, 0.45), tx, 0.23, z + dz); }
+  }
+}
+// the gym: treadmills along one wall, a bench with its barbell, a rack of dumbbells, a punching bag, mirrors, mats;
+// the reception is the counter. Training (an hour, at the counter or at the machines) makes you fitter for good
+function gymFittings(B, o) {
+  const { hw, D, cx, cz, mDark, mMetal, mWhite } = o;
+  const mat = B.mat('g_mat', () => std(0x2a2c30, { roughness: 0.95 }));
+  const red = B.mat('g_red', () => std(0xb8302a, { roughness: 0.6 }));
+  const mirror = B.mat('g_mirror', () => std(0xc8d4dc, { roughness: 0.05, metalness: 0.9 }));
+  B.add(mat, planeGeo(2 * hw - 1.0, cz - 2.2, 1).rotateX(-Math.PI / 2), 0, 0.012, (cz - 1.2) / 2 + 1.0);
+  // treadmills on the left, facing the wall
+  for (const z of [1.8, 3.2]) {
+    const x = -hw + 0.9;
+    B.block(mDark, 0.75, 0.22, 1.7, x, 0, z, Math.PI / 2);
+    B.add(mMetal, boxGeo(0.04, 1.1, 0.04, 1), x - 0.75, 0.75, z - 0.3); B.add(mMetal, boxGeo(0.04, 1.1, 0.04, 1), x - 0.75, 0.75, z + 0.3);
+    B.add(mDark, boxGeo(0.18, 0.3, 0.62, 1), x - 0.75, 1.32, z);
+  }
+  // the bench, its rack and barbell
+  const bx = 0.4, bz = 2.6;
+  B.block(red, 0.34, 0.45, 1.2, bx, 0, bz);
+  for (const s of [-1, 1]) B.add(mMetal, boxGeo(0.05, 1.2, 0.05, 1), bx + s * 0.55, 0.6, bz - 0.45);
+  B.add(mMetal, cylGeo(0.016, 0.016, 1.8).rotateZ(Math.PI / 2), bx, 1.12, bz - 0.45);
+  for (const s of [-1, 1]) B.add(mDark, cylGeo(0.22, 0.22, 0.05).rotateZ(Math.PI / 2), bx + s * 0.72, 1.12, bz - 0.45);
+  // dumbbells on a rack against the right wall, mirrors over it
+  const rx = hw - 0.4;
+  B.block(mDark, 0.4, 0.75, 2.2, rx, 0, 3.4);
+  for (let i = 0; i < 6; i++) { const z = 2.5 + i * 0.36; for (const dx of [-0.08, 0.08]) B.add(mMetal, cylGeo(0.05, 0.05, 0.12).rotateX(Math.PI / 2), rx + dx, 0.82, z); }
+  B.add(mirror, planeGeo(3.6, 1.6, 1), hw - 0.09, 1.75, 3.4, -Math.PI / 2);
+  // the punching bag, hung from the ceiling
+  B.add(red, cylGeo(0.2, 0.2, 1.0), -0.9, 1.35, cz - 2.2); B.add(mMetal, cylGeo(0.01, 0.01, 1.3), -0.9, 2.5, cz - 2.2);
+  B.footprint(0.45, 0.45, -0.9, cz - 2.2, 0, 1.5);
+  // a poster: the hours
+  const c = document.createElement('canvas'); c.width = 256; c.height = 340;
+  const x = c.getContext('2d');
+  x.fillStyle = '#1f6fb2'; x.fillRect(0, 0, 256, 340); x.fillStyle = '#ffffff'; x.textAlign = 'center';
+  x.font = 'bold 34px sans-serif'; x.fillText('GIMNASIO', 128, 60); x.font = '22px sans-serif';
+  ['Abierto todos los días', 'de 7:00 a 22:30', '', 'Una hora: 4 €', 'Cinta · Pesas · Saco'].forEach((l, i) => x.fillText(l, 128, 120 + i * 38));
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  B.extraMesh(new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.06), new THREE.MeshStandardMaterial({ map: t, roughness: 0.7 })), -hw + 0.09, 1.7, cz - 0.6, Math.PI / 2);
+  B.interact({ type: 'train', x: 0.0, z: 3.2, r: 1.6, label: 'Entrenar una hora' });
+}
 function armeriaFittings(B, o) {
   const { hw, D, mWood, mDark, mMetal, glass, tag, buyAt } = o;
   // rack on the back wall
@@ -413,14 +494,14 @@ export class Shops {
     const count = {};
     for (const p of map.pois) {
       if (!map.inTown(p.x, p.z)) continue;
-      const type = Object.keys(SHOP_TYPES).find((t) => SHOP_TYPES[t].kinds.includes(p.kind));
+      const type = p.shopType || Object.keys(SHOP_TYPES).find((t) => SHOP_TYPES[t].kinds.includes(p.kind));
       if (!type) continue;
       const door = this.fixDoor(activities.doorOf(p));
       if (!door || used.some((u) => Math.hypot(u.x - door.x, u.z - door.z) < 5)) continue;
       used.push(door);
       const n = count[type] = (count[type] || 0) + 1;
       const T = SHOP_TYPES[type];
-      const title = n === 1 ? T.title : (NAMES[type] && NAMES[type][(n - 2) % NAMES[type].length]) || T.title;
+      const title = p.title || (n === 1 ? T.title : (NAMES[type] && NAMES[type][(n - 2) % NAMES[type].length]) || T.title);
       this.add({ ...door, type, title, name: T.name, seed: 300 + this.list.length * 17 + n });
     }
     // the gun shop: the building by the Cooperativa where the old sign stood
@@ -545,6 +626,11 @@ export class Shops {
       if (J.job && J.job.place === wp) out.push({ kind: 'quitjob', title: 'Dejar el trabajo', sub: `Ahora trabajas aquí (${what}).`, price: 0, ico: '🧾', wp });
       else if (!J.job) out.push({ kind: 'job', title: 'Pedir trabajo', sub: `Buscan a alguien: ${what}. Te pagan por tarea.`, price: 0, ico: '🤝', wp });
     }
+    if (H.s.type === 'gimnasio') {
+      const lv = (g.save && g.save.fitness) || 0;
+      out.push(lv >= 10 ? { kind: 'train', title: 'Ya estás en plena forma', sub: 'Nivel de forma 10 de 10: más no se puede.', price: 0, ico: '🏆', off: true }
+        : { kind: 'train', title: 'Entrenar una hora', sub: `Cinta, pesas y saco. Nivel de forma ${lv} de 10: cada hora, más aguante al esprintar, recuperas antes el aliento y pegas más fuerte.`, price: 4, ico: '🏋️' });
+    }
     if (H.s.type === 'armeria') for (const it of g.activities.shopItems()) out.push({ ...it, ico: it.kind === 'weapon' || it.kind === 'ammo' ? '🎯' : it.kind === 'armor' ? '🦺' : '🩹' });
     for (const id of SHOP_TYPES[H.s.type].stock) {
       const d = ITEMS[id];
@@ -558,6 +644,7 @@ export class Shops {
   optionAt(it) {
     const g = this.g;
     if (it.type === 'counter') return { label: it.label, run: () => this.openStore() };
+    if (it.type === 'train') { const row = this.rows().find((r) => r.kind === 'train'); return row ? (row.off ? { label: row.title, info: true } : { label: `${row.title} <small>(${row.price} €)</small>`, run: () => this.buy(row) }) : null; }
     if (it.type !== 'buy') return null;
     const row = this.rowFor(it);
     if (!row) return null;
@@ -584,6 +671,14 @@ export class Shops {
       return true;
     }
     if (p.money < row.price) { g.audio.sfx('ui_back'); this.say(pick(['Uy, no le llega…', 'Le faltan unos euros, ¿eh?', 'Con eso no le llega, lo siento.'])); return false; }
+    if (row.kind === 'train') {
+      if (row.off) return false;
+      p.money -= row.price;
+      g.audio.sfx('money', { vol: 0.7 });
+      this.closeStore();
+      this.train();
+      return true;
+    }
     if (row.kind === 'item') {
       const d = ITEMS[row.id];
       if (d.unique && g.inv.has(row.id)) return false;
@@ -650,6 +745,24 @@ export class Shops {
     this.sel = (this.sel + d + this.items.length) % this.items.length;
     this.renderStore();
     const b = this.g.ui.shopList.querySelector(`[data-i="${this.sel}"]`); if (b) b.scrollIntoView({ block: 'nearest' });
+  }
+  // an hour at the gym: time goes by, you come out fitter (for good, up to level 10) and out of breath for a moment
+  async train() {
+    const g = this.g, p = g.player;
+    if (this.training) return;
+    this.training = true;
+    try {
+      if (g.interiors && g.interiors.fade) await g.interiors.fade(true, 600);
+      g.sky.hour = (g.sky.hour + 1) % 24;
+      g.save.fitness = Math.min(10, (g.save.fitness || 0) + 1);
+      p.applyPerks();
+      p.stamina = 1; p.health = Math.min(100, p.health + 10);
+      g.hud.notify(`🏋️ Una hora de gimnasio. Nivel de forma ${g.save.fitness} de 10: aguantas más esprintando, recuperas antes el aliento y pegas más fuerte.`, 'ok', 5);
+      g.persist();
+      await new Promise((res) => setTimeout(res, 700));
+      if (g.interiors && g.interiors.fade) g.interiors.fade(false, 600);
+      this.say(pick(['¡Buen entreno! Mañana más.', '¡Así se hace! Bebe agua, ¿eh?', 'Se te nota en forma, ¿eh?']), 2200);
+    } finally { this.training = false; }
   }
   closeStore() {
     const g = this.g;

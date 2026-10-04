@@ -125,10 +125,14 @@ export function buildPools(L) {
         steel.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.3), 16, 0.025, 6, false));
       }
       for (let k = 0; k < 2; k++) steel.push(bx(0.56, 0.03, 0.12, lx, 0.0 - k * 0.3, s * (Ww / 2 - 0.12)));
-      const wp = toW(lx, s * (Ww / 2 + cw + 0.9));
-      ladders.push({ x: wp.x, z: wp.z, kids });
+      const wp = toW(lx, s * (Ww / 2 + cw + 0.9)), ip = toW(lx, s * (Ww / 2 - 0.9)); // (on the deck; at its foot, in the water)
+      ladders.push({ x: wp.x, z: wp.z, kids, wx: ip.x, wz: ip.z });
     }
     (L.poi.poolLadders || (L.poi.poolLadders = [])).push(...ladders);
+    // the water itself, for swimming in it (src/player.js updateSwim): its frame, its half sizes, its ladders
+    const pool = { cx: ob.cx, cz: ob.cz, ux, uz, hl: Lw / 2, hd: Ww / 2, cw, kids, ladders, y: 0.12 };
+    for (const q of ladders) q.pool = pool;
+    (L.poi.pools || (L.poi.pools = [])).push(pool);
     if (!kids) {
       big = { g, Lw, Ww, cw, dw, toW };
       // the starting blocks at the shallow end, numbered; the lane ropes, red and white, blue near the walls

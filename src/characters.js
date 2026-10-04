@@ -2130,6 +2130,25 @@ export class Character {
         Q('armL', -1.2, 0, 0.18); Q('armR', -1.2, 0, -0.18); Q('foreL', -0.35); Q('foreR', -0.35); Q('head', -0.25);
         Q('clavL', 0, -0.1, 0); Q('clavR', 0, 0.1, 0);
         grip = 1;
+      } else if (bs === 'swim') {
+        // in the water up to the shoulders: a front crawl when moving — each arm over in turn, the head turning to that
+        // side for air, a flutter kick — and treading water when still: upright, the hands sculling, the legs turning
+        const v = clamp(this.swimSpeed || 0, 0, 2), mv = smoothstep(0.12, 0.8, v), tr = 1 - mv;
+        this.swimPh = (this.swimPh || 0) + dt * (1.6 + 2.2 * v);
+        const ph = this.swimPh, a = Math.sin(ph), b = Math.cos(ph), k = Math.sin(ph * 3), sc2 = Math.sin(this.t * 3.4 + this.seed), cc2 = Math.cos(this.t * 3.4 + this.seed);
+        Q('hips', 0.95 * mv, 0, 0.06 * a * mv); Q('spine', 0.08 * mv + 0.04 * tr); Q('chest', 0.04 * mv);
+        Q('neck', -0.35 * mv); Q('head', -0.55 * mv + 0.06 * tr, 0.55 * mv * Math.max(0, -b) * Math.sign(a || 1), 0);
+        // crawl: one arm reaching forward over the water while the other pulls under it
+        const reachL = a, reachR = -a;
+        Q('armL', mv * (-1.6 - 1.3 * reachL) + tr * -0.25, 0, mv * (0.25 + 0.25 * Math.max(0, b)) + tr * (0.9 + 0.25 * sc2));
+        Q('armR', mv * (-1.6 - 1.3 * reachR) + tr * -0.25, 0, -(mv * (0.25 + 0.25 * Math.max(0, -b)) + tr * (0.9 - 0.25 * sc2)));
+        Q('foreL', mv * -0.35 * Math.max(0, -reachL) + tr * -0.35, tr * 0.6 * cc2); Q('foreR', mv * -0.35 * Math.max(0, -reachR) + tr * -0.35, -tr * 0.6 * cc2);
+        Q('handL', tr * 0.2 * sc2); Q('handR', -tr * 0.2 * sc2);
+        // legs: a flutter kick, or slow circles treading water
+        Q('thighL', mv * (0.12 + 0.28 * k) + tr * (-0.55 + 0.25 * sc2), 0, 0.08 * tr); Q('thighR', mv * (0.12 - 0.28 * k) + tr * (-0.55 - 0.25 * sc2), 0, -0.08 * tr);
+        Q('shinL', mv * (0.25 + 0.2 * Math.max(0, k)) + tr * (1.0 + 0.3 * cc2)); Q('shinR', mv * (0.25 + 0.2 * Math.max(0, -k)) + tr * (1.0 - 0.3 * cc2));
+        Q('footL', 0.7 * mv + 0.3 * tr); Q('footR', 0.7 * mv + 0.3 * tr);
+        hy = 0;
       } else if (bs === 'lie') {
         // flat out, limbs where they fell (each body a little different)
         const s = this.seed;
@@ -2201,7 +2220,7 @@ export class Character {
         Q('thighL', 0, 0, 0.02); Q('thighR', 0, 0, -0.02);
         wantFace('sad', 1);
       }
-      const full = bs === 'sit' || bs === 'drive' || bs === 'lie' || bs === 'sitTalk' || bs === 'sitFan' || bs === 'moto' || bs === 'bici';
+      const full = bs === 'sit' || bs === 'drive' || bs === 'lie' || bs === 'sitTalk' || bs === 'sitFan' || bs === 'moto' || bs === 'bici' || bs === 'swim';
       for (let pi = 0; pi < pl.length; pi++) {
         const n = pl[pi];
         const cur = r[n];

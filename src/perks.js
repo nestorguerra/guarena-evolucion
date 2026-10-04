@@ -19,6 +19,12 @@ export const PERKS = {
   adri: { title: 'Callejero', lines: ['Despista a la policía en la mitad de tiempo', 'Se sabe los atajos: +30 % en las carreras de taxi', '+30 % de botín en los atracos'], lose: 0.55, taxi: 1.3, loot: 1.3 },
 };
 export const PERK = { ...BASE, id: null };
+// what training at the gym leaves you with (level 0–10), on top of the character's own edge: longer sprints, quicker
+// to get your breath back, harder fists, a touch faster
+export function applyFitness(level = 0) {
+  const k = Math.max(0, Math.min(10, level || 0));
+  PERK.stamina *= 1 - 0.035 * k; PERK.regen *= 1 + 0.05 * k; PERK.melee *= 1 + 0.04 * k; PERK.run *= 1 + 0.005 * k;
+}
 export function setPerk(id) {
   for (const k in PERK) delete PERK[k];
   Object.assign(PERK, BASE, PERKS[id] || {}, { id: PERKS[id] ? id : null });
