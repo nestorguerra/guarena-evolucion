@@ -142,3 +142,25 @@ export async function perf({ W = 1280, H = 720, n = 90 } = {}) {
   }
   return out;
 }
+
+// a walk in motion: the player goes up the narrow street with the game's own camera behind, one picture every few
+// frames → .snaps/rec_<tag>_NN.jpg (put together as a GIF outside)
+export async function walk(tag = 'a', { W = 560, H = 350, n = 36, stepM = 0.55, hour = 14 } = {}) {
+  const g = G(), p = g.player, map = g.map, list = await views(), v = list[1], tmp = {};
+  for (const id of ['pause', 'menu']) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+  const e = map.edges.find((q) => q.name === v.street);
+  let s = Math.min(18, e.len * 0.2);
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
+  map.sample(e, s, tmp); p.spawnAt(tmp.x, tmp.z, Math.atan2(tmp.dx, tmp.dz)); g.sky.hour = hour; step(40);
+  for (let i = 0; i < n; i++) {
+    s += stepM; map.sample(e, s, tmp);
+    const h = Math.atan2(tmp.dx, tmp.dz);
+    p.pos.x = tmp.x; p.pos.z = tmp.z; if (p.heading !== undefined) p.heading = h;
+    g.cam.yaw = h + Math.PI + Math.sin(i * 0.12) * 0.25; g.cam.pitch = -0.08;
+    g.sky.hour = hour; step(2);
+    renderInto(ctx, 0, 0, g.camera.position.toArray(), g.cam.target.toArray(), g.camera.fov, W, H);
+    await fetch('/__snap?name=rec_' + tag + '_' + String(i).padStart(2, '0'), { method: 'POST', body: cv.toDataURL('image/jpeg', 0.85) });
+  }
+  g.resize();
+  return n;
+}
