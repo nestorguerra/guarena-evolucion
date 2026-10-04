@@ -1,5 +1,6 @@
 // Procedural textures (canvas 2D): facades of Extremaduran houses, roofs, ground surfaces, road markings, signs, sprites.
 import { mulberry32, clamp } from './util.js';
+import { STYLE } from './style.js';
 
 // ---------------------------------------------------------------- tileable noise
 function makeNoiseTile(n, period, seed) {
@@ -95,6 +96,19 @@ export const STYLE_DEF = {
   nave: { wall: 'metal', zocalo: '#9a9a92', zocH: 1.2, wood: '#6d7c86', frame: '#6d7c86', reja: false, persiana: '#aaa', door: 'metal', doorCol: '#4f6d7a', garage: '#4f6d7a' },
   piedra: { wall: 'stone', zocalo: 'stone', zocH: 0.4, wood: '#4e3421', frame: '#4e3421', reja: true, persiana: '#d0c8b8', door: 'wood', doorCol: '#4a2e1a', garage: '#4a2e1a' },
 };
+
+// the diorama's façades (Ajustes › Estética › Diorama; src/diorama.js): the visual spec's palette over the same kinds of
+// house — ivory and cream whitewash, toasted-ochre plinths, deep green or dark wood doors and shutters; brick, stone,
+// sheds and the modern blocks keep what they are. Applied once, before the town is painted (main.js boot), so the 3D
+// details of the fronts (facades.js) take the same colours
+const DIORAMA_DEF = {
+  trad_verde: { wall: '#f0e5cd', zocalo: '#bb7d44', wood: '#354d3d', frame: '#354d3d', persiana: '#e6dcc4', doorCol: '#354d3d', garage: '#e6dcc6' },
+  trad_ocre: { wall: '#f2e8d4', zocalo: '#bb7d44', wood: '#5a3a24', frame: '#4a3020', persiana: '#dcd0b8', doorCol: '#4e3220', garage: '#5a3a24' },
+  renovada: { wall: '#ece2cc', wood: '#d8d2c4', frame: '#e6dfd0', persiana: '#ece4d4', doorCol: '#6e5034', garage: '#e8e0d0' },
+  color: { zocalo: '#bf9258', persiana: '#e8dcc6', doorCol: '#5a3a24' },
+  moderna: { wall: '#e6ded0', zocalo: '#6a6560', persiana: '#8a8580' },
+};
+export function applyDioramaPalette() { for (const [k, v] of Object.entries(DIORAMA_DEF)) Object.assign(STYLE_DEF[k], v); }
 
 function facadePainter(S) {
   const kx = S / BAY_W, ky = S / FLOOR_H;
@@ -678,8 +692,10 @@ function drawGroundLayer(name, S, seed) {
   switch (name) {
     case 'asphalt':
     case 'asphalt2': {
-      base(name === 'asphalt' ? '#7c7a76' : '#696866');
-      speckle(ctx, S, rnd, S * S * 0.22, ['#5f5d59', '#8e8b85', '#9c9892', '#55534f', '#857d74'], 0.6, 1.6, 0.6);
+      // (the diorama's asphalt: a warm grey, darker, its grain finer)
+      const D = STYLE.diorama;
+      base(name === 'asphalt' ? (D ? '#6c675f' : '#7c7a76') : (D ? '#655f58' : '#696866'));
+      speckle(ctx, S, rnd, S * S * 0.22, D ? ['#58544d', '#7a746b', '#857e74', '#504c46', '#766d62'] : ['#5f5d59', '#8e8b85', '#9c9892', '#55534f', '#857d74'], 0.6, 1.6, 0.6);
       grain(ctx, S, seed, 0.12, 5, 3);
       if (name === 'asphalt') {
         // patches & cracks
@@ -700,11 +716,12 @@ function drawGroundLayer(name, S, seed) {
     }
     case 'acera': {
       // Spanish pavement tiles: 30 cm squares with 4-pastilla relief (2.4 m -> 8 tiles)
-      base('#a79c8a');
+      const D = STYLE.diorama; // (the diorama's pavements: sand-coloured)
+      base(D ? '#a8916a' : '#a79c8a');
       const n = 8, w = S / n;
       for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
         const v = 0.9 + rnd() * 0.14;
-        ctx.fillStyle = `rgb(${Math.floor(206 * v)},${Math.floor(194 * v)},${Math.floor(172 * v)})`;
+        ctx.fillStyle = D ? `rgb(${Math.floor(220 * v)},${Math.floor(200 * v)},${Math.floor(162 * v)})` : `rgb(${Math.floor(206 * v)},${Math.floor(194 * v)},${Math.floor(172 * v)})`;
         ctx.fillRect(i * w + 1.5, j * w + 1.5, w - 3, w - 3);
         const q = w / 2;
         for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) {
@@ -722,7 +739,8 @@ function drawGroundLayer(name, S, seed) {
     }
     case 'plaza': {
       // granite slabs in running bond
-      base('#8e877a');
+      const D = STYLE.diorama;
+      base(D ? '#988462' : '#8e877a');
       const rows = 6, rh = S / rows;
       for (let j = 0; j < rows; j++) {
         let x = (j % 2) * rh * 0.7;
@@ -730,7 +748,7 @@ function drawGroundLayer(name, S, seed) {
         while (x < S) {
           const w = rh * (1.1 + rnd() * 0.8);
           const v = 0.85 + rnd() * 0.2;
-          ctx.fillStyle = `rgb(${Math.floor(190 * v)},${Math.floor(182 * v)},${Math.floor(166 * v)})`;
+          ctx.fillStyle = D ? `rgb(${Math.floor(214 * v)},${Math.floor(194 * v)},${Math.floor(156 * v)})` : `rgb(${Math.floor(190 * v)},${Math.floor(182 * v)},${Math.floor(166 * v)})`;
           ctx.fillRect(x + 1.5, j * rh + 1.5, w - 3, rh - 3);
           x += w;
         }

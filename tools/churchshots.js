@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 const G = () => window.game;
 async function post(name) { const c = G().renderer.domElement; const o = document.createElement('canvas'); o.width = c.width; o.height = c.height; o.getContext('2d').drawImage(c, 0, 0); await fetch('/__snap?name=' + name, { method: 'POST', body: o.toDataURL('image/jpeg', 0.86) }); }
-function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); if (g.toon) g.toon.setSize(w, h); }
+function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); if (g.composer) g.composer.setSize(w, h); if (g.toon) g.toon.setSize(w, h); }
 // the views (church coordinates: x to the altar, z south): [name, eye, target, fov]
 export const VIEWS = [
   ['nave', [-21.2, 1.7, 0.6], [10, 6, 0], 62],

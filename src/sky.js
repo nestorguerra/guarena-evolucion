@@ -38,10 +38,19 @@ const KEYS_ANIME = [
   { a: 0.35, zen: 0x6cbdbb, hor: 0xb0e0d6, warm: 0xd3ede5, gnd: 0xb9b4a0, sun: 0xfff4de },
   { a: 1.0, zen: 0x68bab9, hor: 0xa9ddd4, warm: 0xc9e9e1, gnd: 0xbdb8a4, sun: 0xffffff },
 ];
+// the diorama's sky: a clear, deeper blue than the physical one, a pale horizon, warm low suns
+const KEYS_DIORAMA = [
+  { a: -0.3, zen: 0x08102a, hor: 0x16203c, warm: 0x1c2640, gnd: 0x0a0c12, sun: 0x000000 },
+  { a: -0.08, zen: 0x1a2a58, hor: 0x4a3c58, warm: 0x8a5a50, gnd: 0x1a1816, sun: 0x5a3020 },
+  { a: 0.0, zen: 0x2f4f96, hor: 0xe09a68, warm: 0xff9a50, gnd: 0x5a4a3c, sun: 0xff8a40 },
+  { a: 0.12, zen: 0x3570c0, hor: 0xeac49a, warm: 0xffc078, gnd: 0x9a8668, sun: 0xffc98a },
+  { a: 0.35, zen: 0x3a7ccc, hor: 0xa8cdea, warm: 0xe6d8c2, gnd: 0xbfa880, sun: 0xffe0b4 },
+  { a: 1.0, zen: 0x3576c8, hor: 0xa0c7e8, warm: 0xd8dfe8, gnd: 0xc4ad87, sun: 0xffecd2 },
+];
 const _ca = new THREE.Color(), _cb = new THREE.Color();
 const NIGHT_FILL = new THREE.Color(0.27, 0.33, 0.47), NIGHT_GND = new THREE.Color(0.11, 0.1, 0.09);
 function paletteAt(alt, key, out) {
-  const K = STYLE.anime ? KEYS_ANIME : KEYS;
+  const K = STYLE.anime ? KEYS_ANIME : STYLE.diorama ? KEYS_DIORAMA : KEYS;
   let i = 0;
   while (i < K.length - 2 && alt > K[i + 1].a) i++;
   const A = K[i], B = K[i + 1];
@@ -163,6 +172,51 @@ function makeAnimeSkyMaterial(uniforms) {
   });
 }
 
+// the diorama's sky (all of it, day and night): a clean gradient, the sun with a soft glow, and soft cumulus — white
+// lit tops, bluish-grey bellies, thinning towards the zenith (no ink, no hard cut: the reference renders' summer sky)
+function makeDioramaSkyMaterial(uniforms) {
+  return new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms,
+    vertexShader: `varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w; }`,
+    fragmentShader: `
+      uniform vec3 uSun, uZen, uHor, uWarm, uGnd, uSunCol; uniform float uTime, uNight, uCloud;
+      varying vec3 vDir;
+      float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+      float n2(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h2(i),h2(i+vec2(1,0)),f.x), mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x), f.y); }
+      float fbm(vec2 p){ float s=0.0, a=0.5; for(int i=0;i<5;i++){ s+=a*n2(p); p=p*2.03+vec2(1.7,9.2); a*=0.5; } return s; }
+      void main(){
+        vec3 d = normalize(vDir);
+        float h = d.y;
+        vec2 hs = normalize(uSun.xz + 1e-5), hd = normalize(d.xz + 1e-5);
+        float toward = pow(max(dot(hs, hd), 0.0), 2.5);
+        vec3 hor = mix(uHor, uWarm, toward * 0.7);
+        vec3 col = mix(hor, uZen, smoothstep(0.0, 0.55, pow(max(h, 0.0), 0.75)));
+        col = mix(col, uGnd, smoothstep(0.0, -0.1, h));
+        float sd = max(dot(d, uSun), 0.0), up = step(-0.03, uSun.y);
+        col += uSunCol * (pow(sd, 8.0) * 0.16 + pow(sd, 64.0) * 0.3) * up;
+        col = mix(col, uSunCol * 1.5 + 0.4, smoothstep(0.99955, 0.9998, sd) * up);
+        col += vec3(0.16, 0.11, 0.08) * exp(-max(h, 0.0) * 12.0) * uNight * 0.3;
+        if (h > -0.02) {
+          vec2 uv = d.xz / (h + 0.14) * 1.1 + vec2(uTime * 0.003, uTime * 0.001);
+          vec2 w = vec2(fbm(uv * 0.7 + 3.1), fbm(uv * 0.7 + 7.7)) - 0.5;
+          float c = fbm(uv + w * 0.9);
+          float t = 0.68 - uCloud * 0.18;
+          float m = smoothstep(t, t + 0.12, c) * smoothstep(-0.01, 0.1, h) * (1.0 - smoothstep(0.45, 0.9, h) * 0.7);
+          float lit = smoothstep(t, t + 0.22, fbm(uv + w * 0.9 + vec2(uSun.x, uSun.z) * 0.05 + vec2(0.0, 0.04)));
+          vec3 cl = mix(vec3(1.0, 0.985, 0.96), uSunCol * 1.1 + vec3(0.15), 0.3 * (1.0 - smoothstep(0.0, 0.45, uSun.y)));
+          vec3 cs = mix(hor, uZen, 0.4) * 0.9 + cl * 0.14;
+          vec3 cc = mix(cs, cl, 0.3 + 0.7 * lit);
+          cc = mix(cc, uZen * 0.5 + vec3(0.03, 0.04, 0.07), uNight * 0.85);
+          col = mix(col, cc, m * (0.95 - 0.35 * uNight));
+        }
+        gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  });
+}
+
 export class SkySystem {
   constructor(renderer, scene, quality) {
     this.renderer = renderer;
@@ -174,7 +228,7 @@ export class SkySystem {
       uWarm: { value: new THREE.Color() }, uGnd: { value: new THREE.Color() }, uSunCol: { value: new THREE.Color() },
       uTime: { value: 0 }, uNight: { value: 0 }, uCloud: { value: 0.42 },
     };
-    this.mat = STYLE.anime ? makeAnimeSkyMaterial(this.uniforms) : makeSkyMaterial(this.uniforms);
+    this.mat = STYLE.anime ? makeAnimeSkyMaterial(this.uniforms) : STYLE.diorama ? makeDioramaSkyMaterial(this.uniforms) : makeSkyMaterial(this.uniforms);
     // physical daytime sky (Rayleigh + Mie scattering): real blues, a white haze at the horizon, orange sunsets
     this.phys = new Sky();
     this.phys.scale.setScalar(3800);
@@ -243,17 +297,19 @@ export class SkySystem {
     sc.near = 1; sc.far = 600;
     this.sun.shadow.bias = -0.00025;
     this.sun.shadow.normalBias = 0.035;
-    this.sun.shadow.radius = 2.5;
+    this.sun.shadow.radius = STYLE.diorama ? 3.5 : 2.5;
     scene.add(this.sun, this.sun.target);
     this.hemi = new THREE.HemisphereLight(0xbfd8ff, 0x8a7a60, 0.6);
     scene.add(this.hemi);
+    // the diorama's bounce: the sunlit street and walls lighting the shade back, warm (a fill light: no shadows)
+    if (STYLE.diorama) { this.bounce = new THREE.DirectionalLight(0xffdcb0, 0); scene.add(this.bounce, this.bounce.target); }
     this.fog = new THREE.Fog(0xcad6e0, 150, 1600);
     scene.fog = this.fog;
     this.sunDir = new THREE.Vector3();
     // IBL: the same sky rendered into a PMREM environment map
     this.pmrem = new THREE.PMREMGenerator(renderer);
     this.envScene = new THREE.Scene();
-    this.envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), STYLE.anime ? makeAnimeSkyMaterial(this.uniforms) : makeSkyMaterial(this.uniforms)));
+    this.envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), STYLE.anime ? makeAnimeSkyMaterial(this.uniforms) : STYLE.diorama ? makeDioramaSkyMaterial(this.uniforms) : makeSkyMaterial(this.uniforms)));
     this.envGround = new THREE.Mesh(new THREE.CircleGeometry(90, 24), new THREE.MeshBasicMaterial({ color: 0x8a7e6c }));
     this.envGround.rotation.x = -Math.PI / 2; this.envGround.position.y = -2;
     this.envScene.add(this.envGround);
@@ -308,7 +364,7 @@ export class SkySystem {
     this.phys.position.copy(focus);
     this.phys.material.uniforms.sunPosition.value.copy(d);
     this.phys.material.uniforms.turbidity.value = 2.8 + this.cloud * 2.4; // hazier with more cloud
-    this.phys.visible = !STYLE.anime && alt > -0.2;
+    this.phys.visible = !STYLE.anime && !STYLE.diorama && alt > -0.2;
     this.stars.position.copy(focus);
     this.stars.material.uniforms.uOpacity.value = this.night * (1 - (this.cloud || 0) * 0.5);
     // moon opposite-ish to the sun, high at night
@@ -320,7 +376,8 @@ export class SkySystem {
     const sunCol = paletteAt(Math.max(alt, 0.0), 'sun', new THREE.Color());
     if (alt > -0.02) {
       this.sun.color.copy(sunCol).lerp(new THREE.Color(1, 1, 1), 0.25);
-      this.sun.intensity = (STYLE.anime ? 2.6 : 4.4) * smoothstep(-0.02, 0.16, alt);
+      this.sun.intensity = (STYLE.anime ? 2.6 : STYLE.diorama ? 5.2 : 4.4) * smoothstep(-0.02, 0.16, alt);
+      if (STYLE.diorama) this.sun.color.copy(sunCol).lerp(new THREE.Color(1, 0.97, 0.9), 0.1); // (the afternoon sun stays warm)
       this.sun.position.copy(focus).addScaledVector(d, 250);
       this.lightDir = (this.lightDir || new THREE.Vector3()).copy(d);
     } else {
@@ -343,11 +400,28 @@ export class SkySystem {
       this.hemi.groundColor.copy(U.uGnd.value).lerp(new THREE.Color(0.62, 0.66, 0.7), 0.4).lerp(NIGHT_GND, this.night * 0.7);
       this.hemi.intensity = lerp(0.42, 1.9, day) + this.night * 0.12; // (night: a deep blue, the lamps do the rest)
     }
+    if (STYLE.diorama) { // a clear, warm shade (never blue-grey); the ground bounce warm like the sand of the pavements
+      this.hemi.color.copy(U.uZen.value).lerp(U.uHor.value, 0.5).lerp(new THREE.Color(0.98, 0.94, 0.88), 0.7 * day).lerp(NIGHT_FILL, this.night * 0.85);
+      this.hemi.groundColor.copy(U.uGnd.value).lerp(new THREE.Color(0.88, 0.76, 0.58), 0.7 * day).lerp(NIGHT_GND, this.night * 0.8);
+      this.hemi.intensity = lerp(0.45, 1.6, day) + this.night * 0.8;
+      // the bounce comes from the side away from the sun, a little above the street
+      const b = this.bounce;
+      b.color.copy(U.uGnd.value).lerp(new THREE.Color(1.0, 0.84, 0.64), 0.65);
+      b.intensity = 0.85 * day * smoothstep(-0.02, 0.16, alt);
+      b.target.position.copy(focus);
+      b.position.set(-d.x, 0, -d.z).normalize().setY(0.35).normalize().multiplyScalar(100).add(focus);
+      b.target.updateMatrixWorld();
+    }
     // fog matches the horizon
     this.fog.color.copy(U.uHor.value).lerp(U.uZen.value, 0.15);
     this.fog.near = lerp(60, 280, day);
     this.fog.far = lerp(800, 2600, day);
     this.renderer.toneMappingExposure = lerp(1.08, 0.68, day) + golden * day * 0.06;
+    if (STYLE.diorama) { // only as much air as the distance needs: no milky haze over the streets
+      this.fog.color.copy(U.uHor.value).lerp(new THREE.Color(0.93, 0.88, 0.8), 0.25 * day);
+      this.fog.near = lerp(120, 520, day); this.fog.far = lerp(1200, 4200, day);
+      this.renderer.toneMappingExposure = lerp(1.0, 1.0, day) + golden * day * 0.05;
+    }
     if (STYLE.anime) {
       this.fog.color.copy(U.uHor.value).lerp(U.uZen.value, 0.25);
       this.fog.near = lerp(90, 380, day); this.fog.far = lerp(1100, 3400, day);
@@ -358,16 +432,18 @@ export class SkySystem {
     if (forceEnv || this.envTimer <= 0) {
       this.envTimer = 3;
       this.envGround.material.color.copy(U.uGnd.value);
+      if (STYLE.diorama) this.envGround.material.color.lerp(new THREE.Color(0.78, 0.66, 0.5), 0.6 * day); // (warm sand below)
       const sunK = smoothstep(-0.02, 0.2, alt);
       this.envBand.material.color.copy(U.uHor.value).multiplyScalar(0.35).lerp(new THREE.Color(0.9, 0.84, 0.72).multiply(U.uSunCol.value), sunK * 0.85);
       this.envHaze.material.color.copy(U.uHor.value).lerp(new THREE.Color(0.8, 0.77, 0.72), 0.6).multiplyScalar(0.25 + 0.75 * day);
-      this.envHaze.material.opacity = 0.38 * day;
+      this.envHaze.material.opacity = (STYLE.diorama ? 0.12 : 0.38) * day;
+      if (STYLE.diorama) this.envBand.material.color.copy(U.uHor.value).multiplyScalar(0.3).lerp(new THREE.Color(0.96, 0.89, 0.76).multiply(U.uSunCol.value), sunK * 0.95);
       const rt = this.pmrem.fromScene(this.envScene, 0, 0.1, 400);
       if (this.envRT) this.envRT.dispose();
       this.envRT = rt;
       this.scene.environment = rt.texture;
     }
-    this.scene.environmentIntensity = STYLE.anime ? lerp(0.3, 0.45, day) : lerp(0.4, 0.55, day);
+    this.scene.environmentIntensity = STYLE.anime ? lerp(0.3, 0.45, day) : STYLE.diorama ? lerp(0.45, 0.6, day) : lerp(0.4, 0.55, day);
     return this.night;
   }
 }

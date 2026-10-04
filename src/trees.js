@@ -364,6 +364,18 @@ function animeFlatten(dc, da, W, H) {
     dc[i] = Math.min(255, r); dc[i + 1] = Math.min(255, g); dc[i + 2] = Math.min(255, b);
   }
 }
+// the diorama look: the leaves towards the visual spec's olive and dark greens (dusty, a little warm); flowers keep theirs
+function dioramaGreens(dc, W, H) {
+  for (let i = 0; i < W * H * 4; i += 4) {
+    const r = dc[i], g = dc[i + 1], b = dc[i + 2];
+    const gr = Math.min(1, (g - Math.max(r, b)) / 30); // how green the pixel is
+    if (gr <= 0) continue;
+    const L = 0.299 * r + 0.587 * g + 0.114 * b, k = 0.7;
+    dc[i] = r + ((L + (r - L) * k) * 1.06 - r) * gr;
+    dc[i + 1] = g + ((L + (g - L) * k) * 0.97 - g) * gr;
+    dc[i + 2] = b + ((L + (b - L) * k) * 0.8 - b) * gr;
+  }
+}
 // the leaf atlas as a DataTexture: colour painted over the tile's own mean colour (so filtering never pulls in a dark
 // halo), alpha painted separately
 export function makeLeafAtlas() {
@@ -384,6 +396,7 @@ export function makeLeafAtlas() {
   });
   const dc = xc.getImageData(0, 0, W, H).data, da = xa.getImageData(0, 0, W, H).data;
   if (STYLE.anime) animeFlatten(dc, da, W, H);
+  else if (STYLE.diorama) dioramaGreens(dc, W, H);
   const out = new Uint8Array(W * H * 4);
   // rows flipped: the DataTexture's first row is the bottom (v = 0)
   for (let y = 0; y < H; y++) {

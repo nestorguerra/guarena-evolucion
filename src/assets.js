@@ -153,6 +153,20 @@ export function loadTexture(name, suffix = '_d', { srgb = true, repeat = 1 } = {
       toonifyLayers(id.data, S, 1, { rColor: 6, rEdge: 2, levels: 5, posterize: 0.8, ink: 0.4, edge0: 20, edge1: 44 });
       x.putImageData(id, 0, 0);
       t.image = c;
+    } else if (STYLE.diorama && suffix === '_d' && /plaster/.test(name)) {
+      // the diorama's lime plaster (the visual spec): the scan's stains and blotches kept as soft differences of tone
+      const S = Math.min(1024, im.width || 1024), c = document.createElement('canvas'); c.width = c.height = S;
+      const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, S, S);
+      const id = x.getImageData(0, 0, S, S), d = id.data, M = [0, 0, 0];
+      for (let i = 0; i < d.length; i += 4) { M[0] += d[i]; M[1] += d[i + 1]; M[2] += d[i + 2]; }
+      const IV = [240, 230, 208], T = [0, 0, 0]; // (its mean moved most of the way to the ivory of fresh lime)
+      for (let k = 0; k < 3; k++) { M[k] /= d.length / 4; T[k] = M[k] + (IV[k] - M[k]) * 0.7; }
+      for (let i = 0; i < d.length; i += 4) {
+        const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        for (let k = 0; k < 3; k++) d[i + k] = T[k] + (l + (d[i + k] - l) * 0.6 - M[k]) * 0.3;
+      }
+      x.putImageData(id, 0, 0);
+      t.image = c;
     } else t.image = im;
     t.needsUpdate = true;
   });

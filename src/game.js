@@ -4,6 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { DIORAMA, DioramaGrade } from './diorama.js';
 import { STYLE } from './style.js';
 import { ToonPipeline } from './toon.js';
 import { LoFi } from './lofi.js';
@@ -90,7 +93,7 @@ export class Game {
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.shadowMap.enabled = q.shadows > 0;
-    r.shadowMap.type = THREE.PCFSoftShadowMap;
+    r.shadowMap.type = STYLE.diorama ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap; // (the diorama: a short, soft penumbra — sky.js radius)
     this.renderer = r;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.25, 4200);
@@ -183,6 +186,30 @@ export class Game {
       this.toon = new ToonPipeline(r, { msaa: this.qKey === 'baja' ? 0 : 4 });
       this.toon.setLook(this.save.look || 'manga'); // (the look: Ajustes › Estética)
       r.toneMapping = THREE.CustomToneMapping; // (what is drawn straight to the screen gets the pipeline's curve)
+    } else if (STYLE.diorama) {
+      // the diorama: the scene, its contact shadows (ambient occlusion where things meet), a warm grade, a little bloom
+      const rt = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: this.qKey === 'baja' ? 0 : 4, depthTexture: new THREE.DepthTexture(innerWidth, innerHeight) });
+      this.composer = new EffectComposer(r, rt);
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
+      if (this.qKey !== 'baja') {
+        // the AO reads the depth the scene pass has just drawn (normals from that depth): no second drawing of the whole
+        // town for a normal buffer (twice the draw calls), and no sprites without normals (they came out as black squares)
+        this.gtao = new GTAOPass(this.scene, this.camera, innerWidth, innerHeight);
+        this.gtao.setGBuffer(rt.depthTexture); // (after construction: r170's constructor trips over a given depth texture)
+        this.gtao.updateGtaoMaterial(DIORAMA.ao); this.gtao.updatePdMaterial(DIORAMA.aoDenoise);
+        this.gtao.blendIntensity = DIORAMA.aoBlend;
+        const gtaoRender = this.gtao.render.bind(this.gtao);
+        this.gtao.render = (renderer, wb, rb, dt, mask) => { // (the composer's two buffers take turns: the one just drawn)
+          this.gtao.gtaoMaterial.uniforms.tDepth.value = rb.depthTexture; this.gtao.pdMaterial.uniforms.tDepth.value = rb.depthTexture;
+          gtaoRender(renderer, wb, rb, dt, mask);
+        };
+        this.composer.addPass(this.gtao);
+      }
+      this.grade = new ShaderPass(DioramaGrade);
+      this.composer.addPass(this.grade);
+      if (q.bloom) { this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.12, 0.5, 0.95); this.composer.addPass(this.bloom); }
+      this.composer.addPass(new OutputPass());
+      this.composer.setPixelRatio(r.getPixelRatio());
     } else if (q.bloom) {
       const rt = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: 4 });
       this.composer = new EffectComposer(r, rt);
@@ -235,7 +262,7 @@ export class Game {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    if (this.composer) { this.composer.setSize(w, h); this.bloom.setSize(w, h); }
+    if (this.composer) { this.composer.setSize(w, h); if (this.bloom) this.bloom.setSize(w, h); } // (the diorama's composer may have no bloom)
     if (this.toon) this.toon.setSize(w, h);
     const radar = this.ui.radar;
     const size = Math.round(w < 520 ? Math.min(128, w * 0.34) : h <= 500 ? Math.min(112, h * 0.3) : Math.min(230, Math.max(150, Math.min(w, h) * 0.24)));
@@ -699,7 +726,7 @@ export class Game {
   // the scene through whichever pipeline is on (also used by the photo tools with their own cameras)
   renderView(cam, overlay = null) {
     if (this.toon) this.toon.render(this.scene, cam, { night: this.sky ? this.sky.night : 0, exposure: this.renderer.toneMappingExposure, overlay });
-    else if (this.composer) { const rp = this.composer.passes[0], keep = rp.camera; rp.camera = cam; this.composer.render(); rp.camera = keep; }
+    else if (this.composer) { const rp = this.composer.passes[0], keep = rp.camera; rp.camera = cam; if (this.gtao) this.gtao.camera = cam; this.composer.render(); rp.camera = keep; if (this.gtao) this.gtao.camera = keep; }
     else this.renderer.render(this.scene, cam);
   }
   render() {

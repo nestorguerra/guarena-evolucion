@@ -1,0 +1,41 @@
+// «Diorama extremeño» — the central settings of the diorama look (Ajustes › Estética › Diorama), after the visual spec
+// of 4 October 2026: warm stylized realism with the finish of a crafted architectural model. One place for the palette,
+// the families of materials, the contact shadows and the final grade; the sky and the sun keep theirs in sky.js
+// (KEYS_DIORAMA), the façades theirs in textures.js (DIORAMA_DEF) and buildings.js (tints).
+//
+// The palette is the spec's (a starting point for production, tuned by eye against its three reference renders):
+// ivory whitewash, cream, toasted-ochre plinths, terracotta, deep green doors, warm charcoal iron, sand pavements, warm
+// grey asphalt, olive and dark greens, geranium red, a soft blue sky.
+export const PALETTE = {
+  cal: '#f0e5cd', crema: '#e2d2b5', zocalo: '#be793c', teja: '#ab573a', verde: '#354d3d', hierro: '#30322d',
+  acera: '#c4ad87', asfalto: '#56544d', oliva: '#637648', verdeOscuro: '#3d5536', geranio: '#bd4e43', cielo: '#8cb8d6',
+};
+
+// families of materials: roughness ranges for a PBR renderer (0..1), from the spec
+export const ROUGH = { cal: [0.85, 0.95], teja: [0.7, 0.9], piedra: [0.8, 1.0], asfalto: [0.8, 1.0], metal: [0.55, 0.8] };
+
+export const DIORAMA = {
+  // contact shadows: ambient occlusion where things meet (the foot of a wall, under eaves, balconies, pots, people)
+  ao: { radius: 2.0, distanceExponent: 1.0, thickness: 2.5, scale: 1.7, samples: 16, distanceFallOff: 1.0, screenSpaceRadius: false },
+  aoDenoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 },
+  aoBlend: 1.0,
+};
+
+// the last grade, in linear light before the tone curve: a little more colour, the white balance of a warm afternoon,
+// a touch of contrast round the middle greys (the model's light, not a filter: no outlines, no grain, no wash)
+export const DioramaGrade = {
+  uniforms: { tDiffuse: { value: null }, uSat: { value: 1.04 }, uWarm: { value: 0.03 }, uContrast: { value: 1.04 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uSat, uWarm, uContrast; varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      vec3 col = max(c.rgb, 0.0);
+      float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      col = mix(vec3(l), col, uSat);
+      col *= vec3(1.0 + uWarm, 1.0 + uWarm * 0.3, 1.0 - uWarm * 0.7);
+      float k = pow(max(l, 1e-4) / 0.18, uContrast - 1.0);
+      col *= clamp(k, 0.6, 1.6);
+      gl_FragColor = vec4(col, c.a);
+    }`,
+};

@@ -6,6 +6,8 @@
 import * as THREE from 'three';
 import { BAY_W, FLOOR_H, STYLE_DEF } from './textures.js';
 import { mulberry32, clamp } from './util.js';
+// (the look — anime / real / diorama — as LOOK: STYLE here is the façades' styles)
+import { STYLE as LOOK } from './style.js';
 import { CardGeo, potPlant, groundPlant, GROUND_KINDS } from './trees.js';
 
 // facade cell types = painted layer index inside a style
@@ -271,8 +273,10 @@ const C = {
   glassDk: hexC('#27323c'), brass: hexC('#b08d3c'), metal: hexC('#8e9295'), metalDk: hexC('#6d7175'), pipe: hexC('#9fa3a6'),
   ac: hexC('#ecece8'), acDk: hexC('#3a3c3e'), plate: hexC('#f4f6f8'), tileBlue: hexC('#2f5aa0'), vadoRed: hexC('#c8202a'), vadoBlue: hexC('#2d56a8'),
   meter: hexC('#c9c9c2'), slabUnder: hexC('#cfc9bd'),
+  sandstone: hexC('#d6c3a0'), sandSill: hexC('#e2d4b6'), // the diorama's warm stone (src/diorama.js)
 };
 const RECERCADO = ['#d9a441', '#c9b27a', '#8d97a3', '#4f6fa8', '#b8793f'];
+const RECERCADO_D = ['#cfae78', '#c49a62', '#b8793f', '#d8c39a', '#c9b27a']; // the diorama's: warm ochres and sand
 const CURTAINS = ['#2f7a45', '#b8342c', '#d8b23a', '#3e5f9a', '#6b4a2e', '#e8e4d8'];
 const AWNING = ['#1d6e3e', '#b02a2a', '#1f4f8a', '#c77a12', '#6b4a2e', '#2a2a2a'];
 const FASCIA = ['#1f3b5a', '#7a1f1f', '#23472c', '#3b3b3b', '#8a5a1c', '#5a2d5f', '#e8e4dc'];
@@ -304,8 +308,12 @@ function buildingStyle(o) {
   bs.buche = (trad || o.style === 'piedra') && r() < 0.3;
   bs.sill = o.style === 'piedra' ? C.granite : o.style === 'ladrillo' ? hexC('#9b9a95') : o.style === 'moderna' ? hexC('#c9c9c6') : trad && r() < 0.3 ? C.terracotta : C.marble;
   bs.sillPat = o.style === 'piedra' || o.style === 'ladrillo' ? PAT.GRANITE : 0;
-  bs.surround = o.style === 'piedra' || ((trad || o.style === 'renovada') && r() < 0.55);
-  bs.recercado = !bs.surround && (trad || o.style === 'color') && r() < 0.35 ? hexC(pickR(r, RECERCADO)) : null;
+  // the diorama (the visual spec's references): wide, proud door surrounds of warm sandstone on most old houses
+  const D = LOOK.diorama;
+  bs.surround = o.style === 'piedra' || ((trad || o.style === 'renovada' || (D && o.style === 'color')) && r() < (D ? 0.8 : 0.55));
+  bs.stone = D && o.style !== 'piedra' ? C.sandstone : C.granite;
+  if (D && bs.sill === C.marble) bs.sill = C.sandSill;
+  bs.recercado = !bs.surround && (trad || o.style === 'color') && r() < 0.35 ? hexC(pickR(r, D ? RECERCADO_D : RECERCADO)) : null;
   bs.pots = (trad || o.style === 'renovada' || o.style === 'color' || o.style === 'piedra') ? 0.45 : 0.12;
   bs.shutters = trad || o.style === 'piedra';
   bs.curtain = hexC(pickR(r, CURTAINS));
@@ -525,12 +533,12 @@ function buildDoor(G, F, o, bs, rnd) {
   const X0 = o.x0, X1 = o.x1, Y1 = o.y1, D = o.D;
   const W = X1 - X0;
   const stepH = 0.13;
-  G.box(X0 - 0.15, 0, -D, X1 + 0.15, stepH, 0.3, bs.style === 'piedra' || bs.surround ? C.granite : C.step, bs.surround ? PAT.GRANITE : 0);
+  G.box(X0 - 0.15, 0, -D, X1 + 0.15, stepH, 0.3, bs.style === 'piedra' || bs.surround ? bs.stone : C.step, bs.surround ? PAT.GRANITE : 0);
   if (bs.surround) {
-    const b = 0.16, z = 0.026;
-    G.box(X0 - b, stepH, 0, X0, Y1, z, C.granite, PAT.GRANITE, 31);
-    G.box(X1, stepH, 0, X1 + b, Y1, z, C.granite, PAT.GRANITE, 31);
-    G.box(X0 - b, Y1, 0, X1 + b, Y1 + b, z + 0.01, C.granite, PAT.GRANITE, 31);
+    const b = LOOK.diorama ? 0.22 : 0.16, z = LOOK.diorama ? 0.05 : 0.026;
+    G.box(X0 - b, stepH, 0, X0, Y1, z, bs.stone, PAT.GRANITE, 31);
+    G.box(X1, stepH, 0, X1 + b, Y1, z, bs.stone, PAT.GRANITE, 31);
+    G.box(X0 - b, Y1, 0, X1 + b, Y1 + b, z + 0.01, bs.stone, PAT.GRANITE, 31);
   } else if (bs.recercado) {
     const b = 0.13, z = 0.003;
     G.box(X0 - b, stepH, 0, X0, Y1 + b, z, bs.recercado, 0, 16);

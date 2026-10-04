@@ -18,11 +18,22 @@ zombis y multijugador con tus amigos.
 Desde la versión 32 se ve **como un anime**, inspirado en la estética del juego web
 [Messenger](https://messenger.abeto.co/) (Abeto): luz de dos tonos con sombras frías, contornos de tinta
 dibujados a partir de la profundidad, texturas repintadas en colores planos, cielo turquesa con nubes planas, árboles de
-copas redondeadas y caras de ojos grandes y piel lisa. El aspecto fotográfico de antes sigue en *Ajustes › Estilo
-visual › Realista*.
+copas redondeadas y caras de ojos grandes y piel lisa.
 
-En *Ajustes › Estética* el manga se cambia al momento por la **Acuarela de dehesa**: aguadas claras sobre papel de
-grano, el pigmento acumulado donde se tocan dos colores, el papel en blanco para las luces y un lápiz suave debajo.
+En *Ajustes › Estética* hay cuatro formas de verlo: **Manga**, **Acuarela** (la Acuarela de dehesa: aguadas claras
+sobre papel de grano, el pigmento acumulado donde se tocan dos colores, el papel en blanco para las luces y un lápiz
+suave debajo), **Realista** (el aspecto fotográfico de antes) y **Diorama**. Manga y Acuarela cambian al momento;
+Realista y Diorama, al recargar.
+
+La **Diorama** sigue la especificación visual «realismo estilizado cálido con acabado de diorama artesanal»: cal marfil y
+crema con su grano, zócalos ocre tostado, tejas terracota, puertas verde profundo con jambas de piedra arenisca, rejas
+de carbón cálido, aceras de arena y asfalto gris cálido; tarde luminosa de sol lateral cálido, cielo azul con cúmulos
+suaves, sombras algo más frías con penumbra corta, oclusión de contacto (GTAO) donde las cosas se tocan y la luz que
+rebota de la calle; la vegetación hacia el verde oliva. Toda su configuración está junta en `src/diorama.js` (paleta,
+rugosidades, oclusión, gradación final) y en las ramas `STYLE.diorama` del cielo, las fachadas y el suelo. Para
+compararla con las otras: `tools/lookcompare.js` (las tres vistas de prueba —hacia Santa María, una calle estrecha y un
+cruce— con la cámara y la luz fijas, más plaza, atardecer, noche, un coche, el campo y el pueblo desde arriba, y la
+medida del tiempo por fotograma).
 
 ![Guareña desde el aire: la Iglesia de Santa María y la Plaza de España con el Ayuntamiento](docs/portada.jpg)
 

@@ -59,6 +59,7 @@ export function arrayTexture(data, size, layers, { srgb = true, aniso = 8 } = {}
 export function makeBuildingMaterial(facadeTex, detail = null) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0.0, side: THREE.DoubleSide });
   if (STYLE.anime) m.defines = { ANIME: '' };
+  else if (STYLE.diorama) m.defines = { DIORAMA: '' };
   const dOn = detail && detail.on ? 1 : 0;
   const nOn = detail && detail.on && detail.normals ? 1 : 0;
   const dummy = new THREE.DataArrayTexture(new Uint8Array([128, 128, 255, 255]), 1, 1, 1);
@@ -318,6 +319,9 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
 if (uDetNOn > 0.5 && gDetK > 0.01) {
   vec3 mapN = texture(uDetN, vec3(gDetUV, gDetL)).xyz * 2.0 - 1.0;
   mapN.xy *= gDetK;
+#ifdef DIORAMA
+  mapN.xy *= 1.5; // (the diorama: the grain of the lime plaster legible under the side sun)
+#endif
   mat3 tbn = cotangentFrame(normal, -vViewPosition, gDetUV);
   normal = normalize(tbn * mapN);
 }`)
@@ -446,6 +450,7 @@ mat3 gCotangent(vec3 N, vec3 p, vec2 uv) {
 
 export function makeGroundMaterial(groundTex, { polygonOffset = 0, roughness = 0.95, transparentEdges = false, fx = null } = {}) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness, metalness: 0 });
+  if (STYLE.diorama) m.defines = { DIORAMA: '' };
   if (polygonOffset) {
     m.polygonOffset = true;
     m.polygonOffsetFactor = -polygonOffset;
@@ -508,7 +513,12 @@ ${GROUND_GLSL}`)
       vec2 duv = wp / uGDetSize[dl];
       vec3 d = texture(uGDet, vec3(duv, float(dl))).rgb;
       float mn = max(uGDetMean[dl], 0.05);
-      if (mode > 1.5) col = mix(col, col * d / mn, 0.7);
+      bool lumOnly = false;
+#ifdef DIORAMA
+      lumOnly = layer < 1.5; // the diorama keeps its warm painted asphalt: the scan only lends it its grain
+#endif
+      if (lumOnly) col *= mix(1.0, clamp(dot(d, vec3(0.3333)) / mn, 0.62, 1.38), 0.85);
+      else if (mode > 1.5) col = mix(col, col * d / mn, 0.7);
       else if (mode > 0.5) col = mix(col, d * vTint * (layer > 0.5 && layer < 1.5 ? vec3(0.86) : layer > 6.5 && layer < 7.5 ? vec3(1.1, 1.0, 0.82) : vec3(1.0)), 0.85);
       else col *= mix(1.0, clamp(dot(d, vec3(0.3333)) / mn, 0.72, 1.28), 0.5);
       gGDetK = mode > 0.5 ? 0.9 : 0.35; gGDetL = float(dl); gGDetUV = duv;

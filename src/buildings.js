@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { FACADE_STYLES, FACADE_LAYERS_PER_STYLE, ROOF_BASE, BAY_W, FLOOR_H } from './textures.js';
 import { ringArea, orientedRect, hash1, mulberry32, pointInRing, ringCentroid, ringBounds, polyNearest } from './util.js';
 import { PolyIndex } from './collision.js';
+// (the look — anime / real / diorama — as LOOK: STYLE here is the façade styles' layers)
+import { STYLE as LOOK } from './style.js';
 import { planPart, holeRect, recessDepth, styleHasHoles, CT } from './facades.js';
 
 const STYLE = Object.fromEntries(FACADE_STYLES.map((s, i) => [s, i * FACADE_LAYERS_PER_STYLE]));
@@ -61,6 +63,10 @@ class Chunk {
 
 const WHITES = [[1, 1, 1], [0.99, 0.985, 0.97], [0.985, 0.98, 0.99], [1, 0.975, 0.94], [0.97, 0.965, 0.95]];
 const COLORS = [[0.97, 0.9, 0.76], [0.95, 0.84, 0.6], [0.95, 0.78, 0.66], [0.9, 0.74, 0.52], [0.97, 0.92, 0.68], [0.86, 0.9, 0.8], [0.84, 0.89, 0.92], [0.96, 0.87, 0.8]];
+// the diorama's (src/diorama.js): whitewash that is ivory and cream, never blue-white; the coloured houses in the warm
+// earths of the spec (cream, light ochre, pale terracotta, straw)
+const WHITES_D = [[1, 1, 1], [1, 0.985, 0.96], [0.985, 0.97, 0.94], [1, 0.98, 0.95], [0.97, 0.955, 0.93]];
+const COLORS_D = [[0.89, 0.82, 0.71], [0.94, 0.9, 0.8], [0.93, 0.8, 0.58], [0.9, 0.74, 0.63], [0.93, 0.87, 0.69], [0.96, 0.88, 0.66], [0.97, 0.94, 0.88], [0.95, 0.83, 0.72]];
 
 function chooseStyle(b, rnd) {
   const y = b.year || 1960;
@@ -175,12 +181,14 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
     const rnd = mulberry32((b.id * 2654435761) >>> 0);
     const style = chooseStyle(b, rnd);
     let tint;
-    if (style === 'color') tint = COLORS[Math.floor(rnd() * COLORS.length)];
+    const D = LOOK.diorama, CO = D ? COLORS_D : COLORS, WH = D ? WHITES_D : WHITES;
+    if (style === 'color') tint = CO[Math.floor(rnd() * CO.length)];
     else if (style === 'ladrillo' || style === 'piedra') tint = [1, 1, 1];
     else if (style === 'nave') tint = rnd() < 0.5 ? [1, 1, 1] : [0.95, 0.93, 0.88];
-    else tint = WHITES[Math.floor(rnd() * WHITES.length)];
+    else tint = WH[Math.floor(rnd() * WH.length)];
     const rt = 0.85 + rnd() * 0.25;
-    const roofTint = [rt, rt * (0.95 + rnd() * 0.08), rt * (0.9 + rnd() * 0.12)];
+    // (the diorama's roofs: fired clay, terracotta)
+    const roofTint = D ? [rt * 0.98, rt * (0.84 + rnd() * 0.06), rt * (0.76 + rnd() * 0.08)] : [rt, rt * (0.95 + rnd() * 0.08), rt * (0.9 + rnd() * 0.12)];
     const info = { style, tint, roofTint, seed: rnd(), shop: b.use === 4 ? 1 : 0, rnd, pitch: 0.42 + rnd() * 0.16, minFloors: 0 };
     const ov = overrides && overrides.get(b.id);
     if (ov) Object.assign(info, ov);
