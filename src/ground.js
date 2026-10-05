@@ -63,9 +63,11 @@ export function parkingBays(map) {
 // aLoc = local frame of roads & curbs: (distance along, offset across, half width, damage + 4 * seed) — zero elsewhere
 const NOLOC = [0, 0, 0, 0];
 export class GroundBuilder {
-  constructor() { this.pos = []; this.gnd = []; this.tint = []; this.idx = []; this.loc = []; }
+  constructor() { this.pos = []; this.gnd = []; this.tint = []; this.idx = []; this.loc = []; this.nrm = null; }
   get n() { return this.pos.length / 3; }
-  vert(x, y, z, u, v, layer, t, loc = NOLOC) {
+  vert(x, y, z, u, v, layer, t, loc = NOLOC, nrm = null) {
+    if (nrm && !this.nrm) { this.nrm = []; for (let i = 0; i < this.n; i++) this.nrm.push(0, 1, 0); } // (normals of their own from the first vertex that has one)
+    if (this.nrm) this.nrm.push(nrm ? nrm[0] : 0, nrm ? nrm[1] : 1, nrm ? nrm[2] : 0);
     this.pos.push(x, y, z);
     this.gnd.push(u, v, layer);
     this.tint.push(t[0], t[1], t[2]);
@@ -88,6 +90,7 @@ export class GroundBuilder {
   }
   // curb strip: inner edge on the road side (across 0) to the outer edge (across 0.28); flags per point (ramps)
   curbStrip(inner, outer, along, flags, y, layer, tint) {
+    if (STYLE.plastilina) return this.curbRoll(inner, outer, along, flags, y, layer, tint);
     const n = inner.length / 2;
     const s = GROUND_SCALE[layer] || 5;
     const i0 = this.n;
@@ -97,6 +100,28 @@ export class GroundBuilder {
     }
     for (let i = 0; i < n - 1; i++) {
       const a = i0 + i * 2, b = a + 1, c = a + 2, d = a + 3;
+      this.tri(a, b, d); this.tri(a, d, c);
+    }
+  }
+  // claymation: the kerb as a rounded roll of clay 7 cm high (lower in front of garages and crossings), its own normals;
+  // flags + 8 tell the material it is real (no painted face). A hand's width of sinking for the feet that cross it.
+  curbRoll(inner, outer, along, flags, y, layer, tint) {
+    const n = inner.length / 2, s = GROUND_SCALE[layer] || 5, W = KW();
+    const T = [0, 0.016, 0.04, 0.08, W - 0.08, W - 0.04, W - 0.016, W], F = [0, 0.55, 0.86, 1, 1, 0.86, 0.55, 0], m = T.length;
+    const i0 = this.n;
+    for (let i = 0; i < n; i++) {
+      const ix = inner[i * 2], iz = inner[i * 2 + 1], ox = outer[i * 2], oz = outer[i * 2 + 1];
+      const ax = (ox - ix) / W, az = (oz - iz) / W; // (across, per metre)
+      const H = 0.075 * (1 - 0.8 * clamp(flags[i], 0, 1));
+      for (let k = 0; k < m; k++) {
+        const t = T[k], h = F[k] * H, x = ix + ax * t, z = iz + az * t;
+        const k0 = Math.max(0, k - 1), k1 = Math.min(m - 1, k + 1), dh = ((F[k1] - F[k0]) * H) / Math.max(1e-4, T[k1] - T[k0]);
+        const al = Math.hypot(ax, az) || 1, nx = (-dh * ax) / al, nz = (-dh * az) / al, nl = Math.hypot(nx, 1, nz);
+        this.vert(x, y + h, z, x / s, z / s, layer, tint, [along[i], t, W, flags[i] + 8], [nx / nl, 1 / nl, nz / nl]);
+      }
+    }
+    for (let i = 0; i < n - 1; i++) for (let k = 0; k < m - 1; k++) {
+      const a = i0 + i * m + k, b = a + 1, c = a + m, d = c + 1;
       this.tri(a, b, d); this.tri(a, d, c);
     }
   }
@@ -154,8 +179,8 @@ export class GroundBuilder {
     if (!this.n) return null;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
-    const nrm = new Float32Array(this.pos.length);
-    for (let i = 1; i < nrm.length; i += 3) nrm[i] = 1;
+    const nrm = this.nrm ? Float32Array.from(this.nrm) : new Float32Array(this.pos.length);
+    if (!this.nrm) for (let i = 1; i < nrm.length; i += 3) nrm[i] = 1;
     g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
     g.setAttribute('aGnd', new THREE.Float32BufferAttribute(this.gnd, 3));
     g.setAttribute('aTint', new THREE.Float32BufferAttribute(this.tint, 3));

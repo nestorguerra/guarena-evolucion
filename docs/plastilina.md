@@ -210,5 +210,22 @@ contraste de pared, carretera, árboles y adoquines, sacados con PIL de las refe
 Rendimiento (este Mac, 1280×720, sin otra pestaña del juego abierta): 12–14 ms por imagen, igual que antes. Una
 prueba con bolitas más pequeñas y numerosas subió a 27 ms: se quedaron en 24–70 según el árbol, de 180 triángulos.
 
+Después, con la cámara y el color medidos contra las referencias (`refcompare` con la inclinación por defecto del
+juego): cámara a la altura de la calle (~2,5 m, 5,7 m detrás, mirando ~7° abajo); sombras cálidas (el relleno y el
+reflejo del entorno sin el azul del fondo); carretera de grano gris visible y sin motas claras; paredes sin manchas;
+coches de plastilina limpios; tinte rosado del grado y exposición 0,9; nubes redondas y bajas. Y **bordillos de
+verdad**: un rulo de plastilina de 7 cm de alto y 42 cm de ancho, redondeado, en bloques de medio metro (más bajo
+frente a cocheras y pasos; los pies que lo cruzan se hunden lo que no se nota).
+
+Colores medidos (zona central de cada imagen, media de la imagen / saturación / luminancia / contraste):
+
+| Vista | Referencia | Juego |
+|---|---|---|
+| Calle estrecha | (162,137,119) / 72 / 143 / 49 | (168,150,126) / 80 / 153 / 54 |
+| Calle ancha | (161,144,129) / 68 / 148 / 41 | (166,146,123) / 83 / 150 / 50 |
+| Iglesia | (159,147,129) / 85 / 149 / 38 | (160,144,118) / 91 / 146 / 36 |
+
+(Medido antes de bajar la saturación a 1,1.)
+
 Diferencias que quedan, porque son del pueblo y no de la estética: Guareña tiene sus casas de dos y tres plantas y
 su iglesia real (no la de la imagen), y el protagonista de la Evolución es Álex.

@@ -861,15 +861,18 @@ ${GROUND_GLSL}`)
     { // claymation: the kerb in fat blocks of pale grey clay half a metre long, each rounded at its ends and along its
       // top, a dark gap between them — and painted as raised: its face (towards the road) in shade, its rounded top
       // edge catching the light, its shadow on the road (the user's pictures)
+      float real = step(7.5, vLoc.w), fl = vLoc.w - 8.0 * real; // (real: a roll with its own shape, ground.js curbRoll)
+      ramp = clamp(fl, 0.0, 1.0); yellow = smoothstep(1.4, 1.6, fl);
+      paint = yellow * (1.0 - smoothstep(0.1, 0.12, t)) * step(0.28, gNoise(vec2(s * 7.0, t * 25.0)));
       float bi = floor(s / 0.5), be = min(fract(s / 0.5), 1.0 - fract(s / 0.5)) * 0.5;
       float gap = 1.0 - smoothstep(0.006, 0.02, be);
-      float fw = mix(0.13, 0.03, ramp);                                       // (the face, seen from the road)
-      float f = 1.0 - smoothstep(fw - 0.01, fw + 0.01, t);
+      float fw = mix(0.13, 0.03, ramp) * (1.0 - real);                        // (the face, seen from the road — painted on the flat strip only)
+      float f = (1.0 - smoothstep(fw - 0.01, fw + 0.01, t)) * (1.0 - real);
       float lip = smoothstep(fw, fw + 0.03, t) * (1.0 - smoothstep(fw + 0.03, fw + 0.09, t)); // (the rounded top edge)
       vec3 cc = vec3(0.8, 0.77, 0.71) * (0.9 + 0.14 * gHash2(vec2(bi, 5.0)));
       col = cc * mix(1.0, mix(0.38, 0.62, t / max(fw, 1e-3)), f) * (1.0 + 0.16 * lip) * (1.0 - 0.65 * gap);
       col = mix(col, vec3(0.92, 0.74, 0.08), paint * 0.9);
-      gGH = 0.11 * (1.0 - f) * (1.0 - ramp * 0.8) * (1.0 - 0.6 * gap) + 0.025 * smoothstep(0.0, 0.07, be) * smoothstep(fw, fw + 0.06, t);
+      gGH = mix(0.11 * (1.0 - f) * (1.0 - ramp * 0.8) * (1.0 - 0.6 * gap) + 0.025 * smoothstep(0.0, 0.07, be) * smoothstep(fw, fw + 0.06, t), 0.02 * smoothstep(0.0, 0.07, be), real);
       gGRough = 0.8;
     }
     #endif
