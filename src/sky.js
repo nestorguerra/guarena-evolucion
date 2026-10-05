@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { clamp, lerp, smoothstep } from './util.js';
 import { STYLE } from './style.js';
-import { MINIATURA } from './diorama.js';
 
 const LAT = 38.86 * Math.PI / 180;
 const DECL = -0.8 * Math.PI / 180; // ~24 September
@@ -298,7 +297,7 @@ export class SkySystem {
     sc.near = 1; sc.far = 600;
     this.sun.shadow.bias = -0.00025;
     this.sun.shadow.normalBias = 0.035;
-    this.sun.shadow.radius = STYLE.miniatura ? 5.5 : STYLE.diorama ? 3.5 : 2.5; // (the miniature: soft studio shadows)
+    this.sun.shadow.radius = STYLE.diorama ? 3.5 : 2.5;
     scene.add(this.sun, this.sun.target);
     this.hemi = new THREE.HemisphereLight(0xbfd8ff, 0x8a7a60, 0.6);
     scene.add(this.hemi);
@@ -347,10 +346,6 @@ export class SkySystem {
 
   update(dt, focus, forceEnv = false) {
     const d = sunDirection(this.hour, this.sunDir);
-    if (STYLE.miniatura && d.y > 0.02) { // the miniature's golden hour, all day long: a low sun, long soft shadows
-      const el = Math.min(Math.asin(Math.min(1, d.y)), MINIATURA.sun.maxElev), hl = Math.hypot(d.x, d.z) || 1;
-      d.set((d.x / hl) * Math.cos(el), Math.sin(el), (d.z / hl) * Math.cos(el));
-    }
     const alt = d.y;
     const U = this.uniforms;
     U.uSun.value.copy(d);
@@ -359,12 +354,6 @@ export class SkySystem {
     paletteAt(alt, 'warm', U.uWarm.value);
     paletteAt(alt, 'gnd', U.uGnd.value);
     paletteAt(alt, 'sun', U.uSunCol.value);
-    if (STYLE.miniatura) { // the golden hour's sky: a warm glowing horizon (and haze) under the blue
-      const gk = smoothstep(-0.05, 0.1, alt);
-      U.uHor.value.lerp(_ca.setRGB(1.0, 0.8, 0.58), 0.5 * gk);
-      U.uWarm.value.lerp(_ca.setRGB(1.0, 0.68, 0.42), 0.55 * gk);
-      U.uSunCol.value.lerp(_ca.setRGB(1.0, 0.76, 0.52), 0.45 * gk);
-    }
     U.uTime.value += dt;
     U.uCloud.value = this.cloud;
     const day = smoothstep(-0.08, 0.12, alt);
@@ -389,7 +378,6 @@ export class SkySystem {
       this.sun.color.copy(sunCol).lerp(new THREE.Color(1, 1, 1), 0.25);
       this.sun.intensity = (STYLE.anime ? 2.6 : STYLE.diorama ? 5.2 : 4.4) * smoothstep(-0.02, 0.16, alt);
       if (STYLE.diorama) this.sun.color.copy(sunCol).lerp(new THREE.Color(1, 0.97, 0.9), 0.1); // (the afternoon sun stays warm)
-      if (STYLE.miniatura) this.sun.color.lerp(new THREE.Color(...MINIATURA.sun.col), MINIATURA.sun.push); // (golden)
       this.sun.position.copy(focus).addScaledVector(d, 250);
       this.lightDir = (this.lightDir || new THREE.Vector3()).copy(d);
     } else {
@@ -416,7 +404,6 @@ export class SkySystem {
       this.hemi.color.copy(U.uZen.value).lerp(U.uHor.value, 0.5).lerp(new THREE.Color(0.98, 0.94, 0.88), 0.7 * day).lerp(NIGHT_FILL, this.night * 0.85);
       this.hemi.groundColor.copy(U.uGnd.value).lerp(new THREE.Color(0.88, 0.76, 0.58), 0.7 * day).lerp(NIGHT_GND, this.night * 0.8);
       this.hemi.intensity = lerp(0.45, 1.6, day) + this.night * 0.8;
-      if (STYLE.miniatura) this.hemi.color.lerp(_ca.setRGB(1.0, 0.86, 0.7), 0.45 * day); // (a warm studio fill)
       // the bounce comes from the side away from the sun, a little above the street
       const b = this.bounce;
       b.color.copy(U.uGnd.value).lerp(new THREE.Color(1.0, 0.84, 0.64), 0.65);
@@ -433,7 +420,7 @@ export class SkySystem {
     if (STYLE.diorama) { // only as much air as the distance needs: no milky haze over the streets
       this.fog.color.copy(U.uHor.value).lerp(new THREE.Color(0.93, 0.88, 0.8), 0.25 * day);
       this.fog.near = lerp(120, 520, day); this.fog.far = lerp(1200, 4200, day);
-      this.renderer.toneMappingExposure = (STYLE.miniatura ? 0.94 : 1.0) + golden * day * 0.05;
+      this.renderer.toneMappingExposure = lerp(1.0, 1.0, day) + golden * day * 0.05;
     }
     if (STYLE.anime) {
       this.fog.color.copy(U.uHor.value).lerp(U.uZen.value, 0.25);

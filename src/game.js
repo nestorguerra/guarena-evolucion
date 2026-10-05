@@ -6,7 +6,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { DIORAMA, DioramaGrade, MINIATURA, TiltShift } from './diorama.js';
+import { DIORAMA, DioramaGrade } from './diorama.js';
 import { STYLE } from './style.js';
 import { ToonPipeline } from './toon.js';
 import { LoFi } from './lofi.js';
@@ -190,16 +190,7 @@ export class Game {
       // the diorama: the scene, its contact shadows (ambient occlusion where things meet), a warm grade, a little bloom
       const rt = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: this.qKey === 'baja' ? 0 : 4, depthTexture: new THREE.DepthTexture(innerWidth, innerHeight) });
       this.composer = new EffectComposer(r, rt);
-      // (the scene pass draws into whichever of the composer's two buffers is free: its depth is kept for the AO and the
-      // lens. The full-screen passes after it draw into the same buffers and clear them: their depth must not be
-      // resolved over the scene's — with MSAA the texture is only written when a pass ends)
-      const rp = new RenderPass(this.scene, this.camera), rpRender = rp.render.bind(rp);
-      rp.render = (renderer, wb, rb, dt, mask) => {
-        rb.resolveDepthBuffer = true; this.sceneDepth = rb.depthTexture;
-        rpRender(renderer, wb, rb, dt, mask);
-        rb.resolveDepthBuffer = wb.resolveDepthBuffer = false;
-      };
-      this.composer.addPass(rp);
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
       if (this.qKey !== 'baja') {
         // the AO reads the depth the scene pass has just drawn (normals from that depth): no second drawing of the whole
         // town for a normal buffer (twice the draw calls), and no sprites without normals (they came out as black squares)
@@ -209,35 +200,13 @@ export class Game {
         this.gtao.blendIntensity = DIORAMA.aoBlend;
         const gtaoRender = this.gtao.render.bind(this.gtao);
         this.gtao.render = (renderer, wb, rb, dt, mask) => { // (the composer's two buffers take turns: the one just drawn)
-          this.gtao.gtaoMaterial.uniforms.tDepth.value = this.sceneDepth; this.gtao.pdMaterial.uniforms.tDepth.value = this.sceneDepth;
+          this.gtao.gtaoMaterial.uniforms.tDepth.value = rb.depthTexture; this.gtao.pdMaterial.uniforms.tDepth.value = rb.depthTexture;
           gtaoRender(renderer, wb, rb, dt, mask);
         };
         this.composer.addPass(this.gtao);
       }
       this.grade = new ShaderPass(DioramaGrade);
-      // (full-screen passes must not write depth: they draw into the buffer whose depth the lens still has to read)
-      this.grade.material.depthTest = this.grade.material.depthWrite = false;
       this.composer.addPass(this.grade);
-      if (STYLE.miniatura) {
-        // the miniature: richer, warmer colours, light in the shadows, a lens vignette, and the macro lens's tilt-shift
-        const G = MINIATURA.grade, U = this.grade.uniforms;
-        U.uSat.value = G.sat; U.uWarm.value = G.warm; U.uContrast.value = G.contrast; U.uLift.value = G.lift; U.uVignette.value = G.vignette;
-        const taps = this.qKey === 'baja' ? 5 : this.qKey === 'media' ? 7 : 10;
-        this.tilt = [0, 1].map((k) => {
-          const pass = new ShaderPass(TiltShift), pr = pass.render.bind(pass);
-          pass.material.defines.TAPS = taps; pass.material.depthTest = pass.material.depthWrite = false;
-          if (this.qKey === 'baja') pass.material.defines.NO_DEPTH = 1; // (no MSAA: the scene's depth is not kept; the band alone)
-          pass.uniforms.uDir.value.set(k ? 0 : 1, k ? 1 : 0);
-          pass.render = (renderer, wb, rb, dt, mask) => {
-            const T = pass.uniforms, L = MINIATURA.tilt;
-            T.tDepth.value = this.sceneDepth; T.uRes.value.set(rb.width, rb.height); T.uMaxR.value = L.maxR * rb.height;
-            T.uRange.value = L.range; T.uBand.value = L.band; T.uSoft.value = L.soft;
-            pr(renderer, wb, rb, dt, mask);
-          };
-          this.composer.addPass(pass);
-          return pass;
-        });
-      }
       if (q.bloom) { this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.12, 0.5, 0.95); this.composer.addPass(this.bloom); }
       this.composer.addPass(new OutputPass());
       this.composer.setPixelRatio(r.getPixelRatio());
@@ -294,7 +263,6 @@ export class Game {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     if (this.composer) { this.composer.setSize(w, h); if (this.bloom) this.bloom.setSize(w, h); } // (the diorama's composer may have no bloom)
-    this.smT = 1; // (stop motion: a resized canvas is blank until it is drawn again)
     if (this.toon) this.toon.setSize(w, h);
     const radar = this.ui.radar;
     const size = Math.round(w < 520 ? Math.min(128, w * 0.34) : h <= 500 ? Math.min(112, h * 0.3) : Math.min(230, Math.max(150, Math.min(w, h) * 0.24)));
@@ -689,7 +657,7 @@ export class Game {
     if (wv) wv.sync();
     this.world.update(dt, night, wv ? wv.eye : this.camera.position);
     this.chars.updateLods(this.camera.position, this.q.shadows > 0, wv ? wv.eye : null);
-    this.present(dtReal);
+    this.render();
     input.endFrame();
   }
 
@@ -758,45 +726,15 @@ export class Game {
   // the scene through whichever pipeline is on (also used by the photo tools with their own cameras)
   renderView(cam, overlay = null) {
     if (this.toon) this.toon.render(this.scene, cam, { night: this.sky ? this.sky.night : 0, exposure: this.renderer.toneMappingExposure, overlay });
-    else if (this.composer) {
-      if (this.tilt) this.focusLens(cam);
-      const rp = this.composer.passes[0], keep = rp.camera; rp.camera = cam; if (this.gtao) this.gtao.camera = cam; this.composer.render(); rp.camera = keep; if (this.gtao) this.gtao.camera = keep;
-    }
+    else if (this.composer) { const rp = this.composer.passes[0], keep = rp.camera; rp.camera = cam; if (this.gtao) this.gtao.camera = cam; this.composer.render(); rp.camera = keep; if (this.gtao) this.gtao.camera = keep; }
     else this.renderer.render(this.scene, cam);
-  }
-  // the miniature's lens focuses on the action: the player (or what they drive), at its distance and across the band of
-  // the picture where it is; in first person, on whatever is in the middle of the view
-  focusLens(cam) {
-    const p = this.player, v = p && p.vehicle, pt = this._lensPt || (this._lensPt = new THREE.Vector3());
-    let focus = -1, bandY = 0.5;
-    const fp = cam === this.camera && this.cam && (this.cam.fp || this.cam.carFP);
-    if (p && !fp) {
-      if (v) pt.set(v.x, (v.y || 0) + 0.9, v.z); else pt.set(p.pos.x, p.pos.y + 1.1, p.pos.z);
-      const d = cam.position.distanceTo(pt);
-      pt.project(cam);
-      if (pt.z < 1 && Math.abs(pt.x) < 1.05 && Math.abs(pt.y) < 1.05) { focus = d; bandY = Math.min(0.8, Math.max(0.2, pt.y * 0.5 + 0.5)); }
-    }
-    for (const t of this.tilt) {
-      const U = t.uniforms;
-      U.uFocus.value = focus; U.uFocusUV.value.set(0.5, 0.5); U.uBandY.value = bandY; U.uNear.value = cam.near; U.uFar.value = cam.far;
-    }
-  }
-  // the miniature's stop motion: the picture changes 12 times a second while the game runs on as always (Ajustes)
-  present(dtReal) {
-    if (STYLE.miniatura && this.save.stopMotion !== false && this.state === 'play') {
-      this.smT = (this.smT || 0) + dtReal;
-      if (this.smT < 1 / MINIATURA.fps) return;
-      this.smT = Math.min(this.smT - 1 / MINIATURA.fps, 1 / MINIATURA.fps);
-      MINIATURA.tick();
-    }
-    this.render();
   }
   render() {
     if (this.bloom) {
       const night = this.sky ? this.sky.night : 0;
-      this.bloom.strength = lerp(STYLE.miniatura ? 0.22 : 0.05, 0.6, night); // (the miniature: a soft golden glow)
-      this.bloom.threshold = lerp(STYLE.miniatura ? 0.95 : 1.8, 0.85, night);
-      this.bloom.radius = lerp(STYLE.miniatura ? 0.5 : 0.3, 0.6, night);
+      this.bloom.strength = lerp(0.05, 0.6, night);
+      this.bloom.threshold = lerp(1.8, 0.85, night);
+      this.bloom.radius = lerp(0.3, 0.6, night);
     }
     const wv = this.interior && this.windowView && this.windowView.render(); // the street, drawn for the windows
     this.renderView(this.camera);

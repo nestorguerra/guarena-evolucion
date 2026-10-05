@@ -5,19 +5,9 @@
 //   const C = await import('/tools/lookcompare.js?' + Date.now()); await C.shoot('manga')
 //   → .snaps/look_<tag>.jpg (three views side by side) and C.views() for the spots
 import * as THREE from 'three';
+import { renderInto } from '/tools/herolab.js';
 const G = () => window.game;
 const step = (n) => { const g = G(); for (let i = 0; i < n; i++) { if (g.state !== 'play') g.state = 'play'; g.frame(1 / 30); } };
-// a picture through the game's own camera (its near plane too: herolab's renderInto uses 1 cm, and at that the town's
-// 24 km base field shows through the streets — not what the game shows)
-function renderGame(ctx, dx, dy, pos, look, fov, w, h) {
-  const g = G();
-  g.renderer.setSize(w, h, false); if (g.composer) { g.composer.setSize(w, h); if (g.bloom) g.bloom.setSize(w, h); } if (g.toon) g.toon.setSize(w, h);
-  const cam = g.camera.clone(); cam.fov = fov; cam.aspect = w / h; cam.position.set(...pos); cam.lookAt(...look); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
-  const keep = g.camera; g.camera = cam; if (g.composer) g.composer.passes[0].camera = cam;
-  try { g.renderView(cam); } finally { g.camera = keep; if (g.composer) g.composer.passes[0].camera = keep; }
-  const c = g.renderer.domElement;
-  ctx.drawImage(c, 0, 0, c.width, c.height, dx, dy, w, h);
-}
 
 // the three spots, from the map (deterministic)
 export async function views() {
@@ -80,7 +70,7 @@ export async function shoot(tag = 'a', { W = 640, H = 400, hour = 14 } = {}) {
     step(40);
     g.cam.yaw = v.h + Math.PI; g.cam.pitch = -0.1;
     step(20);
-    renderGame(ctx, i * W, 0, g.camera.position.toArray(), g.cam.target.toArray(), g.camera.fov, W, H);
+    renderInto(ctx, i * W, 0, g.camera.position.toArray(), g.cam.target.toArray(), g.camera.fov, W, H);
   });
   g.resize();
   await fetch('/__snap?name=look_' + tag, { method: 'POST', body: cv.toDataURL('image/jpeg', 0.88) });
@@ -112,7 +102,7 @@ export async function extras(tag = 'a', { W = 640, H = 400 } = {}) {
     p.spawnAt(at[0], at[1], 0);
     g.sky.hour = hour; step(30);
     g.sky.hour = hour; g.sky.update(0, new THREE.Vector3(eye[0], 0, eye[2]), true);
-    renderGame(ctx, (i % 3) * W, Math.floor(i / 3) * H, eye, look, fov, W, H);
+    renderInto(ctx, (i % 3) * W, Math.floor(i / 3) * H, eye, look, fov, W, H);
     ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect((i % 3) * W, Math.floor(i / 3) * H, 230, 24);
     ctx.fillStyle = '#fff'; ctx.font = '15px system-ui'; ctx.fillText(name, (i % 3) * W + 8, Math.floor(i / 3) * H + 17);
   });
@@ -168,53 +158,9 @@ export async function walk(tag = 'a', { W = 560, H = 350, n = 36, stepM = 0.55, 
     p.pos.x = tmp.x; p.pos.z = tmp.z; if (p.heading !== undefined) p.heading = h;
     g.cam.yaw = h + Math.PI + Math.sin(i * 0.12) * 0.25; g.cam.pitch = -0.08;
     g.sky.hour = hour; step(2);
-    renderGame(ctx, 0, 0, g.camera.position.toArray(), g.cam.target.toArray(), g.camera.fov, W, H);
+    renderInto(ctx, 0, 0, g.camera.position.toArray(), g.cam.target.toArray(), g.camera.fov, W, H);
     await fetch('/__snap?name=rec_' + tag + '_' + String(i).padStart(2, '0'), { method: 'POST', body: cv.toDataURL('image/jpeg', 0.85) });
   }
   g.resize();
   return n;
-}
-
-// the same walk as a video: the original's path, camera sway and speed (0.55 m every 0.11 s), sampled at `fps`; in the
-// miniature every frame is a stop-motion frame (the clay retouched). Saves .snaps/vid_<tag>_NN.jpg and, recorded in the
-// page, .snaps/vid_<tag>.jpg (an MP4 or WebM under that name: rename it)
-const sleepExact = (ms) => new Promise((r) => { const t0 = performance.now(); const ch = new MessageChannel(); ch.port1.onmessage = () => (performance.now() - t0 >= ms ? r() : ch.port2.postMessage(0)); ch.port2.postMessage(0); });
-export async function walkVideo(tag = 'a', { W = 960, H = 600, fps = 12, seconds = 3.96, hour = 14, origStep = 0.55, origDt = 0.11 } = {}) {
-  const g = G(), p = g.player, map = g.map, list = await views(), v = list[1], tmp = {};
-  const S = await import('/src/style.js'), D = await import('/src/diorama.js');
-  for (const id of ['pause', 'menu']) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
-  const e = map.edges.find((q) => q.name === v.street);
-  const s0 = Math.min(18, e.len * 0.2), n = Math.round(seconds * fps), speed = origStep / origDt;
-  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
-  map.sample(e, s0, tmp); p.spawnAt(tmp.x, tmp.z, Math.atan2(tmp.dx, tmp.dz)); g.sky.hour = hour; step(40);
-  const frames = [];
-  for (let i = 0; i < n; i++) {
-    const s = s0 + origStep + (i / fps) * speed, phase = ((s - s0) / origStep - 1) * 0.12;
-    map.sample(e, s, tmp);
-    const h = Math.atan2(tmp.dx, tmp.dz);
-    p.pos.x = tmp.x; p.pos.z = tmp.z; if (p.heading !== undefined) p.heading = h;
-    g.cam.yaw = h + Math.PI + Math.sin(phase) * 0.25; g.cam.pitch = -0.08;
-    g.sky.hour = hour;
-    for (let k = 0; k < 2; k++) { if (g.state !== 'play') g.state = 'play'; g.frame(1 / (2 * fps)); }
-    if (S.STYLE.miniatura) D.MINIATURA.tick();
-    renderGame(ctx, 0, 0, g.camera.position.toArray(), g.cam.target.toArray(), g.camera.fov, W, H);
-    frames.push(await createImageBitmap(cv));
-    await fetch('/__snap?name=vid_' + tag + '_' + String(i).padStart(2, '0'), { method: 'POST', body: cv.toDataURL('image/jpeg', 0.88) });
-  }
-  g.resize();
-  // the recording: each frame held 1/fps of a second
-  const rec = document.createElement('canvas'); rec.width = W; rec.height = H; const rctx = rec.getContext('2d');
-  const stream = rec.captureStream(0), track = stream.getVideoTracks()[0];
-  const mime = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m));
-  const mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 10e6 }), chunks = [];
-  mr.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunks.push(ev.data); };
-  const done = new Promise((r) => (mr.onstop = r));
-  mr.start();
-  rctx.drawImage(frames[0], 0, 0); track.requestFrame(); await sleepExact(1000 / fps);
-  for (let i = 1; i < frames.length; i++) { rctx.drawImage(frames[i], 0, 0); track.requestFrame(); await sleepExact(1000 / fps); }
-  await sleepExact(120); mr.stop(); await done;
-  const blob = new Blob(chunks, { type: mime.split(';')[0] });
-  const url = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
-  await fetch('/__snap?name=vid_' + tag, { method: 'POST', body: url });
-  return { frames: n, mime, bytes: blob.size };
 }
