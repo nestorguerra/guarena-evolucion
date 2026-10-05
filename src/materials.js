@@ -59,6 +59,7 @@ export function arrayTexture(data, size, layers, { srgb = true, aniso = 8 } = {}
 export function makeBuildingMaterial(facadeTex, detail = null) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0.0, side: THREE.DoubleSide });
   if (STYLE.anime) m.defines = { ANIME: '' };
+  else if (STYLE.plastilina) m.defines = { DIORAMA: '', CLAY: '', CLAY_RELIEF: '2.3', CLAY_TONE: '1.5' }; // (a set: worked hard by hand)
   else if (STYLE.diorama) m.defines = { DIORAMA: '' };
   const dOn = detail && detail.on ? 1 : 0;
   const nOn = detail && detail.on && detail.normals ? 1 : 0;
@@ -84,9 +85,15 @@ export function makeBuildingMaterial(facadeTex, detail = null) {
       .replace('#include <common>', `#include <common>
 attribute vec4 aTex; attribute vec3 aTint; attribute vec2 aUv; attribute vec4 aRect; attribute float aWallH;
 varying vec4 vTex; varying vec3 vTint; varying vec2 vUvF; varying float vWY; varying vec3 vWPos; varying vec3 vWNrm;
-varying vec4 vRect; varying float vWallH;`)
+varying vec4 vRect; varying float vWallH;
+#ifdef CLAY
+attribute vec2 aEdge; varying vec2 vEdge;
+#endif`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vTex = aTex; vTint = aTint; vUvF = aUv; vWY = position.y; vRect = aRect; vWallH = aWallH;
+#ifdef CLAY
+vEdge = aEdge;
+#endif
 vWPos = (modelMatrix * vec4(position, 1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * normal);`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
@@ -98,6 +105,9 @@ uniform float uZocH[8]; uniform float uZocStone[8];
 ${LAMPS_GLSL}
 varying vec4 vTex; varying vec3 vTint; varying vec2 vUvF; varying float vWY; varying vec3 vWPos; varying vec3 vWNrm;
 varying vec4 vRect; varying float vWallH;
+#ifdef CLAY
+varying vec2 vEdge;
+#endif
 float gGlass; float gLit; float gDetK; vec2 gDetUV; float gDetL; float gRoom; vec3 gRoomCol; float gEmK;
 ${HASH}
 mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
@@ -324,7 +334,39 @@ if (uDetNOn > 0.5 && gDetK > 0.01) {
 #endif
   mat3 tbn = cotangentFrame(normal, -vViewPosition, gDetUV);
   normal = normalize(tbn * mapN);
-}`)
+}
+#ifdef CLAY
+{
+  // claymation: the house as a clay model — its corners, its top edge, the rim of its openings and the top of its
+  // plinth rounded (the light turns round them as round a soft edge): no sharp line anywhere
+  vec3 nW = normalize(vWNrm), nB = nW;
+  if (abs(nW.y) < 0.35 && abs(vTex.y - 1.0) > 0.5) {
+    vec3 T = vec3(-nW.z, 0.0, nW.x);
+    float code = vEdge.y;
+    if (code > 0.5) {
+      float k = floor(code / 10000.0 + 1e-4), L = code - k * 10000.0;
+      float cs = mod(k, 2.0), ce = floor(k / 2.0 + 1e-4);
+      float a0 = cs * pow(1.0 - smoothstep(0.0, 0.34, vEdge.x), 1.5), a1 = ce * pow(1.0 - smoothstep(0.0, 0.34, L - vEdge.x), 1.5);
+      nB += T * (a1 - a0) * 0.95;
+    }
+    nB.y += pow(1.0 - smoothstep(0.0, 0.24, vWallH - vWPos.y), 1.5) * 0.9;
+    if (vRect.z > vRect.x + 0.01) { // the rim of a window or a door: the wall curls into the opening
+      vec2 cf = fract(vUvF + 1e-4);
+      float dl = (vRect.x - cf.x) * 3.2, dr = (cf.x - vRect.z) * 3.2, db = (vRect.y - cf.y) * 3.1, dt = (cf.y - vRect.w) * 3.1;
+      bool inY = cf.y > vRect.y - 0.025 && cf.y < vRect.w + 0.025, inX = cf.x > vRect.x - 0.025 && cf.x < vRect.z + 0.025;
+      if (inY && dl > 0.0) nB += T * pow(1.0 - smoothstep(0.0, 0.075, dl), 1.5) * 0.85;
+      if (inY && dr > 0.0) nB -= T * pow(1.0 - smoothstep(0.0, 0.075, dr), 1.5) * 0.85;
+      if (inX && dt > 0.0) nB.y -= pow(1.0 - smoothstep(0.0, 0.075, dt), 1.5) * 0.85;
+      if (inX && db > 0.0 && vRect.y > 0.01) nB.y += pow(1.0 - smoothstep(0.0, 0.075, db), 1.5) * 0.85;
+    }
+    if (floor(vUvF.y + 1e-4) < 0.5 && vTex.x < 63.5) { // the top of the plinth: a strip of clay laid on, its edge rounded
+      float dz = uZocH[int(floor(vTex.x / 8.0 + 0.001))] - fract(vUvF.y + 1e-4) * 3.1;
+      if (dz > 0.0) nB.y += pow(1.0 - smoothstep(0.0, 0.055, dz), 1.5) * 0.75;
+    }
+    normal = normalize(normal + mat3(viewMatrix) * (normalize(nB) - nW));
+  }
+}
+#endif`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
 roughnessFactor = mix(roughnessFactor, 0.12, gGlass);`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
@@ -450,7 +492,7 @@ mat3 gCotangent(vec3 N, vec3 p, vec2 uv) {
 
 export function makeGroundMaterial(groundTex, { polygonOffset = 0, roughness = 0.95, transparentEdges = false, fx = null } = {}) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness, metalness: 0 });
-  if (STYLE.diorama) m.defines = { DIORAMA: '' };
+  if (STYLE.diorama) m.defines = STYLE.plastilina ? { DIORAMA: '', CLAY_RELIEF: '1.8', CLAY_TONE: '1.3' } : { DIORAMA: '' };
   if (polygonOffset) {
     m.polygonOffset = true;
     m.polygonOffsetFactor = -polygonOffset;

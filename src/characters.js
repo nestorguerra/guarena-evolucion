@@ -9,6 +9,7 @@ import { loadAssetBytes, loadAssetImage } from './assets.js';
 import { clamp, lerp, smoothstep, TAU } from './util.js';
 import { GAIT, samp, gaitBody, FACES, FACE_KEYS, GETUP_BACK, GETUP_FRONT } from './motion.js';
 import { Ragdoll } from './ragdoll.js';
+import { SM } from './plastilina.js';
 
 import { SKIN as SKIN0, HAIR as HAIR0, CLOTH as CLOTH0, randomShape, colorize, normalize } from './looks.js';
 export const SKIN = SKIN0;
@@ -147,7 +148,7 @@ function mhTex(file, srgb = true, ph = '#c89a80') {
   t.anisotropy = 4;
   t.needsUpdate = true;
   // (dispose first: once drawn, the 1-pixel stand-in's storage is fixed in size and would not take the image)
-  const p = loadAssetImage('mh/' + file).then((im) => { if (im) { t.dispose(); t.image = STYLE.anime && file.startsWith('eye_') ? animeEye(im) : im; t.needsUpdate = true; } }).finally(() => mhLoading.delete(p));
+  const p = loadAssetImage('mh/' + file).then((im) => { if (im) { t.dispose(); t.image = STYLE.anime && file.startsWith('eye_') ? animeEye(im) : STYLE.plastilina && file.startsWith('eye_') ? clayEye(im) : im; t.needsUpdate = true; } }).finally(() => mhLoading.delete(p));
   mhLoading.add(p);
   mhTexCache.set(file, t);
   return t;
@@ -180,6 +181,28 @@ function animeEye(im) {
     x.fillStyle = 'rgb(18,14,16)'; x.beginPath(); x.arc(cx, cy, r * 0.42, 0, Math.PI * 2); x.fill();
     x.fillStyle = '#fff'; x.beginPath(); x.arc(cx + r * 0.32, cy - r * 0.34, r * 0.24, 0, Math.PI * 2); x.fill();
     x.fillStyle = 'rgba(255,255,255,0.8)'; x.beginPath(); x.arc(cx - r * 0.3, cy + r * 0.36, r * 0.11, 0, Math.PI * 2); x.fill();
+  }
+  return c;
+}
+// claymation: a puppet's eyes are beads — a cream white, a big round black pupil (no iris), one bright glint
+function clayEye(im) {
+  const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(im, 0, 0, S, S);
+  const d = x.getImageData(0, 0, S, S).data;
+  const eyes = [[0, 0, 0], [0, 0, 0]];
+  for (let y = 0; y < S; y++) for (let xx = 0; xx < S; xx++) {
+    const i = (y * S + xx) * 4, L = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    if (L > 120) continue;
+    const e = eyes[xx + (S - y) > S ? 1 : 0];
+    e[0] += xx; e[1] += y; e[2]++;
+  }
+  x.fillStyle = '#f2eee4'; x.fillRect(0, 0, S, S);
+  for (const e of eyes) {
+    if (!e[2]) continue;
+    const cx = e[0] / e[2], cy = e[1] / e[2], r = Math.sqrt(e[2] / Math.PI) * 1.05;
+    x.fillStyle = 'rgb(16,12,12)'; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#fff'; x.beginPath(); x.arc(cx + r * 0.34, cy - r * 0.36, r * 0.22, 0, Math.PI * 2); x.fill();
   }
   return c;
 }
@@ -795,7 +818,8 @@ function makeCharMaterial(uniforms) {
     #endif
     vHairT = normalize((modelViewMatrix * vec4(g, 0.0)).xyz);
   }`);
-    sh.fragmentShader = sh.fragmentShader
+    // (claymation: a puppet — its thumbprints at its own scale, retouched at every pose)
+    sh.fragmentShader = (STYLE.plastilina ? '#define CLAY_SCALE 2.4\n#define CLAY_PUPPET\n' : '') + sh.fragmentShader
       .replace('#include <common>', '#include <common>' + CHAR_FS_HEAD + CHAR_FS_CLOTH)
       .replace('#include <color_fragment>', `#include <color_fragment>
 {
@@ -812,6 +836,9 @@ function makeCharMaterial(uniforms) {
     vec3 col = diffuseColor.rgb * (0.975 + 0.05 * n);
     col *= mix(vec3(1.0), vec3(1.04, 0.955, 0.94), smoothstep(0.45, 0.85, mot) * 0.55) * (0.985 + 0.03 * mot);
     gSkin = 1.0; gRough = 0.5; gSheen = 0.35; gBumpH = n * 0.0002;
+    #ifdef CLAY
+    col = diffuseColor.rgb * vec3(1.0, 0.9, 0.82) * (0.985 + 0.03 * mot); gBumpH = 0.0; gSheen = 0.12; // (a puppet's skin: one smooth, warmer colour of clay)
+    #endif
     if (hasF) { // painted lips, brows and creases with relief; stubble, makeup; the warm and cool parts of a face
       vec2 fuv = vec2(F.x / 0.14 + 0.5, (F.y + 0.045) / 0.16);
       float front = smoothstep(0.02, 0.04, F.z) * step(0.002, fuv.x) * step(fuv.x, 0.998) * step(0.002, fuv.y) * step(fuv.y, 0.998);
@@ -883,6 +910,7 @@ function makeCharMaterial(uniforms) {
     gRough = 0.82; gSheen = 0.5; gBumpH = w * 0.0001;
   } else if (mc == 10) { // hair: strands flowing out from the crown (down the jaw for a beard), in locks, a sheen along them
     vec3 F = vFace;
+    vec3 clayBase = diffuseColor.rgb;
     bool bd = F.y < 0.05 && F.z > 0.0 && F.y > -0.07 && abs(F.x) < 0.075 && F.z > 0.02 - 0.3 * min(F.y, 0.0);
     vec3 d = F - vec3(uPart, 0.188, -0.022);
     float az = atan(d.x, d.z), rad = length(d.xz) + max(0.0, -d.y) * 0.9;
@@ -906,6 +934,13 @@ function makeCharMaterial(uniforms) {
     gRough = 0.46 + 0.16 * (1.0 - str); gSheen = 0.9; gBumpH = (str - 0.5) * 0.0005 + (lk - 0.5) * 0.0022 + (lk2 - 0.5) * 0.0009;
     gHairT = normalize(vHairT + normalize(vNormal) * (lk - 0.5) * 0.5); // locks tilt the band a little
     gHairK = (bd ? 0.8 : 1.25) * (1.0 - 0.75 * uCurl); gRough += 0.15 * uCurl; gSheen = 0.45; // curls scatter the light
+    #ifdef CLAY
+    { // sculpted hair: one piece of clay, combed — wide grooves along the strands, the locks as soft swells
+      float gr = 0.5 + 0.5 * sin(az * 22.0 + lk * 5.0);
+      diffuseColor.rgb = clayBase * (0.86 + 0.18 * lk) * (0.84 + 0.16 * gr);
+      gRough = 0.5; gSheen = 0.1; gBumpH = (gr - 0.5) * 0.0016 + (lk - 0.5) * 0.003; gHairK = 0.0;
+    }
+    #endif
   } else if (mc == 11) { // eye (wet): iris fibres, collarette and limbal ring; a few veins towards the corners
     vec3 F = vFace;
     vec3 d = normalize(F - vec3(F.x > 0.0 ? 0.032 : -0.032, 0.075, 0.075));
@@ -924,6 +959,9 @@ function makeCharMaterial(uniforms) {
     // the white of the eye: ivory, greyer towards the corners and in the shadow of the upper lid
     float lidSh = smoothstep(0.1, 0.55, d.y) * 0.3 + smoothstep(0.6, 1.1, th) * 0.18;
     diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.84, 0.8, 0.78), scl * (0.35 + lidSh));
+    #ifdef CLAY
+    diffuseColor.rgb = mix(vec3(0.95, 0.93, 0.88), vec3(0.05, 0.04, 0.035), 1.0 - smoothstep(0.36, 0.4, th)); // a bead: white, a big black pupil
+    #endif
     gRough = 0.05;
   }
   else if (mc == 16) { // eyelashes: fine dark hairs, in little clumps, each tapering to its tip
@@ -951,6 +989,14 @@ function makeCharMaterial(uniforms) {
       col = mix(col, col * vec3(1.06, 0.84, 0.84), bl * 0.5);
     }
     #endif
+    #ifdef CLAY
+    { // a puppet's face: one smooth colour of skin clay, cheeks a little rosier, the lips a pressed-in darker pink
+      col = mix(diffuseColor.rgb, col, 0.05) * vec3(1.0, 0.9, 0.82);
+      col = mix(col, col * vec3(1.0, 0.78, 0.76), lipA * 0.65);
+      float bl = exp(-pow((abs(F.x) - 0.04) / 0.02, 2.0) - pow((F.y - 0.05) / 0.016, 2.0)) * smoothstep(0.02, 0.05, F.z);
+      col = mix(col, col * vec3(1.05, 0.85, 0.83), bl * 0.5);
+    }
+    #endif
     col = mix(col, col * mix(vec3(1.0), uLip / max(diffuseColor.rgb, vec3(0.02)), 0.6), lipA * uMakeup * fem * 0.6); // a touch of lipstick
     float n = cNoise(P * 300.0) * fa(0.0035), n2 = cNoise(P * 900.0) * fa(0.0012);
     // down the neck the photograph gives way to the plain skin of the sculpted neck it is stitched to (no seam)
@@ -959,12 +1005,19 @@ function makeCharMaterial(uniforms) {
     gSkin = 1.0; gSheen = 0.3;
     gRough = mix(0.5, 0.34, lipA) - 0.07 * smoothstep(0.148, 0.163, F.z) * (1.0 - smoothstep(0.012, 0.026, abs(F.x))); // lips and the tip of the nose shine a little
     gBumpH = (n - 0.5) * 0.00012 + (n2 - 0.5) * 0.00005; // pores
+    #ifdef CLAY
+    gBumpH = 0.0; gSheen = 0.1; gRough = mix(0.5, 0.38, lipA); // (no pores in clay)
+    #endif
     float hcov = cMHHair(col, diffuseColor.rgb, F, P, lipA, fem, vec4(texture2D(uMHHair, vUV2).rgb, fm.g));
     gSheen *= 1.0 - hcov; if (hcov > 0.55) gSkin = 0.0; // (hair painted on it does not glow like skin)
     col *= 1.0 - 0.68 * fm.b; gSheen *= 1.0 - fm.b; gRough = mix(gRough, 0.3, fm.b); // the inside of the mouth, in its own shade
     diffuseColor.rgb = col;
   }
-  else if (mc == 18) { diffuseColor.rgb = texture2D(uMHEye, vUV2).rgb; gRough = 0.06; } // the eye: its painted iris and white, wet
+  else if (mc == 18) { diffuseColor.rgb = texture2D(uMHEye, vUV2).rgb; gRough = 0.06;
+    #ifdef CLAY
+    gRough = 0.1; // (a bead: its texture repainted white and black, glossy)
+    #endif
+  } // the eye: its painted iris and white, wet
   else if (mc == 19 || mc == 20) { // eyebrows and eyelashes: painted hairs on little cards; their alpha becomes the pixel's
     // coverage (the frame is multisampled), so the hairs have soft, fine edges and no sorting is needed
     vec4 t = mc == 19 ? texture2D(uMHBrow, vUV2) : texture2D(uMHLash, vUV2);
@@ -975,6 +1028,10 @@ function makeCharMaterial(uniforms) {
     #ifdef ANIME
     diffuseColor.a = smoothstep(mc == 19 ? 0.22 : 0.2, mc == 19 ? 0.42 : 0.38, a); // (one stroke, not hairs)
     diffuseColor.rgb = mc == 19 ? uBrow * 0.55 : vec3(0.03, 0.025, 0.03);
+    #endif
+    #ifdef CLAY
+    if (mc == 20) discard; // (a puppet has no lashes)
+    diffuseColor.a = smoothstep(0.2, 0.36, a); diffuseColor.rgb = uBrow * 0.6; // (a brow: a little roll of clay)
     #endif
     gRough = mc == 19 ? 0.62 : 0.45;
   }
@@ -1000,6 +1057,9 @@ function makeCharMaterial(uniforms) {
     #ifdef ANIME
     diffuseColor.a = smoothstep(0.24, 0.46, t.a);                    // (locks with a clean edge)
     diffuseColor.rgb *= 0.82 + 0.3 * smoothstep(0.42, 0.58, l);      // two tones of the colour
+    #elif defined(CLAY)
+    diffuseColor.a = smoothstep(0.2, 0.4, t.a);                      // (sculpted locks of clay, not hairs)
+    diffuseColor.rgb *= 0.86 + 0.24 * smoothstep(0.35, 0.65, l);
     #else
     diffuseColor.rgb *= (0.28 + 1.44 * l) * (0.94 + 0.12 * cNoise(P * 40.0));
     #endif
@@ -1041,7 +1101,7 @@ function makeCharMaterial(uniforms) {
         'reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );',
         'reflectedLight.directDiffuse += (gSkin > 0.5 ? cSkinIrr(dot(geometryNormal, directLight.direction)) * directLight.color : irradiance) * BRDF_Lambert( material.diffuseColor );'))
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-roughnessFactor = gRough;`)
+roughnessFactor = ${STYLE.plastilina ? 'mix(gRough, 0.5, 0.65)' : 'gRough'};`) // (claymation: plasticine's sheen; its prints come over the clothes' own colours in the chunk)
       .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
 metalnessFactor = gMetal;`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
@@ -1084,6 +1144,7 @@ if (gHairK > 0.0) {
   };
   m.alphaToCoverage = true; // (brows and lashes; every other class writes alpha 1)
   if (STYLE.anime) m.defines = { ANIME: '' };
+  else if (STYLE.plastilina) m.defines = { CLAY: '' }; // (claymation: a puppet)
   m.customProgramCacheKey = () => 'char14' + (STYLE.anime ? 'a' : '');
   return m;
 }
@@ -1613,6 +1674,8 @@ function ik2(J, T, P, parentQ, L1, L2, sgn, outU, outL) {
 const GU_BONES = ['hips', 'spine', 'chest', 'neck', 'head', 'clavL', 'clavR', 'armL', 'armR', 'foreL', 'foreR', 'handL', 'handR', 'thighL', 'thighR', 'shinL', 'shinR', 'footL', 'footR'];
 const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
 const _AX = new THREE.Vector3(1, 0, 0), _AY = new THREE.Vector3(0, 1, 0), _AZ = new THREE.Vector3(0, 0, 1);
+// claymation (src/plastilina.js): a puppet's proportions, as bone scales over the person's own build
+export const PUPPET = [['head', 1.1], ['eyeL', 1.42], ['eyeR', 1.42], ['lidL', 1.42], ['lidR', 1.42], ['browL', 1.3], ['browR', 1.3], ['handL', 1.16], ['handR', 1.16]];
 export class Character {
   constructor(desc, factory, statue = false) {
     this.desc = desc;
@@ -1621,6 +1684,7 @@ export class Character {
     this.spec = this.makeSpec ? this.makeSpec(desc, factory) : factory.spec(desc); // (a subclass may build its own: the hero)
     this.key = this.spec.key;
     this.object = new THREE.Group();
+    if (STYLE.plastilina && !statue) SM.add(this.object); // (claymation: a puppet, posed 12 times a second)
     const byName = {}, list = [];
     for (const b of this.rigBones ? this.rigBones() : factory.B.rig(this.spec)) {
       const o = new THREE.Bone();
@@ -1689,6 +1753,8 @@ export class Character {
       this.object.add(m);
       return m;
     });
+    // claymation: a puppet's proportions — a bigger head, big bead eyes (their lids with them), fatter brows, big hands
+    if (STYLE.plastilina && !this.statue) for (const [n, k] of PUPPET) if (this.bones[n]) this.bones[n].scale.setScalar(k);
     this.ready = true;
     if (this.rag || this.gu) this.cullSphere(true);
   }
@@ -1706,6 +1772,7 @@ export class Character {
     if (this.disposed) return;
     this.disposed = true;
     this.factory.live.delete(this);
+    SM.remove(this.object);
     if (this.meshes) {
       for (const m of this.meshes) this.object.remove(m);
       this.factory.releaseGeometry(this.key, this.geos);

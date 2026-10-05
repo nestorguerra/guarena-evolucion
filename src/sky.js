@@ -217,6 +217,61 @@ function makeDioramaSkyMaterial(uniforms) {
   });
 }
 
+// claymation: the sky is the set's painted backdrop — a soft gradient with a painter's brush in it — and the clouds are
+// cotton wool, the stop-motion way: round puffs, fibrous at their edges, lit from above, a little lilac underneath
+function makeClaySkyMaterial(uniforms) {
+  return new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms,
+    vertexShader: `varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w; }`,
+    fragmentShader: `
+      uniform vec3 uSun, uZen, uHor, uWarm, uGnd, uSunCol; uniform float uTime, uNight, uCloud;
+      varying vec3 vDir;
+      float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+      float n2(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h2(i),h2(i+vec2(1,0)),f.x), mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x), f.y); }
+      float fbm(vec2 p){ float s=0.0, a=0.5; for(int i=0;i<5;i++){ s+=a*n2(p); p=p*2.03+vec2(1.7,9.2); a*=0.5; } return s; }
+      // round puffs: the nearest of a few jittered centres, each puff a ball of cotton
+      vec2 puffs(vec2 p) { vec2 i = floor(p), f = fract(p); float d = 9.0, id = 0.0;
+        for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 g = vec2(x, y), o = vec2(h2(i + g), h2(i + g + 7.3)) * 0.8 + 0.1;
+          float r = 0.32 + 0.22 * h2(i + g + 3.1), dd = length(g + o - f) / r; if (dd < d) { d = dd; id = h2(i + g + 9.7); } }
+        return vec2(d, id); }
+      void main(){
+        vec3 d = normalize(vDir);
+        float h = d.y;
+        vec2 hs = normalize(uSun.xz + 1e-5), hd = normalize(d.xz + 1e-5);
+        float toward = pow(max(dot(hs, hd), 0.0), 2.5);
+        vec3 hor = mix(uHor, uWarm, toward * 0.6);
+        vec3 col = mix(hor, uZen, smoothstep(0.0, 0.6, pow(max(h, 0.0), 0.8)));
+        col = mix(col, uGnd, smoothstep(0.0, -0.1, h));
+        // the painter's brush: long soft strokes in the backdrop's colour
+        vec2 bp = vec2(atan(d.x, d.z) * 3.0, h * 9.0);
+        col *= 0.97 + 0.06 * fbm(vec2(bp.x * 0.7, bp.y * 3.0));
+        float sd = max(dot(d, uSun), 0.0), up = step(-0.03, uSun.y);
+        col += uSunCol * (pow(sd, 8.0) * 0.12 + pow(sd, 64.0) * 0.22) * up;
+        col = mix(col, uSunCol * 1.4 + 0.45, smoothstep(0.9993, 0.9996, sd) * up); // (a painted disc)
+        col += vec3(0.16, 0.11, 0.08) * exp(-max(h, 0.0) * 12.0) * uNight * 0.3;
+        if (h > -0.02) {
+          vec2 uv = d.xz / (h + 0.16) * 0.9 + vec2(uTime * 0.002, uTime * 0.0007);
+          float big = fbm(uv * 0.35 + 5.0);                                  // where the cotton gathers
+          vec2 pf = puffs(uv * 1.6);
+          float fib = fbm(uv * 14.0 + 3.0) * 0.6 + fbm(uv * 40.0 + 1.0) * 0.4; // its fibres
+          float edge = pf.x + (fib - 0.5) * 0.55;
+          float th = 1.0 - (big - 0.42 + uCloud * 0.25) * 1.6;                // (fewer puffs where the sky is clear)
+          float m = (1.0 - smoothstep(th - 0.08, th + 0.04, edge)) * smoothstep(-0.01, 0.12, h) * (1.0 - smoothstep(0.5, 0.95, h) * 0.6);
+          // lit from above and from the sun's side; a lilac grey underneath and in its folds
+          float shade = clamp(0.55 + 0.45 * (1.0 - pf.x) + 0.25 * (fib - 0.5) + 0.2 * dot(normalize(vec3(uSun.x, 0.6, uSun.z)), vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
+          vec3 lit = mix(vec3(0.82, 0.8, 0.88), vec3(1.0, 0.99, 0.97), shade);
+          lit = mix(lit, lit * (uSunCol * 0.5 + 0.55), 0.35 * (1.0 - smoothstep(0.0, 0.4, uSun.y)));
+          lit = mix(lit, uZen * 0.5 + vec3(0.04, 0.045, 0.07), uNight * 0.85);
+          col = mix(col, lit, m * (0.97 - 0.35 * uNight));
+        }
+        gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  });
+}
+
 export class SkySystem {
   constructor(renderer, scene, quality) {
     this.renderer = renderer;
@@ -228,7 +283,7 @@ export class SkySystem {
       uWarm: { value: new THREE.Color() }, uGnd: { value: new THREE.Color() }, uSunCol: { value: new THREE.Color() },
       uTime: { value: 0 }, uNight: { value: 0 }, uCloud: { value: 0.42 },
     };
-    this.mat = STYLE.anime ? makeAnimeSkyMaterial(this.uniforms) : STYLE.diorama ? makeDioramaSkyMaterial(this.uniforms) : makeSkyMaterial(this.uniforms);
+    this.mat = STYLE.anime ? makeAnimeSkyMaterial(this.uniforms) : STYLE.plastilina ? makeClaySkyMaterial(this.uniforms) : STYLE.diorama ? makeDioramaSkyMaterial(this.uniforms) : makeSkyMaterial(this.uniforms);
     // physical daytime sky (Rayleigh + Mie scattering): real blues, a white haze at the horizon, orange sunsets
     this.phys = new Sky();
     this.phys.scale.setScalar(3800);
@@ -297,7 +352,7 @@ export class SkySystem {
     sc.near = 1; sc.far = 600;
     this.sun.shadow.bias = -0.00025;
     this.sun.shadow.normalBias = 0.035;
-    this.sun.shadow.radius = STYLE.diorama ? 3.5 : 2.5;
+    this.sun.shadow.radius = STYLE.plastilina ? 6.5 : STYLE.diorama ? 3.5 : 2.5; // (claymation: the soft shadows of studio lamps)
     scene.add(this.sun, this.sun.target);
     this.hemi = new THREE.HemisphereLight(0xbfd8ff, 0x8a7a60, 0.6);
     scene.add(this.hemi);
@@ -309,7 +364,7 @@ export class SkySystem {
     // IBL: the same sky rendered into a PMREM environment map
     this.pmrem = new THREE.PMREMGenerator(renderer);
     this.envScene = new THREE.Scene();
-    this.envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), STYLE.anime ? makeAnimeSkyMaterial(this.uniforms) : STYLE.diorama ? makeDioramaSkyMaterial(this.uniforms) : makeSkyMaterial(this.uniforms)));
+    this.envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), STYLE.anime ? makeAnimeSkyMaterial(this.uniforms) : STYLE.plastilina ? makeClaySkyMaterial(this.uniforms) : STYLE.diorama ? makeDioramaSkyMaterial(this.uniforms) : makeSkyMaterial(this.uniforms)));
     this.envGround = new THREE.Mesh(new THREE.CircleGeometry(90, 24), new THREE.MeshBasicMaterial({ color: 0x8a7e6c }));
     this.envGround.rotation.x = -Math.PI / 2; this.envGround.position.y = -2;
     this.envScene.add(this.envGround);
@@ -378,6 +433,7 @@ export class SkySystem {
       this.sun.color.copy(sunCol).lerp(new THREE.Color(1, 1, 1), 0.25);
       this.sun.intensity = (STYLE.anime ? 2.6 : STYLE.diorama ? 5.2 : 4.4) * smoothstep(-0.02, 0.16, alt);
       if (STYLE.diorama) this.sun.color.copy(sunCol).lerp(new THREE.Color(1, 0.97, 0.9), 0.1); // (the afternoon sun stays warm)
+      if (STYLE.plastilina) { this.sun.intensity *= 0.7; this.sun.color.lerp(new THREE.Color(1.0, 0.9, 0.76), 0.35); } // (the key lamp of a studio set: warm, softer)
       this.sun.position.copy(focus).addScaledVector(d, 250);
       this.lightDir = (this.lightDir || new THREE.Vector3()).copy(d);
     } else {
@@ -407,7 +463,11 @@ export class SkySystem {
       // the bounce comes from the side away from the sun, a little above the street
       const b = this.bounce;
       b.color.copy(U.uGnd.value).lerp(new THREE.Color(1.0, 0.84, 0.64), 0.65);
-      b.intensity = 0.85 * day * smoothstep(-0.02, 0.16, alt);
+      b.intensity = (STYLE.plastilina ? 1.15 : 0.85) * day * smoothstep(-0.02, 0.16, alt);
+      if (STYLE.plastilina) { // (claymation: the studio fills the set — warm and generous: no dark shade anywhere)
+        this.hemi.color.lerp(new THREE.Color(1.0, 0.95, 0.88), 0.55 * day);
+        this.hemi.intensity = lerp(0.5, 1.95, day) + this.night * 0.8;
+      }
       b.target.position.copy(focus);
       b.position.set(-d.x, 0, -d.z).normalize().setY(0.35).normalize().multiplyScalar(100).add(focus);
       b.target.updateMatrixWorld();
@@ -420,7 +480,7 @@ export class SkySystem {
     if (STYLE.diorama) { // only as much air as the distance needs: no milky haze over the streets
       this.fog.color.copy(U.uHor.value).lerp(new THREE.Color(0.93, 0.88, 0.8), 0.25 * day);
       this.fog.near = lerp(120, 520, day); this.fog.far = lerp(1200, 4200, day);
-      this.renderer.toneMappingExposure = lerp(1.0, 1.0, day) + golden * day * 0.05;
+      this.renderer.toneMappingExposure = (STYLE.plastilina ? 0.95 : 1.0) + golden * day * 0.05; // (claymation: the whites keep their clay)
     }
     if (STYLE.anime) {
       this.fog.color.copy(U.uHor.value).lerp(U.uZen.value, 0.25);

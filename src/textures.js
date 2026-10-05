@@ -948,6 +948,21 @@ export function smokeCanvas(size = 128) {
   const c = canvas(size);
   const ctx = c.getContext('2d');
   const rnd = mulberry32(5);
+  if (STYLE.plastilina) { // claymation: smoke is a tuft of cotton wool — denser puffs, fibrous at the edge
+    for (let i = 0; i < 14; i++) {
+      const r = size * (0.1 + rnd() * 0.12), x = size / 2 + (rnd() - 0.5) * size * 0.36, y = size / 2 + (rnd() - 0.5) * size * 0.36;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(255,255,255,0.75)'); g.addColorStop(0.7, 'rgba(255,255,255,0.5)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 160; i++) { // the fibres
+      const a = rnd() * Math.PI * 2, r0 = size * (0.18 + rnd() * 0.22), L = size * (0.04 + rnd() * 0.08);
+      const x = size / 2 + Math.cos(a) * r0, y = size / 2 + Math.sin(a) * r0, b = a + (rnd() - 0.5) * 1.2;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(b) * L, y + Math.sin(b) * L); ctx.stroke();
+    }
+    return c;
+  }
   for (let i = 0; i < 26; i++) {
     const r = size * (0.12 + rnd() * 0.18);
     const x = size / 2 + (rnd() - 0.5) * size * 0.4, y = size / 2 + (rnd() - 0.5) * size * 0.4;

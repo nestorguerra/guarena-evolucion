@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { pointInRing, ringCentroid, orientedRect, mulberry32, clamp, polySample } from './util.js';
 import { flagCanvas } from './textures.js';
+import { STYLE } from './style.js';
+import { SM } from './plastilina.js';
 
 const llTo = (map, lat, lon) => { const o = map.raw.origin, R = 6378137, KX = Math.cos((o[0] * Math.PI) / 180) * R * Math.PI / 180, KZ = R * Math.PI / 180; return [(lon - o[1]) * KX, -(lat - o[0]) * KZ]; };
 function norm(g) {
@@ -190,7 +192,9 @@ export function benchGeo() {
   return (benchGeo.cache = { iron: merged(iron), wood: merged(wood) });
 }
 export function updateWater(L, dt, night) {
-  for (const m of L.waterMats || []) { m.uniforms.uTime.value += dt; m.uniforms.uNight.value = night; }
+  L.waterT = (L.waterT || 0) + dt;
+  const t = STYLE.plastilina ? SM.time(L.waterT) : L.waterT; // (claymation: the water's ripples pose by pose)
+  for (const m of L.waterMats || []) { m.uniforms.uTime.value = t; m.uniforms.uNight.value = night; }
 }
 
 // ---------------------------------------------------------------- a public building on the map (the theatre, the market…):

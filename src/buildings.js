@@ -15,15 +15,21 @@ const NORECT = [0, 0, 0, 0];
 class Chunk {
   constructor() {
     this.pos = []; this.nor = []; this.uv = []; this.tex = []; this.tint = []; this.idx = []; this.rect = []; this.wall = [];
+    this.edge = LOOK.plastilina ? [] : null; // (claymation: where each wall runs to its corners, to round them in the shader)
   }
   get vcount() { return this.pos.length / 3; }
   // a-b bottom, c-d top; ks: optional per-vertex tint multipliers (baked occlusion)
-  quad(ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, nx, ny, nz, u0, v0, u1, v1, tex, tint, rect = NORECT, wallH = 0, ks = null) {
+  quad(ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, nx, ny, nz, u0, v0, u1, v1, tex, tint, rect = NORECT, wallH = 0, ks = null, edge = null, nrm = null) {
     const i = this.vcount;
+    // nrm: [na, nb] the normals at the a/d and b/c sides (a wall bending round a rounded corner shades smoothly)
+    // edge: [s at a/d, s at b/c, code] — s the distance along the wall from its first corner, code its length plus which
+    // of its two ends are corners to round (1e4: the first, 2e4: the second)
+    if (this.edge) { if (edge) this.edge.push(edge[0], edge[2], edge[1], edge[2], edge[1], edge[2], edge[0], edge[2]); else this.edge.push(0, 0, 0, 0, 0, 0, 0, 0); }
     this.pos.push(ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz);
     for (let k = 0; k < 4; k++) {
       const m = ks ? ks[k] : 1;
-      this.nor.push(nx, ny, nz); this.tex.push(tex[0], tex[1], tex[2], tex[3]); this.tint.push(tint[0] * m, tint[1] * m, tint[2] * m);
+      if (nrm) { const q = k === 1 || k === 2 ? nrm[1] : nrm[0]; this.nor.push(q[0], q[1], q[2]); } else this.nor.push(nx, ny, nz);
+      this.tex.push(tex[0], tex[1], tex[2], tex[3]); this.tint.push(tint[0] * m, tint[1] * m, tint[2] * m);
       this.rect.push(rect[0], rect[1], rect[2], rect[3]); this.wall.push(wallH);
     }
     this.uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
@@ -35,6 +41,7 @@ class Chunk {
   }
   tri(a, b, c, n, uva, uvb, uvc, tex, tint) {
     const i = this.vcount;
+    if (this.edge) this.edge.push(0, 0, 0, 0, 0, 0);
     this.pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
     for (let k = 0; k < 3; k++) { this.nor.push(n[0], n[1], n[2]); this.tex.push(tex[0], tex[1], tex[2], tex[3]); this.tint.push(tint[0], tint[1], tint[2]); this.rect.push(0, 0, 0, 0); this.wall.push(0); }
     this.uv.push(uva[0], uva[1], uvb[0], uvb[1], uvc[0], uvc[1]);
@@ -54,6 +61,7 @@ class Chunk {
     for (let i = 0; i < r8.length; i++) r8[i] = Math.round(Math.min(1, Math.max(0, this.rect[i])) * 255);
     g.setAttribute('aRect', new THREE.BufferAttribute(r8, 4, true));
     g.setAttribute('aWallH', new THREE.Float32BufferAttribute(this.wall, 1));
+    if (this.edge) g.setAttribute('aEdge', new THREE.Float32BufferAttribute(this.edge, 2));
     g.setIndex(this.vcount > 65535 ? new THREE.Uint32BufferAttribute(this.idx, 1) : new THREE.Uint16BufferAttribute(this.idx, 1));
     g.computeBoundingSphere();
     g.computeBoundingBox();
@@ -156,6 +164,31 @@ function outsetRing(r, d) {
   return out;
 }
 
+// claymation: an outline with its convex corners rounded — each replaced by a short arc (a quadratic curve with the
+// corner as its control point), ~0.32 m round; nrm: the curve's own outward normal at its points (NaN elsewhere), so
+// the bend shades smooth and meets the straight walls with their own normal
+function roundRing(r, R = 0.32, seg = 4) {
+  const n = r.length / 2, pts = [], nrm = [];
+  for (let i = 0; i < n; i++) {
+    const h = (i - 1 + n) % n, j = (i + 1) % n;
+    const px = r[i * 2], pz = r[i * 2 + 1];
+    const ax = r[h * 2] - px, az = r[h * 2 + 1] - pz, bx = r[j * 2] - px, bz = r[j * 2 + 1] - pz;
+    const la = Math.hypot(ax, az), lb = Math.hypot(bx, bz);
+    const cr = la > 1e-6 && lb > 1e-6 ? (-ax * bz + az * bx) / (la * lb) : 0; // (> 0: a convex corner)
+    if (la < 0.5 || lb < 0.5 || cr < 0.35) { pts.push(px, pz); nrm.push(NaN, NaN); continue; }
+    const theta = Math.acos(Math.max(-1, Math.min(1, (ax * bx + az * bz) / (la * lb))));
+    const t = Math.min(R / Math.tan(theta / 2), la * 0.35, lb * 0.35);
+    const p0x = px + (ax / la) * t, p0z = pz + (az / la) * t, p1x = px + (bx / lb) * t, p1z = pz + (bz / lb) * t;
+    for (let k = 0; k <= seg; k++) {
+      const s = k / seg, a = (1 - s) * (1 - s), b = 2 * (1 - s) * s, c = s * s;
+      pts.push(a * p0x + b * px + c * p1x, a * p0z + b * pz + c * p1z);
+      const tx = 2 * (1 - s) * (px - p0x) + 2 * s * (p1x - px), tz = 2 * (1 - s) * (pz - p0z) + 2 * s * (p1z - pz), tl = Math.hypot(tx, tz) || 1;
+      nrm.push(tz / tl, -tx / tl); // (outward, as the walls': (dz, -dx))
+    }
+  }
+  return { pts, nrm };
+}
+
 function triangulate(ring, holes) {
   const toV = (r) => { const a = []; for (let i = 0; i < r.length; i += 2) a.push(new THREE.Vector2(r[i], r[i + 1])); return a; };
   const contour = toV(ring);
@@ -253,6 +286,10 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
     const c = chunkOf(p.c[0], p.c[1]);
     const H = p.H;
     const rings = [p.ring].concat(p.holes || []);
+    // (claymation: the walls follow the outline with its corners rounded, as a clay model's — the roof keeps the true
+    // outline, its eaves cover the difference; what stops you, the colliders, too)
+    const smooths = LOOK.plastilina ? [] : null;
+    if (smooths) for (let ri = 0; ri < rings.length; ri++) { const rr = roundRing(rings[ri]); rings[ri] = rr.pts; smooths[ri] = rr.nrm; }
     // ---------------- walls
     // Each edge is sampled every ~0.5 m: the neighbour part behind it (if any) hides the wall only up to its own
     // height and only where it really is, so partly covered party walls no longer leave see-through gaps.
@@ -260,6 +297,16 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
     for (let ri = 0; ri < rings.length; ri++) {
       const r = rings[ri];
       const n = r.length / 2;
+      // (claymation) the ring's convex corners — the building's own corners, rounded like a clay model's
+      const convex = LOOK.plastilina ? new Uint8Array(n) : null;
+      if (convex) for (let i = 0; i < n; i++) {
+        const h = (i - 1 + n) % n, j = (i + 1) % n;
+        const e0x = r[i * 2] - r[h * 2], e0z = r[i * 2 + 1] - r[h * 2 + 1], e1x = r[j * 2] - r[i * 2], e1z = r[j * 2 + 1] - r[i * 2 + 1];
+        const l0 = Math.hypot(e0x, e0z), l1 = Math.hypot(e1x, e1z);
+        convex[i] = l0 > 0.05 && l1 > 0.05 && (e0x * e1z - e0z * e1x) / (l0 * l1) > 0.85 ? 1 : 0; // (a sharp corner left: the shader rounds it)
+      }
+      // (claymation) the normal at each vertex of a rounded corner: its curve's own (NaN where the outline is straight)
+      const vN = smooths ? smooths[ri] : null;
       for (let i = 0; i < n; i++) {
         const j = (i + 1) % n;
         const ax = r[i * 2], az = r[i * 2 + 1], bx = r[j * 2], bz = r[j * 2 + 1];
@@ -281,6 +328,12 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
           if (cy >= H - 0.05) return; // fully hidden behind a taller neighbour
           const t0 = k0 / K, t1 = k1 / K;
           const run = { ax, az, dx, dz, L, nx, nz, uTot, t0, t1, cy, ri, exposed: cy === 0 };
+          if (convex) run.code = L + (t0 < 1e-6 && convex[i] ? 1e4 : 0) + (t1 > 1 - 1e-6 && convex[j] ? 2e4 : 0);
+          if (vN) { // the normals at the run's two ends (smoothed where the outline bends round a corner)
+            const sA = isNaN(vN[i * 2]) ? [nx, nz] : [vN[i * 2], vN[i * 2 + 1]], sB = isNaN(vN[j * 2]) ? [nx, nz] : [vN[j * 2], vN[j * 2 + 1]];
+            const at = (t) => { const x = sA[0] + (sB[0] - sA[0]) * t, z = sA[1] + (sB[1] - sA[1]) * t, l = Math.hypot(x, z) || 1; return [x / l, 0, z / l]; };
+            run.nrmAt = at;
+          }
           if (run.exposed) { run.street = streetFacing(run); run.exposed = run.street; run.back = !run.street; }
           runs.push(run);
           if (cy === 0 && ri === 0 && (t1 - t0) * L > 1) ao.push(ax + dx * t0, az + dz * t0, ax + dx * t1, az + dz * t1, nx, nz);
@@ -326,7 +379,7 @@ function emitRun(c, run, p, info, H, facade) {
   if (!run.exposed) {
     // party walls: blank (kind 2); backyard / courtyard facades: painted cells picked in the shader (kind 3), one quad
     const x0 = ax + dx * t0, z0 = az + dz * t0, x1 = ax + dx * t1, z1 = az + dz * t1;
-    c.quad(x0, cy, z0, x1, cy, z1, x1, H, z1, x0, H, z0, nx, 0, nz, uTot * t0, cy / FLOOR_H, uTot * t1, H / FLOOR_H, [sBase, run.back ? 3 : 2, info.seed, 0], info.tint, NORECT, H);
+    c.quad(x0, cy, z0, x1, cy, z1, x1, H, z1, x0, H, z0, nx, 0, nz, uTot * t0, cy / FLOOR_H, uTot * t1, H / FLOOR_H, [sBase, run.back ? 3 : 2, info.seed, 0], info.tint, NORECT, H, null, run.code ? [t0 * run.L, t1 * run.L, run.code] : null, run.nrmAt ? [run.nrmAt(t0), run.nrmAt(t1)] : null);
     return 2;
   }
   const u0 = uTot * t0, u1 = uTot * t1;
@@ -340,7 +393,7 @@ function emitRun(c, run, p, info, H, facade) {
   const piece = (ua, ub, ya, yb, layer, rect) => {
     ua -= eu; ub += eu; ya = Math.max(0, ya - ev * FLOOR_H); yb += ev * FLOOR_H;
     const [x0, z0] = at(ua), [x1, z1] = at(ub);
-    c.quad(x0, ya, z0, x1, ya, z1, x1, yb, z1, x0, yb, z0, nx, 0, nz, ua, ya / FLOOR_H, ub, yb / FLOOR_H, [layer, 0, info.seed, 0], info.tint, rect, H);
+    c.quad(x0, ya, z0, x1, ya, z1, x1, yb, z1, x0, yb, z0, nx, 0, nz, ua, ya / FLOOR_H, ub, yb / FLOOR_H, [layer, 0, info.seed, 0], info.tint, rect, H, null, run.code ? [(ua / uTot) * run.L, (ub / uTot) * run.L, run.code] : null, run.nrmAt ? [run.nrmAt(ua / uTot), run.nrmAt(ub / uTot)] : null);
     tris += 2;
   };
   for (let b = Math.floor(u0 + 1e-6); b < u1 - 1e-6; b++) {
@@ -608,6 +661,7 @@ function flatCap(c, ring, holes, y, layer, info, tint) {
     c.tint.push(tint[0], tint[1], tint[2]);
     c.rect.push(0, 0, 0, 0);
     c.wall.push(0);
+    if (c.edge) c.edge.push(0, 0);
   }
   for (const f of t.faces) {
     const a = t.pts[f[0]], b = t.pts[f[1]], d = t.pts[f[2]];

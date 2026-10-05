@@ -153,6 +153,13 @@ export function loadTexture(name, suffix = '_d', { srgb = true, repeat = 1 } = {
       toonifyLayers(id.data, S, 1, { rColor: 6, rEdge: 2, levels: 5, posterize: 0.8, ink: 0.4, edge0: 20, edge1: 44 });
       x.putImageData(id, 0, 0);
       t.image = c;
+    } else if (STYLE.plastilina && suffix === '_d') { // claymation: the interiors' wood, tiles and plaster as pieces of plasticine
+      const S = Math.min(512, im.width || 512), c = document.createElement('canvas'); c.width = c.height = S;
+      const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, S, S);
+      const id = x.getImageData(0, 0, S, S);
+      toonifyLayers(id.data, S, 1, { rColor: 5, rEdge: 1, levels: 5, posterize: 0.55, ink: 0, saturation: 1.1 });
+      x.putImageData(id, 0, 0);
+      t.image = c;
     } else if (STYLE.diorama && suffix === '_d' && /plaster/.test(name)) {
       // the diorama's lime plaster (the visual spec): the scan's stains and blotches kept as soft differences of tone
       const S = Math.min(1024, im.width || 1024), c = document.createElement('canvas'); c.width = c.height = S;

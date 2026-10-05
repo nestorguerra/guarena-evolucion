@@ -20,10 +20,10 @@ Desde la versión 32 se ve **como un anime**, inspirado en la estética del jueg
 dibujados a partir de la profundidad, texturas repintadas en colores planos, cielo turquesa con nubes planas, árboles de
 copas redondeadas y caras de ojos grandes y piel lisa.
 
-En *Ajustes › Estética* hay cuatro formas de verlo: **Manga**, **Acuarela** (la Acuarela de dehesa: aguadas claras
+En *Ajustes › Estética* hay cinco formas de verlo: **Manga**, **Acuarela** (la Acuarela de dehesa: aguadas claras
 sobre papel de grano, el pigmento acumulado donde se tocan dos colores, el papel en blanco para las luces y un lápiz
-suave debajo), **Realista** (el aspecto fotográfico de antes) y **Diorama**. Manga y Acuarela cambian al momento;
-Realista y Diorama, al recargar.
+suave debajo), **Realista** (el aspecto fotográfico de antes), **Diorama** y **Plastilina**. Manga y Acuarela cambian al
+momento; las demás, al recargar.
 
 La **Diorama** sigue la especificación visual «realismo estilizado cálido con acabado de diorama artesanal»: cal marfil y
 crema con su grano, zócalos ocre tostado, tejas terracota, puertas verde profundo con jambas de piedra arenisca, rejas
@@ -34,6 +34,25 @@ rugosidades, oclusión, gradación final) y en las ramas `STYLE.diorama` del cie
 compararla con las otras: `tools/lookcompare.js` (las tres vistas de prueba —hacia Santa María, una calle estrecha y un
 cruce— con la cámara y la luz fijas, más plaza, atardecer, noche, un coche, el campo y el pueblo desde arriba, y la
 medida del tiempo por fotograma).
+
+La **Plastilina** es Guareña como una película de stop motion de plastilina (claymation), a la manera de Aardman,
+*La LEGO Película* o *Kirby and the Rainbow Curse* (el plan, la investigación y la evaluación, en
+[docs/plastilina.md](docs/plastilina.md)):
+- Todo lo iluminado es plastilina: bultos de modelar a mano, huellas de pulgar con sus surcos, alisados de dedo,
+  cortes de espátula, alguna pelusa, color amasado y un brillo céreo; ni una fotografía.
+- Formas blandas: las casas con las esquinas redondeadas, el canto de arriba, el zócalo y los huecos de puertas y
+  ventanas blandos; marcos, balcones, muebles y bancos como losas de plastilina; rejas de churro; árboles de bolas;
+  coches gorditos con ventanas pintadas.
+- Muñecos: piel lisa de plastilina, ojos de cuenta, cejas de churro, pelo modelado con surcos de peine y algo más de
+  cabeza y manos.
+- Cielo de decorado con nubes de algodón, humo de algodón, luz de estudio cálida con sombras suaves y, como en una
+  maqueta fotografiada, el fondo lejano apenas suave.
+- **Stop motion**: personas, perros y coches posan 12 veces por segundo (el agua, el viento y el humo también) y se
+  retocan en cada pose; la cámara, tu personaje y tu coche van fluidos, para jugar igual que siempre. Se puede quitar en
+  *Ajustes › Stop motion*.
+
+Todo está en `src/plastilina.js` y en las ramas `STYLE.plastilina` de casas, fachadas, árboles, personajes, coches y
+cielo. `tools/lookcompare.js` saca las vistas fijas, los primeros planos (`closeups`) y vídeos del juego (`walkVideo`).
 
 ![Guareña desde el aire: la Iglesia de Santa María y la Plaza de España con el Ayuntamiento](docs/portada.jpg)
 

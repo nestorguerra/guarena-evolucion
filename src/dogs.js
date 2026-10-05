@@ -1,6 +1,8 @@
 // Dogs out for a walk with their owners: a mongrel, a podenco, a little terrier… on the lead, trotting ahead,
 // stopping to sniff a corner (and tugging the owner along), wagging at you, barking if you run at them.
 import * as THREE from 'three';
+import { STYLE } from './style.js';
+import { SM } from './plastilina.js';
 
 const COATS = [0x8a5a2e, 0xd8b27a, 0x2a2622, 0xf2eee6, 0x6a6a6a, 0xa8743a, 0x3a2a1e];
 const BREEDS = [
@@ -72,6 +74,7 @@ export class Dogs {
     d.x = ped.x + 1; d.z = ped.z; d.owner = ped;
     this.game.scene.add(d.root);
     this.game.scene.add(d.lead);
+    if (STYLE.plastilina) SM.add(d.root); // (claymation: posed 12 times a second, like its owner)
     ped.dog = d;
     this.list.push(d);
     return d;
@@ -80,6 +83,7 @@ export class Dogs {
     const d = ped.dog;
     if (!d) return;
     this.game.scene.remove(d.root); this.game.scene.remove(d.lead);
+    SM.remove(d.root);
     d.lead.geometry.dispose();
     this.list.splice(this.list.indexOf(d), 1);
     ped.dog = null;

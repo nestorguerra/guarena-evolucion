@@ -376,6 +376,13 @@ function dioramaGreens(dc, W, H) {
     dc[i + 2] = b + ((L + (b - L) * k) * 0.8 - b) * gr;
   }
 }
+// claymation: the leaves and petals as pieces of plasticine — purer, a little lighter, never dusty
+function clayColours(dc, W, H) {
+  for (let i = 0; i < W * H * 4; i += 4) {
+    const r = dc[i], g = dc[i + 1], b = dc[i + 2], L = 0.299 * r + 0.587 * g + 0.114 * b;
+    dc[i] = Math.min(255, (L + (r - L) * 1.25) * 1.04); dc[i + 1] = Math.min(255, (L + (g - L) * 1.25) * 1.04); dc[i + 2] = Math.min(255, (L + (b - L) * 1.25) * 1.04);
+  }
+}
 // the leaf atlas as a DataTexture: colour painted over the tile's own mean colour (so filtering never pulls in a dark
 // halo), alpha painted separately
 export function makeLeafAtlas() {
@@ -396,6 +403,7 @@ export function makeLeafAtlas() {
   });
   const dc = xc.getImageData(0, 0, W, H).data, da = xa.getImageData(0, 0, W, H).data;
   if (STYLE.anime) animeFlatten(dc, da, W, H);
+  else if (STYLE.plastilina) clayColours(dc, W, H);
   else if (STYLE.diorama) dioramaGreens(dc, W, H);
   const out = new Uint8Array(W * H * 4);
   // rows flipped: the DataTexture's first row is the bottom (v = 0)
@@ -757,6 +765,8 @@ function leafCards(B, sp, sk, rnd, lod) {
 const ANIME_LEAF = { olivo: '#93a17c', encina: '#587a4c', platano: '#7aa55c', naranjo: '#4a7a45', limonero: '#52844a', morera: '#72a35a', pino: '#577a55', eucalipto: '#8ca68e', chopo: '#8fb266', higuera: '#6f9c56', frutal: '#7ba45e', adelfa: '#5a8552', cipres: '#446448', seto: '#548453', vid: '#7aa45a' };
 const ANIME_DOTS = { naranjo: [['#f28c1c', 16, 0.075]], limonero: [['#eed63c', 14, 0.07]], adelfa: [['#ef7aa6', 26, 0.09], ['#f6f0ea', 6, 0.09]], frutal: [['#f4b0c0', 10, 0.06]] };
 const lin = (h) => hex(h).map((v) => Math.pow(v / 255, 2.2));
+// (claymation: the same greens as plasticine — more saturated; the anime look keeps its own)
+const clayGreen = (c) => { if (!STYLE.plastilina) return c; const L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; return c.map((v) => Math.max(0, L + (v - L) * 1.35)); };
 const ICO = [];
 function icoMesh(detail) { // a unit icosphere with shared vertices (smooth normals, lumps that stay closed)
   if (ICO[detail]) return ICO[detail];
@@ -790,7 +800,7 @@ function blob(B, c, r, sq, col, sk, rnd, detail, tile, flexK, lump = 0.34, box =
 }
 function clumps(B, sp, sk, rnd, lod) {
   const Lf = sp.leaves, name = sp.name;
-  const col = lin(ANIME_LEAF[name] || '#6e9c4a');
+  const col = clayGreen(lin(ANIME_LEAF[name] || '#6e9c4a'));
   const pts = [];
   for (const tw of sk.twigs) {
     const from = tw.tipOnly ? 0.7 : (Lf.from ?? 0.25);
@@ -832,7 +842,7 @@ function buildBranching(sp, rnd, lod) {
     const radial = b.depth === 0 ? (lod ? 6 : 9) : b.depth === 1 ? (lod ? 4 : 6) : 3;
     tube(bark, b, radial, tile, tint, sk, (i * 0.61803) % 1);
   });
-  if (STYLE.anime) clumps(leaves, sp, sk, rnd, lod); else leafCards(leaves, sp, sk, rnd, lod);
+  if (STYLE.anime || STYLE.plastilina) clumps(leaves, sp, sk, rnd, lod); else leafCards(leaves, sp, sk, rnd, lod); // (claymation: balls of modelled clay)
   return { bark, leaves, H: sk.H, R: Math.max(sk.Rr[0], sk.Rr[2]) };
 }
 // cypress: a slim spindle of foliage round a hidden stem
@@ -840,8 +850,8 @@ function buildColumn(sp, rnd, lod) {
   const H = R(rnd, sp.H), Rm = R(rnd, sp.r), bark = new Buf(), leaves = new Buf();
   const sk = { H, C: [0, H * 0.5, 0], Rr: [Rm, H * 0.5, Rm] };
   tube(bark, { pts: [[0, 0, 0], [0.02, 0.8, 0], [0, H * 0.85, 0.02]], rad: [0.16, 0.12, 0.03], depth: 0, flare: 1.3 }, lod ? 5 : 7, BARK[sp.bark], [1, 1, 1], sk, 0.3);
-  if (STYLE.anime) { // a column of lumps, tapering to a point
-    const col = lin(ANIME_LEAF.cipres), n = lod ? 5 : 9;
+  if (STYLE.anime || STYLE.plastilina) { // a column of lumps, tapering to a point
+    const col = clayGreen(lin(ANIME_LEAF.cipres)), n = lod ? 5 : 9;
     for (let k = 0; k < n; k++) {
       const t = (k + 0.5) / n, y = 0.9 + t * (H - 1.4), prof = Math.pow(Math.sin(Math.PI * clamp(t * 0.92 + 0.06, 0, 1)), 0.7) * (1 - 0.45 * t * t);
       const r = Math.max(0.25, Rm * prof * 1.05), vk = 0.88 + 0.2 * t + rnd() * 0.08;
@@ -870,8 +880,8 @@ function buildColumn(sp, rnd, lod) {
 // clipped hedge: cards all over a box, turned outwards
 function buildBox(sp, rnd, lod) {
   const [L, W, Hh] = sp.size, bark = new Buf(), leaves = new Buf(), tile = TILE[sp.tiles[0]];
-  if (STYLE.anime) { // a clipped hedge as a row of rounded lumps
-    const col = lin(ANIME_LEAF.seto), sk = { H: Hh, C: [0, Hh * 0.55, 0], Rr: [L / 2, Hh / 2, W / 2] };
+  if (STYLE.anime || STYLE.plastilina) { // a clipped hedge as a row of rounded lumps
+    const col = clayGreen(lin(ANIME_LEAF.seto)), sk = { H: Hh, C: [0, Hh * 0.55, 0], Rr: [L / 2, Hh / 2, W / 2] };
     blob(leaves, [0, Hh * 0.5, 0], 1, 1, col.map((v) => v * (0.94 + rnd() * 0.1)), sk, rnd, lod ? 1 : 2, TILE.copa_b, 0.15, 0.05, { n: 5, h: [L * 0.53, Hh * 0.5, W * 0.5] });
     return { bark, leaves, H: Hh, R: L / 2 };
   }
@@ -959,8 +969,8 @@ function buildVine(sp, rnd, lod) {
   const bark = new Buf(), leaves = new Buf(), sk = { H: 1.8, C: [0, 1.25, 0], Rr: [0.9, 0.55, 0.35] };
   tube(bark, { pts: [[0, 0, 0], [0.05, 0.4, 0.02], [-0.03, 0.8, 0]], rad: [0.05, 0.04, 0.035], depth: 0, flare: 1.2 }, 5, BARK.comun, [0.9, 0.8, 0.7], sk, 0.1);
   for (const s of [-1, 1]) tube(bark, { pts: [[-0.03, 0.8, 0], [s * 0.5, 0.86, 0], [s * 1.0, 0.84, 0]], rad: [0.03, 0.025, 0.015], depth: 1 }, 4, BARK.comun, [0.9, 0.8, 0.7], sk, 0.2);
-  if (STYLE.anime) { // the row's leaves as a few soft lumps over the wires
-    const col = lin(ANIME_LEAF.vid);
+  if (STYLE.anime || STYLE.plastilina) { // the row's leaves as a few soft lumps over the wires
+    const col = clayGreen(lin(ANIME_LEAF.vid));
     for (let k = 0; k < (lod ? 2 : 4); k++) blob(leaves, [(k / ((lod ? 2 : 4) - 1) - 0.5) * 1.5, 1.3, 0], 0.55, 0.7, col.map((v) => v * (0.92 + rnd() * 0.12)), sk, rnd, lod ? 0 : 1, TILE.copa, 0.5, 0.3);
     return { bark, leaves, H: 1.8, R: 1.1 };
   }

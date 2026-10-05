@@ -24,10 +24,10 @@ export const DIORAMA = {
 // the last grade, in linear light before the tone curve: a little more colour, the white balance of a warm afternoon,
 // a touch of contrast round the middle greys (the model's light, not a filter: no outlines, no grain, no wash)
 export const DioramaGrade = {
-  uniforms: { tDiffuse: { value: null }, uSat: { value: 1.04 }, uWarm: { value: 0.03 }, uContrast: { value: 1.04 } },
+  uniforms: { tDiffuse: { value: null }, uSat: { value: 1.04 }, uWarm: { value: 0.03 }, uContrast: { value: 1.04 }, uLift: { value: 0 }, uVignette: { value: 0 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uSat, uWarm, uContrast; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uSat, uWarm, uContrast, uLift, uVignette; varying vec2 vUv;
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
       vec3 col = max(c.rgb, 0.0);
@@ -36,6 +36,8 @@ export const DioramaGrade = {
       col *= vec3(1.0 + uWarm, 1.0 + uWarm * 0.3, 1.0 - uWarm * 0.7);
       float k = pow(max(l, 1e-4) / 0.18, uContrast - 1.0);
       col *= clamp(k, 0.6, 1.6);
+      col += uLift * vec3(0.2, 0.17, 0.13) * (1.0 - smoothstep(0.0, 0.3, l)); // (the studio's fill in the shadows)
+      col *= 1.0 - uVignette * smoothstep(0.4, 1.0, length((vUv - 0.5) * vec2(1.25, 1.0))); // (the lens's corners)
       gl_FragColor = vec4(col, c.a);
     }`,
 };

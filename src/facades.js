@@ -163,6 +163,7 @@ class Geo {
     this.tri(i, i + 1, i + 2); this.tri(i, i + 2, i + 3);
   }
   box(x0, y0, z0, x1, y1, z1, col, pat = 0, faces = NOBACK) {
+    if (LOOK.plastilina) return this.clayBox(x0, y0, z0, x1, y1, z1, col, pat, faces);
     if (faces & 1) this.quad([x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0], 1, 0, 0, col, pat);
     if (faces & 2) this.quad([x0, y0, z1], [x0, y0, z0], [x0, y1, z0], [x0, y1, z1], -1, 0, 0, col, pat);
     if (faces & 4) this.quad([x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1], 0, 1, 0, col, pat);
@@ -170,8 +171,32 @@ class Geo {
     if (faces & 16) this.quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], 0, 0, 1, col, pat);
     if (faces & 32) this.quad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], 0, 0, -1, col, pat);
   }
+  // claymation: the same box as a soft slab of clay — each corner's normal leans out along its diagonal, so the light
+  // turns round every edge as round a rounded one (no extra triangles; the outline stays the same)
+  clayBox(x0, y0, z0, x1, y1, z1, col, pat, faces) {
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2;
+    const k = 0.62 * Math.min(1, Math.max(0.2, 0.9 / Math.max(x1 - x0, y1 - y0, z1 - z0))); // (small things the softest)
+    const q = (P, fn) => { // a corner's normal: the face's, leaning towards the corner
+      const ox = Math.sign(P[0] - cx), oy = Math.sign(P[1] - cy), oz = Math.sign(P[2] - cz);
+      const nx = fn[0] + ox * k * (1 - Math.abs(fn[0])), ny = fn[1] + oy * k * (1 - Math.abs(fn[1])), nz = fn[2] + oz * k * (1 - Math.abs(fn[2]));
+      const l = Math.hypot(nx, ny, nz) || 1;
+      return [nx / l, ny / l, nz / l];
+    };
+    const face = (P0, P1, P2, P3, fn) => {
+      const i = this.nv;
+      for (const P of [P0, P1, P2, P3]) { const n = q(P, fn); this.v(P[0], P[1], P[2], n[0], n[1], n[2], col, pat); }
+      this.tri(i, i + 1, i + 2); this.tri(i, i + 2, i + 3);
+    };
+    if (faces & 1) face([x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0], [1, 0, 0]);
+    if (faces & 2) face([x0, y0, z1], [x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [-1, 0, 0]);
+    if (faces & 4) face([x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1], [0, 1, 0]);
+    if (faces & 8) face([x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0], [0, -1, 0]);
+    if (faces & 16) face([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1]);
+    if (faces & 32) face([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1]);
+  }
   // square-section bar between two local points
   bar(A, B, s, col, pat = 0) {
+    if (LOOK.plastilina) s *= 1.3; // (claymation: iron bars as rolls of black clay, a little fatter)
     let dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2];
     const L = Math.hypot(dx, dy, dz) || 1;
     dx /= L; dy /= L; dz /= L;
@@ -187,6 +212,15 @@ class Geo {
     for (let k = 0; k < 4; k++) {
       if (k === skip) continue; // face turned to the wall: never seen
       const c0 = C[k], c1 = C[(k + 1) % 4], nn = NN[k];
+      if (LOOK.plastilina) { // a round roll: each corner's normal its own diagonal, so it shades as a cylinder
+        const i = this.nv, n0 = [c0[0] / Math.SQRT2, c0[1] / Math.SQRT2, c0[2] / Math.SQRT2], n1 = [c1[0] / Math.SQRT2, c1[1] / Math.SQRT2, c1[2] / Math.SQRT2];
+        this.v(A[0] + c0[0] * h, A[1] + c0[1] * h, A[2] + c0[2] * h, n0[0], n0[1], n0[2], col, pat);
+        this.v(A[0] + c1[0] * h, A[1] + c1[1] * h, A[2] + c1[2] * h, n1[0], n1[1], n1[2], col, pat);
+        this.v(B[0] + c1[0] * h, B[1] + c1[1] * h, B[2] + c1[2] * h, n1[0], n1[1], n1[2], col, pat);
+        this.v(B[0] + c0[0] * h, B[1] + c0[1] * h, B[2] + c0[2] * h, n0[0], n0[1], n0[2], col, pat);
+        this.tri(i, i + 1, i + 2); this.tri(i, i + 2, i + 3);
+        continue;
+      }
       this.quad([A[0] + c0[0] * h, A[1] + c0[1] * h, A[2] + c0[2] * h], [A[0] + c1[0] * h, A[1] + c1[1] * h, A[2] + c1[2] * h],
         [B[0] + c1[0] * h, B[1] + c1[1] * h, B[2] + c1[2] * h], [B[0] + c0[0] * h, B[1] + c0[1] * h, B[2] + c0[2] * h], nn[0], nn[1], nn[2], col, pat);
     }

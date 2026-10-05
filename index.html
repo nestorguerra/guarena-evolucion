@@ -697,8 +697,8 @@ body.contemplar #hud .tr, body.contemplar #hud .radarWrap, body.contemplar #hud 
   // the look, before anything shows; in the anime one the drone's picture of Guareña covers the screen and starts
   // drifting closer at once (a CSS transition, smooth while the page loads and builds the town)
   var look = 'anime';
-  try { var st = JSON.parse(localStorage.getItem('guarena_evo_save') || localStorage.getItem('guarena_save') || '{}').style; look = st === 'real' || st === 'diorama' ? st : 'anime'; } catch (e) { /* ignore */ }
-  try { var ue = new URLSearchParams(location.search).get('estilo'); if (ue) look = ue === 'real' || ue === 'diorama' ? ue : 'anime'; } catch (e) { /* ignore */ }
+  try { var st = JSON.parse(localStorage.getItem('guarena_evo_save') || localStorage.getItem('guarena_save') || '{}').style; look = st === 'real' || st === 'diorama' || st === 'plastilina' ? st : 'anime'; } catch (e) { /* ignore */ }
+  try { var ue = new URLSearchParams(location.search).get('estilo'); if (ue) look = ue === 'real' || ue === 'diorama' || ue === 'plastilina' ? ue : 'anime'; } catch (e) { /* ignore */ }
   document.body.dataset.look = look;
   if (look !== 'anime') return;
   var box = document.getElementById('intro'), img = document.getElementById('introImg');

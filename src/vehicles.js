@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clamp, lerp, smoothstep, wrapAngle, TAU } from './util.js';
 import { PERK } from './perks.js';
+import { STYLE } from './style.js';
 
 // ---------------------------------------------------------------- model catalogue
 // Fictional names; silhouettes you recognise from any street in the Vegas Altas: the modern hatch, saloon, crossover,
@@ -186,11 +187,14 @@ function buildCar(spec) {
   const s = spec;
   const pr = profile(s);
   const era = s.era || 'new', old = era === 'old', old80 = era === 'old80', mid = era === 'mid', neu = era === 'new';
-  const [tumble, rounding, bevel] = SHAPE_FORM[s.shape] || SHAPE_FORM.hatch;
+  let [tumble, rounding, bevel] = SHAPE_FORM[s.shape] || SHAPE_FORM.hatch;
+  // (claymation: a toy car modelled in clay — a fatter, rounder body, its edges soft)
+  const clay = STYLE.plastilina;
+  if (clay) { tumble *= 1.18; rounding = Math.min(0.6, rounding * 1.3 + 0.05); bevel = bevel * 1.7 + 0.05; }
   const shape = new THREE.Shape();
   pr.pts.forEach(([z, y], i) => (i ? shape.lineTo(z, y) : shape.moveTo(z, y)));
   const bt = Math.max(0.03, bevel + 0.02);
-  const eg = new THREE.ExtrudeGeometry(shape, { depth: s.W - bt * 2, bevelEnabled: true, bevelThickness: bt, bevelSize: bevel, bevelSegments: 2, curveSegments: 3 });
+  const eg = new THREE.ExtrudeGeometry(shape, { depth: s.W - bt * 2, bevelEnabled: true, bevelThickness: bt, bevelSize: bevel, bevelSegments: clay ? 4 : 2, curveSegments: clay ? 6 : 3 });
   eg.translate(0, 0, -(s.W - bt * 2) / 2);
   eg.rotateY(-Math.PI / 2); // x' = -z, z' = x
   const halfW = (y) => (s.W / 2) * (1 - tumble * clamp((y - pr.bl) / (s.H - pr.bl), 0, 1));
@@ -687,6 +691,12 @@ export class VehicleRenderer {
       rim: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.32, metalness: 0.75 }),
     };
     wearBody(this.mats.body);
+    if (STYLE.plastilina) { // (claymation: painted clay, not lacquer; the windows a pale painted blue with a gleam)
+      const M = this.mats;
+      M.body.clearcoat = 0; M.body.roughness = 0.5; M.body.metalness = 0;
+      M.glass.color.set(0x7d98ad); M.glass.roughness = 0.18; M.glass.clearcoat = 0.4;
+      M.chrome.roughness = 0.4; M.rim.roughness = 0.45; M.trim.roughness = 0.6;
+    }
     this.models = {};
     for (const key in MODELS) {
       const spec = MODELS[key];
@@ -817,8 +827,16 @@ export class VehicleRenderer {
     ws.rim.setMatrixAt(v.wheelSlot * 4 + k, matrix);
   }
   flush() {
-    for (const k in this.models) for (const p in this.models[k].meshes) this.models[k].meshes[p].instanceMatrix.needsUpdate = true;
-    for (const st in this.wheelSets) { this.wheelSets[st].tyre.instanceMatrix.needsUpdate = true; this.wheelSets[st].rim.instanceMatrix.needsUpdate = true; }
+    for (const k in this.models) for (const p in this.models[k].meshes) { const a = this.models[k].meshes[p].instanceMatrix; a.clearUpdateRanges(); a.needsUpdate = true; }
+    for (const st in this.wheelSets) for (const w of [this.wheelSets[st].tyre, this.wheelSets[st].rim]) { w.instanceMatrix.clearUpdateRanges(); w.instanceMatrix.needsUpdate = true; }
+  }
+  // only one car's matrices to the GPU (the others keep their last pose: claymation)
+  flushOnly(v) {
+    if (!v || v.slot < 0) return;
+    const m = this.models[v.model];
+    for (const p in m.meshes) { const a = m.meshes[p].instanceMatrix; a.clearUpdateRanges(); a.addUpdateRange(v.slot * 16, 16); a.needsUpdate = true; }
+    const ws = this.wheelSets[m.wheel];
+    if (ws && v.wheelSlot >= 0) for (const w of [ws.tyre, ws.rim]) { const a = w.instanceMatrix; a.clearUpdateRanges(); a.addUpdateRange(v.wheelSlot * 64, 64); a.needsUpdate = true; }
   }
   info(model) { return this.models[model].geo; }
 }

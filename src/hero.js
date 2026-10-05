@@ -10,7 +10,8 @@
 // on per body part (aiming or a punch in the arms while the legs keep walking), the head and eyes look where they
 // look, the fingers curl, and the feet are locked to the ground while the capture has them down.
 import * as THREE from 'three';
-import { Character, palette } from './characters.js';
+import { Character, palette, PUPPET } from './characters.js';
+import { STYLE } from './style.js';
 import { parseHero } from './herodata.js';
 import { parseMoves, MotionDB, MotionPlayer } from './heromotion.js';
 import { loadAssetBytes } from './assets.js';
@@ -199,6 +200,7 @@ export class Hero extends Character {
     });
     this.headMesh = this.meshes[1];
     this.geos = [gb, gh];
+    if (STYLE.plastilina && !this.statue) for (const [n, k] of PUPPET) if (this.bones[n]) this.bones[n].scale.setScalar(k); // (claymation: a puppet)
     this.ready = true;
   }
   // colours by region (skin, garments…) from the person's palette
