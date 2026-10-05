@@ -644,8 +644,14 @@ ${GROUND_GLSL}`)
         float depth = inside * (1.0 - pow(clamp(dist / max(rr, 0.01), 0.0, 1.0), 2.0));
         // loose gravel and dust in the hole, a lighter broken rim of old asphalt around it
         vec3 grav = mix(vec3(0.2, 0.19, 0.18), vec3(0.52, 0.48, 0.42), gHash2(floor(d * 45.0) + kc)) * (0.75 + 0.5 * depth);
+        vec3 rimC = vec3(0.6, 0.58, 0.55) * (0.8 + 0.4 * gNoise(d * 30.0));
+        #ifdef CLAY_RELIEF
+        // (claymation: a dent pressed into the grey clay, crumbs of the same clay in it — the gravel and the pale rim
+        // came out as a white splash under the studio light)
+        grav = col * mix(0.5, 0.78, gHash2(floor(d * 30.0) + kc)) * (0.85 + 0.3 * depth); rimC = col * 1.06;
+        #endif
         col = mix(col, grav, inside * 0.92);
-        col = mix(col, vec3(0.6, 0.58, 0.55) * (0.8 + 0.4 * gNoise(d * 30.0)), rim * 0.55);
+        col = mix(col, rimC, rim * 0.55);
         gGH -= 0.08 * depth;
         // a damp, darker bottom in some (a dry town: no mirror puddles — they showed as white blobs under the sky)
         if (gHash2(vec2(kc, eid + 25.0)) < 0.18) {

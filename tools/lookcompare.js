@@ -209,7 +209,9 @@ export async function closeups(tag = 'a', { W = 640, H = 400, hour = 14 } = {}) 
 // and speed: 0.55 m every 0.11 s), people and cars moving as they do, sampled at `fps` — in the claymation every frame
 // is a new pose. Saves .snaps/vid_<tag>_NN.jpg and, recorded in the page, .snaps/vid_<tag>.jpg (an MP4: rename it)
 const sleepExact = (ms) => new Promise((r) => { const t0 = performance.now(); const ch = new MessageChannel(); ch.port1.onmessage = () => (performance.now() - t0 >= ms ? r() : ch.port2.postMessage(0)); ch.port2.postMessage(0); });
-export async function walkVideo(tag = 'a', { W = 960, H = 600, fps = 12, seconds = 3.96, hour = 14, view = 1, origStep = 0.55, origDt = 0.11, record = true, spot = null } = {}) {
+export async function walkVideo(tag = 'a', { W = 960, H = 600, fps = 12, seconds = 3.96, hour = 14, view = 1, origStep = 0.55, origDt = 0.11, record = true, spot = null, film = false } = {}) {
+  // (film: the «Película» mode as it plays — 24 frames a second, the puppets on twos, the film's grain and black bars)
+  if (film) fps = 24;
   const g = G(), p = g.player, map = g.map, list = await views(), v = spot ? { x: spot[0], z: spot[1], h: spot[2] } : list[view], tmp = {};
   const P = await import('/src/plastilina.js');
   for (const id of ['pause', 'menu']) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
@@ -228,15 +230,57 @@ export async function walkVideo(tag = 'a', { W = 960, H = 600, fps = 12, seconds
     }
     g.cam.yaw = h + Math.PI + Math.sin(phase) * 0.25; g.cam.pitch = -0.08;
     g.sky.hour = hour;
-    for (let k = 0; k < 2; k++) { if (g.state !== 'play') g.state = 'play'; g.frame(1 / (2 * fps)); }
-    // (each video frame is a pose: hold nothing back)
-    P.SM.tick = true;
+    if (film) { if (g.state !== 'play') g.state = 'play'; g.frame(1 / fps); } // (the game's own clock decides each pose)
+    else for (let k = 0; k < 2; k++) { if (g.state !== 'play') g.state = 'play'; g.frame(1 / (2 * fps)); }
+    // (each video frame is a pose: hold nothing back — but each puppet where the animator's hand put it)
+    if (!film) P.SM.tick = true;
+    if (film && g.grade) { g.grade.uniforms.uGrain.value = P.PLASTILINA.grain; g.grade.uniforms.uSeed.value = Math.random() * 100; }
+    P.SM.hold();
     renderInto(ctx, 0, 0, g.camera.position.toArray(), g.cam.target.toArray(), g.camera.fov, W, H);
+    P.SM.release();
+    if (film) { const bar = Math.max(0, Math.round((H - W / 2.39) / 2)); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, bar); ctx.fillRect(0, H - bar, W, bar); }
     frames.push(await createImageBitmap(cv));
     await fetch('/__snap?name=vid_' + tag + '_' + String(i).padStart(2, '0'), { method: 'POST', body: cv.toDataURL('image/jpeg', 0.88) });
   }
   g.resize();
   if (!record) return { frames: n };
+  const rec = document.createElement('canvas'); rec.width = W; rec.height = H; const rctx = rec.getContext('2d');
+  const stream = rec.captureStream(0), track = stream.getVideoTracks()[0];
+  const mime = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m));
+  const mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 10e6 }), chunks = [];
+  mr.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+  const done = new Promise((r) => (mr.onstop = r));
+  mr.start();
+  for (let i = 0; i < frames.length; i++) { rctx.drawImage(frames[i], 0, 0); track.requestFrame(); await sleepExact(1000 / fps); }
+  await sleepExact(120); mr.stop(); await done;
+  const blob = new Blob(chunks, { type: mime.split(';')[0] });
+  const url = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+  await fetch('/__snap?name=vid_' + tag, { method: 'POST', body: url });
+  return { frames: n, mime, bytes: blob.size };
+}
+
+// a close look at a puppet for a few seconds, standing (its boil, the hand's jitter, its blinks), at 12 poses a second →
+// .snaps/vid_<tag>.jpg (an MP4) like walkVideo
+export async function faceVideo(tag = 'cara', { W = 720, H = 720, fps = 12, seconds = 4, hour = 11, dist = 0.55, side = 0.22 } = {}) {
+  const g = G(), p = g.player, P = await import('/src/plastilina.js');
+  for (const id of ['pause', 'menu']) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+  const SPOT = { x: -346.5, z: 49.4 };
+  p.spawnAt(SPOT.x, SPOT.z, 0); g.sky.hour = hour; step(40);
+  const ch = p.char, n = Math.round(seconds * fps), frames = [];
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
+  for (let i = 0; i < n; i++) {
+    for (let k = 0; k < 2; k++) { if (g.state !== 'play') g.state = 'play'; g.frame(1 / (2 * fps)); }
+    ch.object.updateMatrixWorld(true);
+    const eL = new THREE.Vector3(), eR = new THREE.Vector3(); ch.bones.eyeL.getWorldPosition(eL); ch.bones.eyeR.getWorldPosition(eR);
+    const ec = eL.add(eR).multiplyScalar(0.5), fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(ch.object.getWorldQuaternion(new THREE.Quaternion())); fwd.y = 0; fwd.normalize();
+    const rt = new THREE.Vector3(fwd.z, 0, -fwd.x), c0 = ec.clone(); c0.y -= 0.04;
+    if (i === 0) { faceVideo.cam = [c0.x + fwd.x * dist + rt.x * side, c0.y + 0.03, c0.z + fwd.z * dist + rt.z * side]; faceVideo.look = c0.toArray(); }
+    P.SM.tick = true; P.SM.hold();
+    renderInto(ctx, 0, 0, faceVideo.cam, faceVideo.look, 30, W, H);
+    P.SM.release();
+    frames.push(await createImageBitmap(cv));
+  }
+  g.resize();
   const rec = document.createElement('canvas'); rec.width = W; rec.height = H; const rctx = rec.getContext('2d');
   const stream = rec.captureStream(0), track = stream.getVideoTracks()[0];
   const mime = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m));

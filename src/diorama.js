@@ -24,10 +24,10 @@ export const DIORAMA = {
 // the last grade, in linear light before the tone curve: a little more colour, the white balance of a warm afternoon,
 // a touch of contrast round the middle greys (the model's light, not a filter: no outlines, no grain, no wash)
 export const DioramaGrade = {
-  uniforms: { tDiffuse: { value: null }, uSat: { value: 1.04 }, uWarm: { value: 0.03 }, uContrast: { value: 1.04 }, uLift: { value: 0 }, uVignette: { value: 0 }, uGain: { value: 1 } },
+  uniforms: { tDiffuse: { value: null }, uSat: { value: 1.04 }, uWarm: { value: 0.03 }, uContrast: { value: 1.04 }, uLift: { value: 0 }, uVignette: { value: 0 }, uGain: { value: 1 }, uGrain: { value: 0 }, uSeed: { value: 0 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uSat, uWarm, uContrast, uLift, uVignette, uGain; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uSat, uWarm, uContrast, uLift, uVignette, uGain, uGrain, uSeed; varying vec2 vUv;
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
       vec3 col = max(c.rgb, 0.0) * uGain; // (uGain: the claymation's lamps, a hair brighter or dimmer at each pose)
@@ -38,6 +38,11 @@ export const DioramaGrade = {
       col *= clamp(k, 0.6, 1.6);
       col += uLift * vec3(0.2, 0.17, 0.13) * (1.0 - smoothstep(0.0, 0.3, l)); // (the studio's fill in the shadows)
       col *= 1.0 - uVignette * smoothstep(0.4, 1.0, length((vUv - 0.5) * vec2(1.25, 1.0))); // (the lens's corners)
+      if (uGrain > 0.0) { // the film's grain, new at every pose: finest in the light, a little more in the mid-tones
+        vec2 gp = floor(gl_FragCoord.xy / 1.5) + uSeed * 37.0;
+        float n = fract(sin(dot(gp, vec2(12.9898, 78.233))) * 43758.5453) + fract(sin(dot(gp + 17.3, vec2(39.346, 11.135))) * 24634.6345) - 1.0;
+        col *= 1.0 + n * uGrain * (1.0 - 0.6 * smoothstep(0.4, 1.2, l));
+      }
       gl_FragColor = vec4(col, c.a);
     }`,
 };

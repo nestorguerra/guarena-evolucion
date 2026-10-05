@@ -54,7 +54,7 @@ export class World {
     else if (STYLE.plastilina) toonifyLayers(fac.data, fac.size, fac.layers, { rColor: 3, rEdge: 1, levels: 5, posterize: 0.5, ink: 0, saturation: 1.1 });
     this.facadeTex = arrayTexture(fac.data, fac.size, fac.layers, { aniso: q.aniso });
     await step('Empedrando calles…', 0.18);
-    const gnd = buildGroundArray(Math.min(512, S));
+    const gnd = buildGroundArray(STYLE.plastilina && q.photo >= 1024 ? 1024 : Math.min(512, S)); // (claymation on high: the street sharp close up, as in a film)
     if (STYLE.anime) toonifyLayers(gnd.data, gnd.size, gnd.layers, { rColor: 4, rEdge: 1, levels: 5, posterize: 0.7, ink: 0.62, edge0: 16, edge1: 36, saturation: 0.82, grunge: 0.35 });
     else if (STYLE.plastilina) toonifyLayers(gnd.data, gnd.size, gnd.layers, { rColor: 3, rEdge: 1, levels: 5, posterize: 0.45, ink: 0, saturation: 1.08 });
     this.groundTex = arrayTexture(gnd.data, gnd.size, gnd.layers, { aniso: q.aniso });

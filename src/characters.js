@@ -802,7 +802,7 @@ function makeCharMaterial(uniforms) {
   m.userData.u = uniforms;
   m.onBeforeCompile = (sh) => {
     for (const k in uniforms) sh.uniforms[k] = uniforms[k];
-    sh.vertexShader = sh.vertexShader
+    sh.vertexShader = (STYLE.plastilina ? '#define CLAY_PUPPET\n' : '') + sh.vertexShader // (claymation: its surface boils, plastilina.js)
       .replace('#include <common>', '#include <common>' + CHAR_VS_HEAD)
       .replace('#include <color_vertex>', `#include <color_vertex>
   vColor.rgb = pow(vColor.rgb, vec3(2.2));
@@ -820,7 +820,8 @@ function makeCharMaterial(uniforms) {
     vHairT = normalize((modelViewMatrix * vec4(g, 0.0)).xyz);
   }`);
     // (claymation: a puppet — its thumbprints at its own scale, retouched at every pose)
-    sh.fragmentShader = (STYLE.plastilina ? '#define CLAY_SCALE 2.4\n#define CLAY_PUPPET\n' : '') + sh.fragmentShader
+    // (CWV: how much of the real fabric's weave shows — a puppet's clothes are modelled clay, not cloth)
+    sh.fragmentShader = (STYLE.plastilina ? '#define CLAY_SCALE 2.4\n#define CLAY_PUPPET\n#define CWV 0.12\n' : '#define CWV 1.0\n') + sh.fragmentShader
       .replace('#include <common>', '#include <common>' + CHAR_FS_HEAD + CHAR_FS_CLOTH)
       .replace('#include <color_fragment>', `#include <color_fragment>
 {
@@ -881,32 +882,32 @@ function makeCharMaterial(uniforms) {
       vec2 q = (P.xy - uPrintC.xy) / uPrintS * 0.5 + 0.5;
       if (q.x > 0.0 && q.x < 1.0 && q.y > 0.0 && q.y < 1.0) { vec4 t = texture2D(uPrint, q); diffuseColor.rgb = mix(diffuseColor.rgb, t.rgb, t.a); }
     }
-    float w = cNoise(P * 900.0) * fa(0.0012);
+    float w = cNoise(P * 900.0) * fa(0.0012) * CWV;
     diffuseColor.rgb *= 0.96 + 0.06 * w;
     gRough = 0.86; gSheen = 0.8; gBumpH = w * 0.00018 + cNoise(P * 45.0) * 0.0012 * fa(0.022);
   } else if (mc == 4) { // knit / fleece
-    float rib = (sin(P.x * 1400.0 + cNoise(P * 60.0) * 2.0) * 0.5 + 0.5) * fa(0.0045);
-    float w = cNoise(P * 500.0) * fa(0.002);
+    float rib = (sin(P.x * 1400.0 + cNoise(P * 60.0) * 2.0) * 0.5 + 0.5) * fa(0.0045) * CWV;
+    float w = cNoise(P * 500.0) * fa(0.002) * CWV;
     diffuseColor.rgb *= 0.95 + 0.07 * w + 0.03 * rib;
     gRough = 0.92; gSheen = 1.0; gBumpH = rib * 0.00022 + cNoise(P * 40.0) * 0.0015 * fa(0.025);
   } else if (mc == 5) { // denim: twill diagonals, fading on the front of the thighs/knees
-    float tw = (sin((P.x * 0.7 + P.y + P.z * 0.7) * 1900.0) * 0.5 + 0.5) * fa(0.0033);
-    float slub = cNoise(vec3(P.x * 80.0, P.y * 900.0, P.z * 80.0)) * fa(0.0012);
+    float tw = (sin((P.x * 0.7 + P.y + P.z * 0.7) * 1900.0) * 0.5 + 0.5) * fa(0.0033) * CWV;
+    float slub = cNoise(vec3(P.x * 80.0, P.y * 900.0, P.z * 80.0)) * fa(0.0012) * CWV;
     float fade = smoothstep(0.35, 0.95, cNoise(P * 9.0)) * 0.5 + smoothstep(0.02, 0.1, P.z) * 0.25;
     vec3 c = diffuseColor.rgb * (0.9 + 0.12 * tw + 0.08 * slub);
     diffuseColor.rgb = mix(c, c * vec3(1.35, 1.38, 1.3) + vec3(0.02, 0.025, 0.035), fade * 0.45);
     gRough = 0.9; gSheen = 0.6; gBumpH = tw * 0.00022 + cNoise(P * 38.0) * 0.0015 * fa(0.026);
   } else if (mc == 6) { // twill / chino
-    float tw = (sin((P.x + P.y * 1.3) * 1500.0) * 0.5 + 0.5) * fa(0.0042);
+    float tw = (sin((P.x + P.y * 1.3) * 1500.0) * 0.5 + 0.5) * fa(0.0042) * CWV;
     diffuseColor.rgb *= 0.96 + 0.05 * tw + 0.04 * cNoise(P * 150.0) * fa(0.007);
     gRough = 0.84; gSheen = 0.7; gBumpH = tw * 0.00015 + cNoise(P * 40.0) * 0.0012 * fa(0.025);
   } else if (mc == 7) { // leather
-    float g = cNoise(P * 700.0) * fa(0.0015);
+    float g = cNoise(P * 700.0) * fa(0.0015) * CWV;
     diffuseColor.rgb *= 0.94 + 0.1 * g;
     gRough = 0.42 + 0.12 * g; gSheen = 0.0; gBumpH = g * 0.00015;
   } else if (mc == 8) { gRough = 0.78; } // rubber
   else if (mc == 9) { // canvas sneaker
-    float w = sin(P.x * 2200.0) * sin(P.z * 2200.0) * fa(0.003);
+    float w = sin(P.x * 2200.0) * sin(P.z * 2200.0) * fa(0.003) * CWV;
     diffuseColor.rgb *= 0.97 + 0.04 * w;
     gRough = 0.82; gSheen = 0.5; gBumpH = w * 0.0001;
   } else if (mc == 10) { // hair: strands flowing out from the crown (down the jaw for a beard), in locks, a sheen along them
@@ -1066,11 +1067,16 @@ function makeCharMaterial(uniforms) {
     #endif
     gRough = 0.46 + 0.2 * (1.0 - l); gSheen = 0.45; gBumpH = (l - 0.5) * 0.0004;
     gHairT = normalize(vHairT); gHairK = 1.0 - 0.6 * uCurl;
+    #ifdef CLAY
+    // (a puppet's hair is a piece of clay worked with a modelling tool: deep grooves along the locks, the clay's waxy
+    // sheen, none of the shine of real hair)
+    gBumpH = (smoothstep(0.25, 0.75, l) - 0.5) * 0.0019; gRough = 0.5; gSheen = 0.1; gHairK = 0.0;
+    #endif
   }
   else if (mc == 12) { gRough = 0.12; } // glossy plastic / lenses
   else if (mc == 13) { gRough = 0.3; gMetal = 1.0; } // metal
   else if (mc == 14) { // nylon
-    float w = sin(P.x * 1800.0) * sin(P.y * 1800.0) * fa(0.0035);
+    float w = sin(P.x * 1800.0) * sin(P.y * 1800.0) * fa(0.0035) * CWV;
     diffuseColor.rgb *= 0.96 + 0.04 * w;
     gRough = 0.6; gSheen = 0.3; gBumpH = w * 0.0001;
   }
@@ -1141,12 +1147,20 @@ if (gHairK > 0.0) {
   #ifdef ANIME
   reflectedLight.indirectDiffuse *= mix(vec3(1.0), vec3(1.2, 0.97, 0.92), gSkin); // (skin in shade is warm, not grey)
   #endif
+  #ifdef CLAY
+  { // the studio's backlight: a thin warm rim round the puppet from above and behind — the light stop-motion films use
+    // to lift a puppet off its set, whatever the sun does
+    float fres = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
+    float up = clamp(dot(normal, normalize(vec3(-0.35, 0.94, 0.0))) * 0.6 + 0.4, 0.0, 1.0);
+    reflectedLight.directDiffuse += diffuseColor.rgb * vec3(1.0, 0.93, 0.82) * fres * up * 0.4 * ao;
+  }
+  #endif
 }`);
   };
   m.alphaToCoverage = true; // (brows and lashes; every other class writes alpha 1)
   if (STYLE.anime) m.defines = { ANIME: '' };
   else if (STYLE.plastilina) m.defines = { CLAY: '' }; // (claymation: a puppet)
-  m.customProgramCacheKey = () => 'char14' + (STYLE.anime ? 'a' : '');
+  m.customProgramCacheKey = () => 'char16' + (STYLE.anime ? 'a' : '');
   return m;
 }
 

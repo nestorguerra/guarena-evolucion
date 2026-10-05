@@ -243,7 +243,7 @@ export class Fleet {
       if (key !== v._lightKey || v.siren) { rend.setLights(v, front, rear, extra); v._lightKey = key; }
     }
     // (claymation: the cars go pose by pose — only the one you drive keeps up with the camera between poses)
-    if (STYLE.plastilina && SM.on && !SM.tick) rend.flushOnly(this.game.player && this.game.player.vehicle);
+    if (STYLE.plastilina && SM.on && !SM.tick) rend.flushOnly(this.game.cine ? null : this.game.player && this.game.player.vehicle); // («Película»: your car on twos too)
     else rend.flush();
   }
 

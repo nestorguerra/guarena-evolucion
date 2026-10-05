@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { SPOT } from '/tools/faces.js';
 const G = () => window.game;
-export async function build(desc, clay, shape) {
+export async function build(desc, clay, shape, more = {}) {
   const g = G();
   const CB = await import('/src/charbuild.js?x=' + Date.now() + Math.random());
   const { mhLib } = await import('/src/mhdata.js');
@@ -14,6 +14,7 @@ export async function build(desc, clay, shape) {
   if (g.chars.mhBuf) B.setMH(g.chars.mhBuf);
   const spec = g.chars.spec(desc);
   spec.clay = clay || undefined; spec.clayShape = shape;
+  if (more.sdfHair && spec.mh) spec.mh.hair = null; // (the sculpted hair instead of MakeHuman's cards)
   spec.key = spec.key + '|p' + Date.now() + Math.random();
   const r = B.build(spec);
   g.chars.shapes.set(spec.key, g.chars.makeShape(r));
@@ -30,18 +31,18 @@ function render(ctx, dx, dy, pos, look, fov, w, h) {
   const c = g.renderer.domElement;
   ctx.drawImage(c, 0, 0, c.width, c.height, dx, dy, w, h);
 }
-export async function sheet(list, tag = 'a', { clay = true, shape, before = true, views = ['f', 'q', 'p', 'b'], S = 300, hour = 11 } = {}) {
+export async function sheet(list, tag = 'a', { clay = true, shape, before = true, views = ['f', 'q', 'p', 'b'], S = 300, hour = 11, sdfHair = false, compareHair = false } = {}) {
   const g = G(), C = await import('/src/characters.js');
   for (const id of ['pause', 'menu']) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
   g.sky.hour = hour; g.sky.update(0, new THREE.Vector3(SPOT.x, 0, SPOT.z), true);
   g.player.spawnAt(SPOT.x, SPOT.z + 6, Math.PI);
-  const kinds = before ? [false, clay] : [clay];
+  const kinds = compareHair ? [[clay, false], [clay, true]] : (before ? [false, clay] : [clay]).map((c) => [c, sdfHair]);
   const cv = document.createElement('canvas'); cv.width = S * views.length * kinds.length; cv.height = S * list.length;
   const ctx = cv.getContext('2d');
   for (let k = 0; k < list.length; k++) {
     const desc = typeof list[k] === 'number' ? C.PLAYER_PRESETS[list[k]] : list[k];
     for (let j = 0; j < kinds.length; j++) {
-      const ch = await build({ ...desc, hq: true }, kinds[j], shape);
+      const ch = await build({ ...desc, hq: true }, kinds[j][0], shape, { sdfHair: kinds[j][1] });
       if (C.mhTexReady) await C.mhTexReady();
       ch.object.position.set(SPOT.x, 0, SPOT.z); ch.object.rotation.y = 0; g.scene.add(ch.object);
       for (let f = 0; f < 40; f++) ch.update(1 / 30, 0, {});

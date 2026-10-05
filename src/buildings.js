@@ -167,7 +167,7 @@ function outsetRing(r, d) {
 // claymation: an outline with its convex corners rounded — each replaced by a short arc (a quadratic curve with the
 // corner as its control point), ~0.32 m round; nrm: the curve's own outward normal at its points (NaN elsewhere), so
 // the bend shades smooth and meets the straight walls with their own normal
-function roundRing(r, R = 0.32, seg = 4) {
+function roundRing(r, R = 0.32, seg = 6) {
   const n = r.length / 2, pts = [], nrm = [];
   for (let i = 0; i < n; i++) {
     const h = (i - 1 + n) % n, j = (i + 1) % n;

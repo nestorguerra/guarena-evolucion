@@ -149,3 +149,39 @@ Evaluación de esta pasada (mismas vistas, mismo equipo):
 
 **Pendiente**: bocas de recambio (fonemas al hablar), las líneas rectas de los tejados y las aristas algo onduladas,
 como en un decorado hecho a mano.
+
+## 8. Cuarta pasada: que parezca una película de plastilina
+
+Petición del usuario: «mejora la resolución de los elementos, para que se simule todavía mucho más que es una película
+de stop motion… que mejore en resolución, en estética, en stop motion y en estética de plastilina».
+
+Qué distingue una película de plastilina de un juego con aspecto de plastilina:
+
+| Rasgo de las películas | Cómo se ve | Qué hacemos |
+|---|---|---|
+| **Imagen nítida** | Se fotografía cada pose con una cámara de cine: todo se ve definido, sin dientes de sierra. | Plastilina en calidad alta a la resolución completa de la pantalla (como el Manga), con la resolución dinámica que la baja un poco si el equipo no llega. Suelo pintado al doble de resolución. Muñecos modelados más finos y esquinas de las casas con más segmentos. |
+| **El hervor** (*boiling*) | Entre una foto y otra el animador ha tocado el muñeco: su superficie y su contorno nunca quedan igual, tiemblan un poco a cada pose. | El contorno de los muñecos se mueve 1–2 mm a cada pose (en el shader, a lo largo de la piel), además de las huellas que ya se movían. |
+| **La mano del animador** | Un muñeco recolocado nunca queda exactamente donde estaba. | En cada pose, cada muñeco se desplaza unos milímetros y una fracción de grado (tu personaje, menos). |
+| **Muñecos a doses, cámara a unos** | En los largometrajes los muñecos posan 12 veces por segundo y la cámara, montada en un brazo de control de movimiento, va a las 24 imágenes de la película. | Modo **Película** (Ajustes › Stop motion): tú también posas 12 veces por segundo, la cámara va a 24, grano de película nuevo en cada imagen y bandas negras de cine (2,39:1, nunca más del 11 % de la altura). El modo normal se queda como estaba, para jugar fluido. |
+| **Pelo esculpido** | El pelo de un muñeco es una pieza de plastilina trabajada con un palillo: surcos, no hebras. | El pelo de los muñecos con surcos marcados y el brillo céreo de la plastilina, sin el brillo del pelo de verdad. (Se probó el pelo esculpido en volumen del juego antiguo: no encaja bien en las cabezas de ahora.) |
+| **Contraluz de estudio** | Una luz detrás y arriba separa al muñeco del decorado con un filo de luz cálida. | Un filo cálido en el borde de los muñecos, de arriba, sea cual sea el sol. |
+
+Evaluación (este Mac):
+
+- **Nitidez**: las huellas, los ojos de cuenta y los surcos del pelo se ven definidos.
+- **Rendimiento**:
+
+  | Ventana | Escala | Tiempo por imagen |
+  |---|---|---|
+  | 1280×720 | 1 | 12,6 ms |
+  | 1440×900 | 1,5 | 21,9 ms |
+  | 1440×900 | 2 | 32,5 ms |
+
+  A escala 2 la resolución dinámica se asienta hacia 1,6–1,7 en este equipo (antes no pasaba de 1,5); en uno más
+  potente se queda en 2.
+- **Hervor**: entre dos poses el contorno y las huellas cambian 1–2 mm (se ve en la diferencia entre dos imágenes);
+  quieto apenas se nota, en movimiento da el temblor de la plastilina.
+- **Película**: los muñecos y la cámara a cadencia de cine, el grano fino y las bandas; las bandas no tapan el HUD.
+
+Herramientas: `tools/lookcompare.js` `faceVideo` (un muñeco de cerca, 12 poses por segundo: hervor, mano, parpadeos);
+`walkVideo` aplica ya la mano del animador.

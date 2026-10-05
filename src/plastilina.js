@@ -19,6 +19,10 @@ export const PLASTILINA = {
   // the lens: how soft the far background goes at most (a fraction of the picture's height) and from how far behind the
   // subject it starts and is at its softest (× the subject's distance). Only a little: the user asked for it gentler
   lens: { blur: 0.0024, from: 2.4, to: 11 },
+  boilMM: 0.002, // how far a puppet's surface boils from one pose to the next (metres)
+  grain: 0.045, // «Película»: the film's grain
+  // the animator's hand: a puppet put back each pose is never exactly where it was (metres, radians; the player less)
+  jitter: { pos: 0.003, yaw: 0.006, player: 0.35 },
   // the clay of the sets (metres): lumps, prints, cuts, lint; the puppets take theirs at their own scale (CLAY_SCALE)
   boil: null, // the shared uniform (installClayChunks): moved at every pose, for the puppets only
 };
@@ -37,9 +41,27 @@ varying vec3 vClayP;
 #endif
 `;
   // (the pattern sits on each thing's own shape — its vertices before skinning — so it travels with the cars and people)
+  // A puppet's surface also «boils»: between two frames the animator's fingers have been on it, so its skin never sits
+  // quite where it sat — every pose its outline shifts by a millimetre or two, a few centimetres at a time
   C.begin_vertex += `
 #ifdef STANDARD
 vClayP = position;
+#if defined(CLAY_PUPPET) && !defined(CLAY_NO_BOIL)
+{
+  vec3 bq = position * 26.0 + vec3(uClayBoil.x, uClayBoil.y, uClayBoil.x - uClayBoil.y) * 5.3, bi = floor(bq), bf = fract(bq);
+  bf = bf * bf * (3.0 - 2.0 * bf);
+  #define CLAY_VH(o) fract(sin(dot(bi + o, vec3(127.1, 311.7, 74.7))) * 43758.5453)
+  float bn = mix(mix(mix(CLAY_VH(vec3(0, 0, 0)), CLAY_VH(vec3(1, 0, 0)), bf.x), mix(CLAY_VH(vec3(0, 1, 0)), CLAY_VH(vec3(1, 1, 0)), bf.x), bf.y),
+                 mix(mix(CLAY_VH(vec3(0, 0, 1)), CLAY_VH(vec3(1, 0, 1)), bf.x), mix(CLAY_VH(vec3(0, 1, 1)), CLAY_VH(vec3(1, 1, 1)), bf.x), bf.y), bf.z);
+  #undef CLAY_VH
+  transformed += objectNormal * (bn - 0.5) * ${PLASTILINA.boilMM.toFixed(4)};
+}
+#endif
+#endif
+`;
+  C.common += `
+#if defined(STANDARD) && defined(CLAY_PUPPET)
+uniform vec2 uClayBoil;
 #endif
 `;
   C.bumpmap_pars_fragment += `
@@ -53,7 +75,9 @@ vClayP = position;
 #ifndef CLAY_TONE
 #define CLAY_TONE 1.0
 #endif
+#ifndef CLAY_PUPPET
 uniform vec2 uClayBoil;
+#endif
 vec2 gClaySlope; float gClayDark;
 float clayHash(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
 float clayNoise(vec3 p) {
@@ -291,18 +315,26 @@ export class StopMotion {
       o.scale.set(a[k + 7], a[k + 8], a[k + 9]);
     }
   }
-  // before drawing: the puppets not due a new pose go back to their last one
+  // before drawing: the puppets not due a new pose go back to their last one — and every puppet sits where the
+  // animator's hand put it this pose: a few millimetres and a fraction of a degree off (PLASTILINA.jitter)
   hold() {
     this.swapped = false;
     if (!this.on) return;
+    const J = PLASTILINA.jitter;
     for (const [root, it] of this.items) {
       if (!root.parent || !root.visible) { it.held = null; continue; }
       // (the node list is gathered again when the tree changes: a hat put on, a level of detail swapped)
       let count = 0; root.traverse(() => count++);
       if (!it.nodes || count !== it.n) { it.nodes = this.nodesOf(root); it.n = count; it.held = null; }
-      if (this.tick || !it.held) { it.held = StopMotion.capture(it.nodes, it.held); continue; }
+      const newPose = this.tick || !it.held;
+      if (newPose) {
+        it.held = StopMotion.capture(it.nodes, it.held);
+        const k = it.smooth ? J.player : 1;
+        it.jit = [(Math.random() - 0.5) * 2 * J.pos * k, (Math.random() - 0.5) * 2 * J.pos * k, (Math.random() - 0.5) * 2 * J.yaw * k];
+      }
       it.live = StopMotion.capture(it.nodes, it.live);
-      StopMotion.apply(it.nodes, it.held, it.smooth);
+      if (!newPose) StopMotion.apply(it.nodes, it.held, it.smooth);
+      if (it.jit && it.nodes[0] === root) { root.position.x += it.jit[0]; root.position.z += it.jit[1]; root.rotateY(it.jit[2]); } // (put back after the picture: release)
       it.swapped = true; this.swapped = true;
     }
   }

@@ -358,6 +358,10 @@ body.hiding::after { content: ''; position: fixed; inset: 0; z-index: 11; pointe
 #damage { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(170,10,10,0.55) 100%); opacity: 0; }
 #damage.hit { animation: dmg 0.6s ease; }
 @keyframes dmg { 0% { opacity: 1; } 100% { opacity: 0; } }
+/* «Película» (Plastilina › Stop motion): a stop-motion film's black bars, 2.39:1, under the HUD */
+#cine::before, #cine::after { content: ''; position: fixed; left: 0; right: 0; height: 0; background: #000; z-index: 12; pointer-events: none; transition: height 0.6s ease; }
+#cine::before { top: 0; } #cine::after { bottom: 0; }
+body.cine #cine::before, body.cine #cine::after { height: clamp(0px, calc((100vh - 100vw / 2.39) / 2), 11vh); } /* (never more than a film's bars on a tall screen) */
 #letterbox::before, #letterbox::after { content: ''; position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height 0.5s ease; z-index: 1; }
 #letterbox::before { top: 0; } #letterbox::after { bottom: 0; }
 #letterbox.on::before, #letterbox.on::after { height: 11vh; }
@@ -642,6 +646,7 @@ body[data-look="anime"] #bChars, body[data-look="anime"] #pChars, body[data-look
 body.contemplar #hud .tr, body.contemplar #hud .radarWrap, body.contemplar #hud #notes, body.contemplar #hud #streetBox { opacity: 0.1; }
 </style>
 <canvas id="game"></canvas>
+<div id="cine"></div>
 
 <div id="hud" hidden>
   <div id="letterbox"></div>

@@ -88,8 +88,9 @@ export class Game {
   async init(progress) {
     const q = this.q;
     const r = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: !q.bloom, powerPreference: 'high-performance', stencil: false });
-    // (the anime look's ink lines want the screen's own resolution on high quality; dynamic resolution backs off if needed)
-    r.setPixelRatio(Math.min(devicePixelRatio || 1, STYLE.anime && this.qKey === 'alta' ? 2 : q.pr));
+    // (the anime look's ink lines and the claymation's thumbprints want the screen's own resolution on high quality —
+    // a film is sharp; dynamic resolution backs off if needed)
+    r.setPixelRatio(Math.min(devicePixelRatio || 1, (STYLE.anime || STYLE.plastilina) && this.qKey === 'alta' ? 2 : q.pr));
     r.setSize(innerWidth, innerHeight, false);
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
@@ -100,7 +101,7 @@ export class Game {
     this.camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.25, 4200);
     progress('Leyendo el callejero de Guareña…', 0.03);
     // characters are sculpted in background workers while the town is being built
-    this.chars = new CharacterFactory(this.qKey === 'baja' ? { q: 1.3, lodNear: 7 } : this.qKey === 'media' ? { lodNear: 10 } : {});
+    this.chars = new CharacterFactory(this.qKey === 'baja' ? { q: 1.3, lodNear: 7 } : this.qKey === 'media' ? { lodNear: 10 } : STYLE.plastilina ? { q: 0.8 } : {}); // (claymation: the puppets modelled finer, smoother clay)
     installHero(this.chars); this.heroLoad = loadHero(); // (the protagonist's body and motion capture, unzipped meanwhile)
     // (the anime look has one protagonist, Álex the courier; the photographic one keeps the saved character)
     const firstDesc = STYLE.anime ? PLAYER_PRESETS[0] : this.save.custom || PLAYER_PRESETS[0];
@@ -221,7 +222,7 @@ export class Game {
       if (STYLE.plastilina) { // (claymation: pure clay colours, the studio's fill in the shadows, a touch of lens)
         const G = PLASTILINA.grade, U = this.grade.uniforms;
         U.uSat.value = G.sat; U.uWarm.value = G.warm; U.uContrast.value = G.contrast; U.uLift.value = G.lift; U.uVignette.value = G.vignette;
-        SM.on = this.save.stopMotion !== false;
+        this.setStopMotion(this.save.stopMotion);
         if (this.qKey !== 'baja') this.lens = [0, 1].map((k) => { // (the far background a little soft, as through a real lens)
           const pass = new ShaderPass(ClayLens), pr = pass.render.bind(pass);
           pass.material.depthTest = pass.material.depthWrite = false;
@@ -762,6 +763,15 @@ export class Game {
     }
     else this.renderer.render(this.scene, cam);
   }
+  // claymation's stop motion: true (the puppets pose 12 times a second), 'cine' (the camera too, with the film's grain and
+  // its black bars: a stop-motion film), false (everything smooth)
+  setStopMotion(mode) {
+    SM.on = mode !== false;
+    this.cine = STYLE.plastilina && mode === 'cine';
+    if (this._camHold) this._camHold.ok = false;
+    if (typeof document !== 'undefined') document.body.classList.toggle('cine', !!this.cine);
+    if (this.grade && this.grade.uniforms.uGrain && !this.cine) this.grade.uniforms.uGrain.value = 0;
+  }
   // claymation: the lens focuses on the action — the player (or what they drive) at its distance; in first person, on
   // whatever is in the middle of the view
   focusLens(cam) {
@@ -785,14 +795,26 @@ export class Game {
     }
     // claymation: the puppets not due a new pose are drawn as they were at the last one (the player keeps its place);
     // at each pose the lamps flicker a hair
+    // «Película»: a stop-motion feature — the puppets (you too) on twos, the camera on the film's own 24 frames a second
+    // (drawn where it was at the last frame between them), a new grain on every frame
+    let camLive = null;
     if (STYLE.plastilina) {
-      if (this.player && this.player.char) SM.setSmooth(this.player.char.object, true);
+      if (this.player && this.player.char) SM.setSmooth(this.player.char.object, !this.cine); // («Película»: you too, on twos)
+      const now = performance.now(), h = this._camHold || (this._camHold = { p: new THREE.Vector3(), q: new THREE.Quaternion(), fov: 60, ok: false, t: 0 });
+      const filmTick = now - h.t >= 1000 / 24 - 2;
       if (this.grade && SM.tick) this.grade.uniforms.uGain.value = SM.on ? 1 + (Math.random() - 0.5) * PLASTILINA.flicker : 1;
+      if (this.grade && filmTick) { const U = this.grade.uniforms; U.uGrain.value = this.cine && SM.on ? PLASTILINA.grain : 0; U.uSeed.value = Math.random() * 100; }
       SM.hold();
+      if (this.cine && SM.on) {
+        const c = this.camera;
+        if (filmTick || !h.ok || c.position.distanceToSquared(h.p) > 25) { h.p.copy(c.position); h.q.copy(c.quaternion); h.fov = c.fov; h.ok = true; h.t = now; } // (a cut: no held frame)
+        else { camLive = [c.position.clone(), c.quaternion.clone(), c.fov]; c.position.copy(h.p); c.quaternion.copy(h.q); if (c.fov !== h.fov) { c.fov = h.fov; c.updateProjectionMatrix(); } c.updateMatrixWorld(); }
+      }
     }
     const wv = this.interior && this.windowView && this.windowView.render(); // the street, drawn for the windows
     this.renderView(this.camera);
     if (wv) this.windowView.after();
+    if (camLive) { const c = this.camera; c.position.copy(camLive[0]); c.quaternion.copy(camLive[1]); if (c.fov !== camLive[2]) { c.fov = camLive[2]; c.updateProjectionMatrix(); } c.updateMatrixWorld(); }
     if (STYLE.plastilina) SM.release();
     // first-person gun on top (in the anime look, through the same tone curve: CustomToneMapping)
     if (this.viewModel && this.state === 'play') this.viewModel.render(this.renderer);
