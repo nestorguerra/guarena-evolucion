@@ -117,12 +117,13 @@ cabezas guardadas en el navegador se vuelven a hacer.
 
 Al revisar las caras de muy cerca salieron dos defectos, ya corregidos:
 
-- **Dientes que asomaban** por las comisuras al ensanchar la boca: ahora quedan 6 mm más adentro.
-- **Pliegues de la malla** (un triángulo dado la vuelta, que no se dibuja y deja ver la calle a través): algunos venían
-  ya de antes, de caras con rasgos muy marcados (la de Álex, en la comisura). Ahora, en todas las estéticas, cada cabeza
-  se compara con la cara base de MakeHuman y los pliegues se relajan hasta quedar planos (sin tocar el interior de la
-  boca ni las cuencas de los ojos). Herramientas: `tools/puppetlab.js` (`sheet`, `flips`, `holes`, que pone la cabeza
-  sola delante de un fondo magenta).
+- **Dientes que asomaban** por las comisuras al ensanchar la boca (una manchita gris en la comisura): ahora quedan
+  6 mm más adentro.
+- **Pliegues de la malla** (triángulos dados la vuelta respecto a la cara base de MakeHuman): la herramienta los
+  encontró en todas las estéticas, más en caras de rasgos marcados como la de Álex. Ahora cada cabeza se compara con la
+  cara base y los pliegues se relajan hasta quedar planos (sin tocar el interior de la boca ni las cuencas de los
+  ojos). Herramientas: `tools/puppetlab.js` (`sheet`; `flips`, los triángulos que no casan con sus normales; `holes`,
+  la cabeza sola delante de un fondo magenta: un agujero se ve magenta, algo que asoma, no).
 
 **Fondo menos desenfocado** (petición del usuario: «solo algo desenfocado, pero no tanto»): el objetivo ablanda el
 fondo como mucho 0,24 % de la altura de la imagen (antes 0,55 %) y empieza más lejos, a 2,4 veces la distancia del
