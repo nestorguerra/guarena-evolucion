@@ -192,6 +192,12 @@ void main(){
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = q.aniso;
       const mm = new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -32 });
+      if (STYLE.plastilina) { // claymation: the lines are strips of white clay laid on the road — raised, their edges rounded
+        const src = tex.image, bc = document.createElement('canvas'); bc.width = src.width; bc.height = src.height;
+        const bx = bc.getContext('2d'); bx.fillStyle = '#000'; bx.fillRect(0, 0, bc.width, bc.height); bx.filter = 'blur(5px)'; bx.drawImage(src, 0, 0);
+        const bt = new THREE.CanvasTexture(bc); bt.wrapS = THREE.RepeatWrapping; bt.wrapT = THREE.ClampToEdgeWrapping;
+        mm.bumpMap = bt; mm.bumpScale = 4; mm.color.setRGB(0.97, 0.93, 0.85); mm.roughness = 0.8;
+      }
       const m = new THREE.Mesh(mk, mm);
       m.receiveShadow = true; m.renderOrder = 1; m.matrixAutoUpdate = false;
       this.root.add(m);

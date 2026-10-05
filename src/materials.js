@@ -59,7 +59,7 @@ export function arrayTexture(data, size, layers, { srgb = true, aniso = 8 } = {}
 export function makeBuildingMaterial(facadeTex, detail = null) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0.0, side: THREE.DoubleSide });
   if (STYLE.anime) m.defines = { ANIME: '' };
-  else if (STYLE.plastilina) m.defines = { DIORAMA: '', CLAY: '', CLAY_RELIEF: '2.3', CLAY_TONE: '2.8' }; // (a set: worked hard by hand; its marks in the colour too, for the shade and the whitewash)
+  else if (STYLE.plastilina) m.defines = { DIORAMA: '', CLAY: '', CLAY_RELIEF: '2.3', CLAY_TONE: '2.8', CLAY_SET: '0', CLAY_TILE: '2.4', CLAY_AMP: '0.035', CLAY_CAV: '0.34' }; // (a set: worked hard by hand; its marks in the colour too, for the shade and the whitewash)
   else if (STYLE.diorama) m.defines = { DIORAMA: '' };
   const dOn = detail && detail.on ? 1 : 0;
   const nOn = detail && detail.on && detail.normals ? 1 : 0;
@@ -108,7 +108,7 @@ varying vec4 vRect; varying float vWallH;
 #ifdef CLAY
 varying vec2 vEdge;
 #endif
-float gGlass; float gLit; float gDetK; vec2 gDetUV; float gDetL; float gRoom; vec3 gRoomCol; float gEmK;
+float gGlass; float gLit; float gDetK; vec2 gDetUV; float gDetL; float gRoom; vec3 gRoomCol; float gEmK; float gEave;
 ${HASH}
 mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
   vec3 dp1 = dFdx(p), dp2 = dFdy(p);
@@ -134,6 +134,17 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
   } else if (kind > 1.5) layer += (fl < 0.5 ? 5.0 : 6.0);
   if (kind < 0.5) lt = layer - 8.0 * floor(layer / 8.0 + 0.01);
   bool isRoof = kind > 0.5 && kind < 1.5;
+  gEave = -9.0;
+  #ifdef CLAY
+  // claymation: the front row of tiles along the eaves (the upright band, buildings.js tileEdge) ends in round tile
+  // ends — cut in scallops, a tube of clay each, as in the user's pictures
+  if (isRoof && abs(normalize(vWNrm).y) < 0.35 && vTex.x - ${ROOF_BASE_VALUE}.0 < 0.5) {
+    float fu = fract(vUvF.x * 16.0) - 0.5, vb = vUvF.y / 0.035; // (a tile is 0.2 m; 0 the band's bottom, 1 its top)
+    float arc = 0.5 - sqrt(max(0.25 - fu * fu, 0.0));
+    if (vb < arc * 1.25) discard;
+    gEave = fu;
+  }
+  #endif
   float camD = length(vWPos.xz - cameraPosition.xz);
   bool fillQ = kind < 0.5 && vTex.w > 1.5;
   bool nearFill = fillQ && camD < uNearDist;
@@ -319,6 +330,9 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
   }
   #endif
   diffuseColor.rgb *= col;
+  #ifdef CLAY
+  if (!isRoof) diffuseColor.rgb *= vec3(0.95, 0.85, 0.72); // (claymation: the whitewash is cream-coloured clay, warm as in the user's pictures)
+  #endif
   float isShop = lt > 6.5 ? 1.0 : 0.0;
   float litChance = isShop > 0.5 ? 0.7 : uNightLit;
   gLit = step(gHash3(vec3(bay * 1.7 + 3.1, fl * 3.3, vTex.z * 53.0)), litChance) * (isShop > 0.5 ? 0.45 : 1.0)
@@ -478,6 +492,11 @@ if (gH != 0.0) {
 // greenery) and the local frame of roads and kerbs (aLoc) decide where potholes, patches, cracks, manholes, drains,
 // worn tiles, gum spots and lowered kerbs go. fx = { det, detN, on, normals, mean[6], size[6], field, rect[4] }
 const GROUND_GLSL = `
+#ifdef CLAY_RELIEF
+#define GCW 0.011
+#else
+#define GCW 0.004
+#endif
 vec2 gVor(vec2 p) {
   vec2 ip = floor(p), fp = fract(p);
   float d1 = 8.0, d2 = 8.0; vec2 id = vec2(0.0);
@@ -500,7 +519,7 @@ mat3 gCotangent(vec3 N, vec3 p, vec2 uv) {
 
 export function makeGroundMaterial(groundTex, { polygonOffset = 0, roughness = 0.95, transparentEdges = false, fx = null } = {}) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness, metalness: 0 });
-  if (STYLE.diorama) m.defines = STYLE.plastilina ? { DIORAMA: '', CLAY_RELIEF: '1.8', CLAY_TONE: '2.0' } : { DIORAMA: '' };
+  if (STYLE.diorama) m.defines = STYLE.plastilina ? { DIORAMA: '', CLAY_RELIEF: '1.8', CLAY_TONE: '2.0', CLAY_SET: '0', CLAY_TILE: '3.4', CLAY_AMP: '0.016', CLAY_CAV: '0.34' } : { DIORAMA: '' }; // (the ground smoothed by hand at a model's scale — broad dents and swells, as in the user's pictures)
   if (polygonOffset) {
     m.polygonOffset = true;
     m.polygonOffsetFactor = -polygonOffset;
@@ -587,20 +606,26 @@ ${GROUND_GLSL}`)
     col *= 1.0 - 0.06 * clamp(tr, 0.0, 1.0);
     // gutter: sand, leaves and dust against the kerb
     float gut = smoothstep(hw - 0.5, hw - 0.04, at);
-    col = mix(col, col * vec3(0.93, 0.87, 0.76) * (0.82 + 0.3 * gNoise(wp * 6.0)), gut * 0.65);
     // crumbling edge where there is no kerb to hold the asphalt
     float cr = smoothstep(hw - 0.12 - 0.22 * gNoise(vec2(s * 1.3, eid)), hw, at) * (0.25 + dmg);
+    #ifdef CLAY_RELIEF
+    // (claymation: the road's clay meets the kerb clean, in the kerb's soft shadow — the pale dust read as a glow)
+    col *= 1.0 - 0.22 * smoothstep(hw - 0.35, hw - 0.02, at);
+    cr = 0.0;
+    #else
+    col = mix(col, col * vec3(0.93, 0.87, 0.76) * (0.82 + 0.3 * gNoise(wp * 6.0)), gut * 0.65);
+    #endif
     col = mix(col, vec3(0.6, 0.56, 0.5) * (0.8 + 0.4 * gNoise(wp * 11.0)), clamp(cr, 0.0, 1.0) * 0.7);
     gGH -= 0.008 * clamp(cr, 0.0, 1.0);
     // cracks: the paving joint along the street, transverse cracks, alligator cracking where the street is tired
     float crack = 0.0;
     float jn = step(0.55 - dmg * 0.4, gNoise(vec2(s * 0.06, eid * 1.7)));
-    crack = max(crack, gLine(t - (hw > 3.2 ? 0.0 : hw * 0.3) - 0.07 * sin(s * 0.8 + eid) - 0.05 * (gNoise(vec2(s * 2.5, eid)) - 0.5), 0.004) * jn);
+    crack = max(crack, gLine(t - (hw > 3.2 ? 0.0 : hw * 0.3) - 0.07 * sin(s * 0.8 + eid) - 0.05 * (gNoise(vec2(s * 2.5, eid)) - 0.5), GCW) * jn);
     float cc = floor(s / 11.0);
     float sc = s - (cc * 11.0 + 5.5 + (gHash2(vec2(cc, eid)) - 0.5) * 7.0) - 0.3 * sin(t * 1.7 + cc * 2.1) - 0.22 * (gNoise(vec2(t * 1.3, cc)) - 0.5) - 0.07 * (gNoise(vec2(t * 6.0, cc + 4.0)) - 0.5);
     // a transverse crack rarely spans the whole street: a random stretch of it
     float tc = (gHash2(vec2(cc, eid + 5.0)) * 2.0 - 1.0) * hw, tl = hw * (0.35 + 0.8 * gHash2(vec2(cc, eid + 6.0)));
-    crack = max(crack, gLine(sc, 0.004) * step(gHash2(vec2(cc, eid + 3.0)), 0.2 + dmg * 0.55) * step(at, hw - 0.1) * (1.0 - smoothstep(tl * 0.8, tl, abs(t - tc))));
+    crack = max(crack, gLine(sc, GCW) * step(gHash2(vec2(cc, eid + 3.0)), 0.2 + dmg * 0.55) * step(at, hw - 0.1) * (1.0 - smoothstep(tl * 0.8, tl, abs(t - tc))));
     float an = gNoise(vec2(s * 0.13, t * 0.4) + eid * 3.1) * 0.7 + gNoise(vec2(s * 0.4, t * 0.9) + eid) * 0.3;
     float thr = 1.0 - dmg * 0.22;
     if (an > thr && fine > 0.0) {
@@ -610,8 +635,14 @@ ${GROUND_GLSL}`)
       crack = max(crack, (1.0 - smoothstep(0.01, 0.035 + fwidth(v.x), v.x)) * smoothstep(thr, thr + 0.06, an) * 0.7);
     }
     crack *= fine;
+    #ifdef CLAY_RELIEF
+    crack = clamp(crack * 1.6, 0.0, 1.0); // (claymation: cracks cut deep into the clay with a tool)
+    col *= 1.0 - 0.62 * crack;
+    gGH -= 0.009 * crack;
+    #else
     col *= 1.0 - 0.48 * crack;
     gGH -= 0.004 * crack;
+    #endif
     // repair patches (bacheo): rectangles of newer or older asphalt with a sealed seam
     float pc = floor(s / 7.0);
     if (gHash2(vec2(pc, eid + 11.0)) < 0.04 + dmg * 0.2) {
@@ -709,6 +740,7 @@ ${GROUND_GLSL}`)
   }
   // ---- sidewalk tiles (30 cm, on the texture grid): replaced, cracked, stained and chewing gum; yards away from streets
   if (layer > 1.5 && layer < 2.5) {
+    float clSq = 0.0; // (claymation: how much of a square this is — cobbles, not a yard)
     vec2 tp = wp / 0.3;
     vec2 tid = floor(tp), tf = fract(tp);
     float th = gHash2(tid + 0.37);
@@ -723,6 +755,26 @@ ${GROUND_GLSL}`)
     }
     float st = gNoise(wp * 1.3 + 11.0);
     col *= 1.0 - 0.18 * smoothstep(0.72, 0.85, st) * (0.4 + zd);
+    #ifdef CLAY_RELIEF
+    { // claymation: each tile a slab of clay pressed down — its edges rounded, a dark gap round it, each its own shade;
+      // away from the street (a square, the space before the church) the ground is laid with rounded cobbles instead
+      // (slabs of 45 cm, a little irregular, the colour of sand — the user's pictures)
+      vec2 sp = wp / 0.45 + vec2(gNoise(wp * 1.7), gNoise(wp * 1.7 + 4.0)) * 0.08;
+      vec2 sid = floor(sp), sf = fract(sp);
+      vec2 ef = min(sf, 1.0 - sf); float e = min(ef.x, ef.y) * 0.45;
+      float sq = smoothstep(4.8, 6.8, fld.a * 20.0 + (gNoise(wp * 0.3) - 0.5) * 1.6); clSq = sq; // (well away from any front: a square)
+      gGH += 0.009 * smoothstep(0.0, 0.05, e) * (1.0 - sq);
+      col *= mix(vec3(1.0), vec3(1.06, 0.95, 0.78) * mix(0.58, 1.0, smoothstep(0.003, 0.014, e)) * (0.9 + 0.18 * gHash2(sid + 8.8)), 1.0 - sq);
+      if (sq > 0.0) {
+        vec2 cq = wp / 0.36 + vec2(gNoise(wp * 0.8), gNoise(wp * 0.8 + 7.0)) * 0.6;
+        vec2 cv = gVor(cq);
+        float bulge = 1.0 - pow(1.0 - smoothstep(0.0, 0.5, cv.x), 2.0);
+        vec3 stone = vec3(0.17, 0.148, 0.138) * (0.82 + 0.3 * cv.y) * (0.92 + 0.16 * gNoise(wp * 3.0));
+        col = mix(col, mix(vec3(0.15, 0.125, 0.11), stone, smoothstep(0.03, 0.09, cv.x)) * mix(0.72, 1.0, bulge), sq);
+        gGH += 0.026 * bulge * sq;
+      }
+    }
+    #endif
     vec2 gcell = floor(wp * 2.6);
     float gh = gHash2(gcell + 9.3);
     if (gh > 0.972 - zd * 0.02) {
@@ -732,7 +784,7 @@ ${GROUND_GLSL}`)
     }
     // yards and empty lots, well away from the streets: dry earth, gravel, old concrete, dry grass
     float facD = fld.a * 20.0;
-    float yard = smoothstep(4.5, 8.5, roadD + (gNoise(wp * 0.23) - 0.5) * 4.0) * smoothstep(3.0, 5.5, facD);
+    float yard = smoothstep(4.5, 8.5, roadD + (gNoise(wp * 0.23) - 0.5) * 4.0) * smoothstep(3.0, 5.5, facD) * (1.0 - clSq);
     if (yard > 0.0) {
       float zn = gNoise(wp * 0.06 + 3.0);
       vec3 ycol;
@@ -798,7 +850,33 @@ ${GROUND_GLSL}`)
     col = c;
     gGH = 0.11 * (1.0 - onFace) * (1.0 - ramp * 0.8);
     gGRough = paint > 0.5 ? 0.6 : 0.85;
+    #ifdef CLAY_RELIEF
+    { // claymation: the kerb in blocks of cream clay half a metre long, each rounded at its ends and along its top, a
+      // dark gap between them (the user's pictures)
+      float bi = floor(s / 0.5), be = min(fract(s / 0.5), 1.0 - fract(s / 0.5)) * 0.5;
+      float gap = 1.0 - smoothstep(0.004, 0.016, be);
+      vec3 cc = vec3(0.86, 0.79, 0.68) * (0.9 + 0.14 * gHash2(vec2(bi, 5.0)));
+      col = cc * mix(1.0, 0.6, onFace) * (1.0 - 0.6 * gap);
+      col = mix(col, vec3(0.92, 0.74, 0.08), paint * 0.9);
+      gGH = 0.11 * (1.0 - onFace) * (1.0 - ramp * 0.8) * (1.0 - 0.6 * gap) + 0.025 * smoothstep(0.0, 0.07, be) * smoothstep(face, face + 0.06, t);
+      gGRough = 0.8;
+    }
+    #endif
   }
+  #ifdef CLAY_RELIEF
+  // claymation: the road's clay smoothed by hand in patches — lighter and darker smears half a metre to two across
+  if (layer < 1.5) col *= 0.84 + 0.2 * gNoise(wp * 0.55 + 3.3) + 0.12 * gNoise(wp * 1.7 + 9.1);
+  if ((layer > 2.5 && layer < 3.5) || (layer > 14.5 && layer < 15.5)) {
+    // claymation: the squares paved with rounded clay cobbles (the user's pictures) — each its own warm grey, swelling
+    // from a sandy joint
+    vec2 cq = wp / 0.34 + vec2(gNoise(wp * 0.8), gNoise(wp * 0.8 + 7.0)) * 0.6;
+    vec2 cv = gVor(cq);
+    float bulge = 1.0 - pow(1.0 - smoothstep(0.0, 0.5, cv.x), 2.0);
+    vec3 stone = vec3(0.17, 0.148, 0.138) * (0.82 + 0.3 * cv.y) * (0.92 + 0.16 * gNoise(wp * 3.0));
+    col = mix(vec3(0.15, 0.125, 0.11), stone, smoothstep(0.03, 0.09, cv.x)) * mix(0.72, 1.0, bulge);
+    gGH += 0.026 * bulge;
+  }
+  #endif
   // macro variation
   float n = gNoise(vWXZ * 0.035) * 0.6 + gNoise(vWXZ * 0.11) * 0.4;
   col *= mix(0.86, 1.1, n);

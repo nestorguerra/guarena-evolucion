@@ -547,7 +547,9 @@ function buildRoof(c, p, info, H) {
     const tileEdge = (a, b) => {
       const ex = b[0] - a[0], ez = b[2] - a[2], L = Math.hypot(ex, ez) || 1;
       const nx = ez / L, nz = -ex / L;
-      c.quad(a[0], a[1] - 0.075, a[2], b[0], b[1] - 0.075, b[2], b[0], b[1] + 0.03, b[2], a[0], a[1] + 0.03, a[2], nx, 0, nz, 0, 0, L / S, 0.035, tex, tint);
+      // (claymation: a deeper row of tile ends, a little out over the wall: they hang over the eave, cut in scallops)
+      const lo = LOOK.plastilina ? 0.13 : 0.075, hi = LOOK.plastilina ? 0.05 : 0.03, o = LOOK.plastilina ? 0.04 : 0;
+      c.quad(a[0] + nx * o, a[1] - lo, a[2] + nz * o, b[0] + nx * o, b[1] - lo, b[2] + nz * o, b[0] + nx * o, b[1] + hi, b[2] + nz * o, a[0] + nx * o, a[1] + hi, a[2] + nz * o, nx, 0, nz, 0, 0, L / S, 0.035, tex, tint);
       tris += 2;
     };
     const outward = (a, b) => { const ex = b[0] - a[0], ez = b[2] - a[2]; const mx = (a[0] + b[0]) / 2 - cx, mz = (a[2] + b[2]) / 2 - cz; return ez * mx - ex * mz > 0 ? [a, b] : [b, a]; };
@@ -586,7 +588,8 @@ function buildRoof(c, p, info, H) {
       const nx = ez / L, nz = -ex / L;
       const nn = norm([nx * rise, lipD, nz * rise]);
       c.quad(ax, H, az, bx, H, bz, cx, H + rise, cz, dx, H + rise, dz, nn[0], nn[1], nn[2], 0, 0, L / S, Math.hypot(lipD, rise) / S, tex, tint);
-      c.quad(ax, H - 0.075, az, bx, H - 0.075, bz, bx, H + 0.02, bz, ax, H + 0.02, az, nx, 0, nz, 0, 0, L / S, 0.035, tex, tint);
+      const lo = LOOK.plastilina ? 0.13 : 0.075, hi = LOOK.plastilina ? 0.05 : 0.02, o = LOOK.plastilina ? 0.04 : 0; // (claymation: the tile ends hang over)
+      c.quad(ax + nx * o, H - lo, az + nz * o, bx + nx * o, H - lo, bz + nz * o, bx + nx * o, H + hi, bz + nz * o, ax + nx * o, H + hi, az + nz * o, nx, 0, nz, 0, 0, L / S, 0.035, tex, tint);
       tris += 4;
     }
     tris += flatCap(c, inner, null, H + rise, ROOF.azotea, info, tint);

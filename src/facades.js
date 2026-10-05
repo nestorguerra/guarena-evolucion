@@ -196,7 +196,7 @@ class Geo {
   }
   // square-section bar between two local points
   bar(A, B, s, col, pat = 0) {
-    if (LOOK.plastilina) s *= 1.3; // (claymation: iron bars as rolls of black clay, a little fatter)
+    if (LOOK.plastilina) s *= 1.6; // (claymation: iron bars as rolls of black clay, fat as in the user's pictures)
     let dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2];
     const L = Math.hypot(dx, dy, dz) || 1;
     dx /= L; dy /= L; dz /= L;
@@ -339,6 +339,8 @@ function buildingStyle(o) {
   if (o.style === 'renovada' || o.style === 'ladrillo') bs.alu = true;
   bs.rejaCol = trad || o.style === 'piedra' ? (r() < 0.72 ? C.iron : r() < 0.5 ? C.ironWhite : C.ironGreen) : (r() < 0.8 ? C.iron : C.ironWhite);
   bs.reja = !!S.reja && r() < 0.85;
+  // (claymation: as in the user's pictures, the old houses' windows behind fat black grilles, pots on every other sill)
+  if (LOOK.plastilina && (trad || o.style === 'piedra' || o.style === 'color' || o.style === 'renovada')) { bs.reja = r() < 0.92; bs.rejaCol = r() < 0.88 ? C.iron : bs.rejaCol; }
   bs.buche = (trad || o.style === 'piedra') && r() < 0.3;
   bs.sill = o.style === 'piedra' ? C.granite : o.style === 'ladrillo' ? hexC('#9b9a95') : o.style === 'moderna' ? hexC('#c9c9c6') : trad && r() < 0.3 ? C.terracotta : C.marble;
   bs.sillPat = o.style === 'piedra' || o.style === 'ladrillo' ? PAT.GRANITE : 0;
@@ -348,10 +350,11 @@ function buildingStyle(o) {
   bs.stone = D && o.style !== 'piedra' ? C.sandstone : C.granite;
   if (D && bs.sill === C.marble) bs.sill = C.sandSill;
   bs.recercado = !bs.surround && (trad || o.style === 'color') && r() < 0.35 ? hexC(pickR(r, D ? RECERCADO_D : RECERCADO)) : null;
-  bs.pots = (trad || o.style === 'renovada' || o.style === 'color' || o.style === 'piedra') ? 0.45 : 0.12;
+  bs.pots = (trad || o.style === 'renovada' || o.style === 'color' || o.style === 'piedra') ? (LOOK.plastilina ? 0.72 : 0.45) : (LOOK.plastilina ? 0.25 : 0.12);
   bs.shutters = trad || o.style === 'piedra';
   bs.curtain = hexC(pickR(r, CURTAINS));
   bs.pipe = r() < 0.6 ? C.pipe : r() < 0.5 ? hexC('#e8e8e4') : hexC('#a65a3a');
+  if (LOOK.plastilina) bs.pipe = hexC('#8e9092'); // (claymation: grey clay downpipes, as in the user's pictures)
   bs.awning = hexC(pickR(r, AWNING));
   bs.fascia = hexC(pickR(r, FASCIA));
   bs.ac = !trad && o.style !== 'piedra' ? 0.22 : 0.06;
@@ -495,7 +498,7 @@ function buildWindow(G, F, o, bs, rnd, upper) {
   persiana(G, X0 + 0.024, Y0 + 0.07, X1 - 0.024, Y1, zP, persianaLevel(rnd), bs.pers, bs.alu ? C.alu : fc);
   // sill
   G.box(X0 - 0.05, Y0 - 0.034, -D + 0.07, X1 + 0.05, Y0 + 0.004, 0.044, bs.sill, bs.sillPat);
-  const hasReja = bs.reja && (!upper ? rnd() < 0.78 : rnd() < 0.1);
+  const hasReja = bs.reja && (!upper ? rnd() < (LOOK.plastilina ? 0.93 : 0.78) : rnd() < 0.1);
   // pots on the sill (between the shutter and the grille / wall face)
   if (rnd() < bs.pots) {
     const n = W > 0.95 ? 3 : 2;

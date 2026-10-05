@@ -47,10 +47,16 @@ const KEYS_DIORAMA = [
   { a: 0.35, zen: 0x3a7ccc, hor: 0xa8cdea, warm: 0xe6d8c2, gnd: 0xbfa880, sun: 0xffe0b4 },
   { a: 1.0, zen: 0x3576c8, hor: 0xa0c7e8, warm: 0xd8dfe8, gnd: 0xc4ad87, sun: 0xffecd2 },
 ];
+// claymation: the sky is the studio's backdrop — one even cyan blue by day, painted on plaster (no pale horizon), as in
+// the user's pictures; dawn, dusk and night as the diorama's
+const KEYS_CLAY = KEYS_DIORAMA.slice(0, 4).concat([
+  { a: 0.35, zen: 0x3a92c4, hor: 0x5aa6cc, warm: 0xc8d8dc, gnd: 0xbfa880, sun: 0xffe2b8 },
+  { a: 1.0, zen: 0x3790c4, hor: 0x56a3ca, warm: 0xc4d6dc, gnd: 0xc4ad87, sun: 0xffeccf },
+]);
 const _ca = new THREE.Color(), _cb = new THREE.Color();
 const NIGHT_FILL = new THREE.Color(0.27, 0.33, 0.47), NIGHT_GND = new THREE.Color(0.11, 0.1, 0.09);
 function paletteAt(alt, key, out) {
-  const K = STYLE.anime ? KEYS_ANIME : STYLE.diorama ? KEYS_DIORAMA : KEYS;
+  const K = STYLE.anime ? KEYS_ANIME : STYLE.plastilina ? KEYS_CLAY : STYLE.diorama ? KEYS_DIORAMA : KEYS;
   let i = 0;
   while (i < K.length - 2 && alt > K[i + 1].a) i++;
   const A = K[i], B = K[i + 1];
@@ -240,17 +246,21 @@ function makeClaySkyMaterial(uniforms) {
         float h = d.y;
         vec2 hs = normalize(uSun.xz + 1e-5), hd = normalize(d.xz + 1e-5);
         float toward = pow(max(dot(hs, hd), 0.0), 2.5);
-        vec3 hor = mix(uHor, uWarm, toward * 0.6);
+        vec3 hor = mix(uHor, uWarm, toward * 0.35);
         vec3 col = mix(hor, uZen, smoothstep(0.0, 0.6, pow(max(h, 0.0), 0.8)));
         col = mix(col, uGnd, smoothstep(0.0, -0.1, h));
-        // the painter's brush: long soft strokes in the backdrop's colour
+        // the painter's brush: long soft strokes in the backdrop's colour, over a plaster wall dabbed with a sponge (its
+        // little bumps lit from above)
         vec2 bp = vec2(atan(d.x, d.z) * 3.0, h * 9.0);
         col *= 0.97 + 0.06 * fbm(vec2(bp.x * 0.7, bp.y * 3.0));
+        vec2 sp = vec2(atan(d.x, d.z) * 260.0, h * 260.0);
+        float st0 = fbm(sp), st1 = fbm(sp + vec2(0.0, 0.6));
+        col *= 0.95 + 0.07 * st0 + 0.12 * (st1 - st0);
         float sd = max(dot(d, uSun), 0.0), up = step(-0.03, uSun.y);
         col += uSunCol * (pow(sd, 8.0) * 0.12 + pow(sd, 64.0) * 0.22) * up;
         col = mix(col, uSunCol * 1.4 + 0.45, smoothstep(0.9993, 0.9996, sd) * up); // (a painted disc)
         col += vec3(0.16, 0.11, 0.08) * exp(-max(h, 0.0) * 12.0) * uNight * 0.3;
-        if (h > -0.02) {
+        if (h > -0.02 && uCloud > -0.5) { // (uCloud −1: the cotton clouds hang in front instead)
           vec2 uv = d.xz / (h + 0.16) * 0.9 + vec2(uTime * 0.002, uTime * 0.0007);
           float big = fbm(uv * 0.35 + 5.0);                                  // where the cotton gathers
           vec2 pf = puffs(uv * 1.6);
@@ -270,6 +280,32 @@ function makeClaySkyMaterial(uniforms) {
         #include <colorspace_fragment>
       }`,
   });
+}
+
+// claymation: the clouds are tufts of cotton wool hung in front of the painted backdrop, as in a stop-motion set — a
+// few clumps of soft balls round the town (low on the backdrop), each lit by the sun as a ball is: bright on top, a soft
+// grey underneath. They go with the camera, like the backdrop (always as far)
+function buildCottonClouds() {
+  let sd = 77031; const rnd = () => { sd = (sd * 16807) % 2147483647; return (sd - 1) / 2147483646; };
+  const balls = [];
+  for (let c = 0; c < 40; c++) {
+    const th = (c / 40) * Math.PI * 2 + (rnd() - 0.5) * 0.25, R = 1300 + rnd() * 400, el = (5 + rnd() * 24) * Math.PI / 180;
+    const cx = Math.sin(th) * R, cz = Math.cos(th) * R, cy = Math.tan(el) * R + 30;
+    const S = 80 + rnd() * 75, n = 7 + Math.floor(rnd() * 5), tx = Math.cos(th), tz = -Math.sin(th); // (spread across the view)
+    for (let k = 0; k < n; k++) {
+      const u = n > 1 ? k / (n - 1) - 0.5 : 0, mid = 1 - Math.abs(u) * 1.4;
+      const r = S * (0.32 + 0.26 * mid + rnd() * 0.12);
+      const along = u * S * 2.1 + (rnd() - 0.5) * S * 0.3, up = r * 0.55 * mid + rnd() * S * 0.12;
+      balls.push([cx + tx * along, cy + up, cz + tz * along + (rnd() - 0.5) * S * 0.4, r]);
+    }
+  }
+  const geo = new THREE.SphereGeometry(1, 22, 16);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xf7f4ee, roughness: 1, metalness: 0, fog: false });
+  mat.defines = { CLAY_TILE: '30.0', CLAY_AMP: '0.6', CLAY_CAV: '0.1' }; // (its fibres: the clay's grain at the cloud's own size)
+  const m = new THREE.InstancedMesh(geo, mat, balls.length), M = new THREE.Matrix4(), q = new THREE.Quaternion();
+  balls.forEach(([x, y, z, r], i) => m.setMatrixAt(i, M.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(r, r * 0.78, r))));
+  m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; m.renderOrder = -90; m.name = 'cotton';
+  return m;
 }
 
 export class SkySystem {
@@ -296,6 +332,7 @@ export class SkySystem {
     this.dome.frustumCulled = false;
     this.dome.renderOrder = -100;
     scene.add(this.dome);
+    if (STYLE.plastilina) { this.cotton = buildCottonClouds(); scene.add(this.cotton); }
     // stars
     const n = 5200, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), siz = new Float32Array(n);
     const bandN = new THREE.Vector3(0.42, 0.28, 0.86).normalize();
@@ -391,7 +428,7 @@ export class SkySystem {
   // the dome, the stars, the moon and the sun's shadow box around another point (the street seen from a window)
   placeAt(focus) {
     if (!this.lightDir) return;
-    this.dome.position.copy(focus); this.phys.position.copy(focus); this.stars.position.copy(focus);
+    this.dome.position.copy(focus); this.phys.position.copy(focus); this.stars.position.copy(focus); if (this.cotton) this.cotton.position.set(focus.x, 0, focus.z);
     this.moon.position.copy(focus).addScaledVector(this.moonDir, 3500);
     const texel = (this.shadowSize * 2) / this.sun.shadow.mapSize.x;
     this.sun.target.position.set(Math.round(focus.x / texel) * texel, 0, Math.round(focus.z / texel) * texel);
@@ -410,12 +447,13 @@ export class SkySystem {
     paletteAt(alt, 'gnd', U.uGnd.value);
     paletteAt(alt, 'sun', U.uSunCol.value);
     U.uTime.value += dt;
-    U.uCloud.value = this.cloud;
+    U.uCloud.value = this.cotton ? -1 : this.cloud;
     const day = smoothstep(-0.08, 0.12, alt);
     const golden = 1 - smoothstep(0.05, 0.35, alt);
     this.night = 1 - smoothstep(-0.12, 0.03, alt);
     U.uNight.value = this.night;
     this.dome.position.copy(focus);
+    if (this.cotton) this.cotton.position.set(focus.x, 0, focus.z);
     this.phys.position.copy(focus);
     this.phys.material.uniforms.sunPosition.value.copy(d);
     this.phys.material.uniforms.turbidity.value = 2.8 + this.cloud * 2.4; // hazier with more cloud
@@ -433,9 +471,16 @@ export class SkySystem {
       this.sun.color.copy(sunCol).lerp(new THREE.Color(1, 1, 1), 0.25);
       this.sun.intensity = (STYLE.anime ? 2.6 : STYLE.diorama ? 5.2 : 4.4) * smoothstep(-0.02, 0.16, alt);
       if (STYLE.diorama) this.sun.color.copy(sunCol).lerp(new THREE.Color(1, 0.97, 0.9), 0.1); // (the afternoon sun stays warm)
-      if (STYLE.plastilina) { this.sun.intensity *= 0.7; this.sun.color.lerp(new THREE.Color(1.0, 0.9, 0.76), 0.35); } // (the key lamp of a studio set: warm, softer)
-      this.sun.position.copy(focus).addScaledVector(d, 250);
-      this.lightDir = (this.lightDir || new THREE.Vector3()).copy(d);
+      let ld = d;
+      if (STYLE.plastilina) {
+        this.sun.intensity *= 0.66; this.sun.color.lerp(new THREE.Color(1.0, 0.89, 0.74), 0.4); // (the key lamp of a studio set: warm, softer — the whites never burn out, so the clay's dabs show in the light too)
+        // (and never overhead: a lamp at most 40° up, where the sun stands round the sky — one pavement in the light, the
+        // other in shade, every dab of clay standing out, as in the user's pictures)
+        const s40 = Math.sin(40 * Math.PI / 180);
+        if (d.y > s40) { const hx = d.x, hz = d.z, hl = Math.hypot(hx, hz) || 1, c40 = Math.cos(40 * Math.PI / 180); ld = (this._keyDir || (this._keyDir = new THREE.Vector3())).set(hx / hl * c40, s40, hz / hl * c40); }
+      }
+      this.sun.position.copy(focus).addScaledVector(ld, 250);
+      this.lightDir = (this.lightDir || new THREE.Vector3()).copy(ld);
     } else {
       this.sun.color.setRGB(0.6, 0.7, 0.95);
       this.sun.intensity = (STYLE.anime ? 0.45 : 0.9) * this.night; // moonlight: soft blue light and long shadows
@@ -463,10 +508,10 @@ export class SkySystem {
       // the bounce comes from the side away from the sun, a little above the street
       const b = this.bounce;
       b.color.copy(U.uGnd.value).lerp(new THREE.Color(1.0, 0.84, 0.64), 0.65);
-      b.intensity = (STYLE.plastilina ? 1.15 : 0.85) * day * smoothstep(-0.02, 0.16, alt);
-      if (STYLE.plastilina) { // (claymation: the studio fills the set — warm and generous: no dark shade anywhere)
+      b.intensity = (STYLE.plastilina ? 0.95 : 0.85) * day * smoothstep(-0.02, 0.16, alt);
+      if (STYLE.plastilina) { // (claymation: the studio fills the set — warm, never a dark shade, but the key lamp still models it)
         this.hemi.color.lerp(new THREE.Color(1.0, 0.95, 0.88), 0.55 * day);
-        this.hemi.intensity = lerp(0.5, 1.95, day) + this.night * 0.8;
+        this.hemi.intensity = lerp(0.5, 1.6, day) + this.night * 0.8;
       }
       b.target.position.copy(focus);
       b.position.set(-d.x, 0, -d.z).normalize().setY(0.35).normalize().multiplyScalar(100).add(focus);

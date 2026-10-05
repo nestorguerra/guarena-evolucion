@@ -15,6 +15,7 @@ import { paint, InstanceGroup } from './props.js';
 import { mulberry32, hash1, polySample, polyNearest, clamp, pointInRing, ringBounds, ringArea } from './util.js';
 import { makeNightGlowMaterial } from './materials.js';
 import { groundPot } from './facades.js';
+import { STYLE } from './style.js';
 
 const at = (g, x, y, z) => { g.translate(x, y, z); return g; };
 function merged(list) {
@@ -380,8 +381,8 @@ export function buildStreetLife(world, map, q) {
       }
       if (ok && seats.length >= 2) { frescoSpots.push({ x: d.x, z: d.z, seats, kind: r() < 0.55 ? 'sillaPlastico' : r() < 0.6 ? 'sillaEnea' : 'sillaEneaVerde', seed: h, used: false }); stats.fresco++; continue; }
     }
-    // pots on the ground beside the door
-    if (r() < 0.42) {
+    // pots on the ground beside the door (claymation: on most doorsteps, as in the user's pictures)
+    if (r() < (STYLE.plastilina ? 0.78 : 0.42)) {
       const n = 1 + Math.floor(r() * 3);
       for (let i = 0; i < n; i++) {
         const [x, z] = P(-side * (0.95 + i * 0.38), 0.24);

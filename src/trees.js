@@ -766,7 +766,8 @@ const ANIME_LEAF = { olivo: '#93a17c', encina: '#587a4c', platano: '#7aa55c', na
 const ANIME_DOTS = { naranjo: [['#f28c1c', 16, 0.075]], limonero: [['#eed63c', 14, 0.07]], adelfa: [['#ef7aa6', 26, 0.09], ['#f6f0ea', 6, 0.09]], frutal: [['#f4b0c0', 10, 0.06]] };
 const lin = (h) => hex(h).map((v) => Math.pow(v / 255, 2.2));
 // (claymation: the same greens as plasticine — more saturated; the anime look keeps its own)
-const clayGreen = (c) => { if (!STYLE.plastilina) return c; const L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; return c.map((v) => Math.max(0, L + (v - L) * 1.35)); };
+// (claymation: the deep olive greens of modelling clay, as in the user's pictures — darker, a touch warm)
+const clayGreen = (c) => { if (!STYLE.plastilina) return c; const L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; return c.map((v, i) => Math.max(0, (L + (v - L) * 1.0) * 0.47 * [1.12, 1.0, 1.0][i])); };
 const ICO = [];
 function icoMesh(detail) { // a unit icosphere with shared vertices (smooth normals, lumps that stay closed)
   if (ICO[detail]) return ICO[detail];
@@ -790,7 +791,8 @@ function blob(B, c, r, sq, col, sk, rnd, detail, tile, flexK, lump = 0.34, box =
       const e = box.n, q = Math.pow(Math.pow(Math.abs(d[0]), e) + Math.pow(Math.abs(d[1]), e) + Math.pow(Math.abs(d[2]), e), -1 / e);
       P = [c[0] + d[0] * q * box.h[0] * kk, c[1] + d[1] * q * box.h[1] * kk, c[2] + d[2] * q * box.h[2] * kk];
     }
-    const n = nrm(add(scl(d, 0.5), scl(nrm(sub(P, cc)), 0.5)));
+    const own = STYLE.plastilina && detail <= 2 && sk.C ? 0.8 : 0.5; // (claymation: each ball shaded as a ball — they read one by one)
+    const n = nrm(add(scl(d, own), scl(nrm(sub(P, cc)), 1 - own)));
     const dd = sk.C ? ellD(P, sk.C, sk.Rr) : 1;
     const ao = (0.62 + 0.38 * sstep(0.2, 1.0, dd)) * (0.86 + 0.14 * (0.5 + 0.5 * d[1]));
     const flex = sk.H ? flexK * Math.pow(clamp(P[1] / sk.H, 0, 1), 1.5) : flexK;
@@ -809,19 +811,29 @@ function clumps(B, sp, sk, rnd, lod) {
   }
   for (let i = pts.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pts[i], pts[j]] = [pts[j], pts[i]]; }
   const crownR = Math.cbrt(sk.Rr[0] * sk.Rr[1] * sk.Rr[2]);
-  const rc = crownR * (lod ? 0.5 : 0.42) * (sp.clump || 1), sq = clamp(sk.Rr[1] / Math.max(sk.Rr[0], 0.1), 0.55, 1.2);
+  if (STYLE.plastilina && !lod) { // (claymation: the balls laid over the crown's whole envelope, evenly, like a broccoli)
+    pts.length = 0;
+    const N = 46, ga = Math.PI * (3 - Math.sqrt(5));
+    for (let k = 0; k < N; k++) {
+      const y = 1 - (k + 0.5) / N * 1.75, r = Math.sqrt(Math.max(0, 1 - y * y)), a = k * ga + rnd() * 0.3;
+      pts.push([sk.C[0] + Math.cos(a) * r * sk.Rr[0] * 1.06, sk.C[1] + y * sk.Rr[1] * 1.06, sk.C[2] + Math.sin(a) * r * sk.Rr[2] * 1.06]);
+    }
+  }
+  // (claymation: the crown made of many small balls of clay, as in the user's pictures)
+  // (claymation: every tree a broccoli of small balls of clay, ~25 cm whatever its size — the user's pictures)
+  const rc = STYLE.plastilina && !lod ? Math.min(crownR * 0.33, 0.62) : crownR * (lod ? 0.5 : 0.42) * (sp.clump || 1), sq = clamp(sk.Rr[1] / Math.max(sk.Rr[0], 0.1), 0.55, 1.2);
   const cs = [];
   for (const p0 of pts) {
     const p = add(sk.C, scl(sub(p0, sk.C), 0.84)); // (a little inside the envelope: the lumps reach out to it)
-    if (cs.some((c) => Math.hypot(c[0] - p[0], (c[1] - p[1]) / sq, c[2] - p[2]) < rc * 1.05)) continue;
+    if (cs.some((c) => Math.hypot(c[0] - p[0], (c[1] - p[1]) / sq, c[2] - p[2]) < rc * (STYLE.plastilina && !lod ? 0.9 : 1.05))) continue;
     cs.push(p);
-    if (cs.length >= (lod ? 9 : 13)) break;
+    if (cs.length >= (lod ? 9 : STYLE.plastilina ? 46 : 13)) break; // (the far ones stay light: thousands of them)
   }
   // a core, so no sky shows through the middle of the crown
   blob(B, sk.C, crownR * 0.62, sq, col.map((v) => v * 0.82), sk, rnd, lod ? 1 : 2, TILE.copa, 0.25, 0.2);
   cs.forEach((c, i) => {
     const vk = 0.9 + rnd() * 0.2 + (c[1] > sk.C[1] ? 0.06 : -0.04);
-    blob(B, c, rc * (0.9 + rnd() * 0.4), sq * (0.85 + rnd() * 0.2), col.map((v) => v * vk), sk, rnd, lod ? 1 : 3, i % 3 ? TILE.copa : TILE.copa_b, 0.45, 0.26);
+    blob(B, c, rc * (0.9 + rnd() * 0.4), sq * (0.85 + rnd() * 0.2), col.map((v) => v * vk), sk, rnd, lod ? 1 : STYLE.plastilina ? 2 : 3, i % 3 ? TILE.copa : TILE.copa_b, 0.45, STYLE.plastilina ? 0.12 : 0.26);
   });
   // fruit, flowers: little balls sitting on the clumps
   if (!lod && ANIME_DOTS[name]) for (const [h, n, r] of ANIME_DOTS[name]) {
@@ -1004,7 +1016,7 @@ export function buildTree(name, variant, lod) {
 // ------------------------------------------------------------ materials: bark and leaves sway in the wind (more
 // towards the tips, each tree in its own time); leaves light up from behind and wrap the light softly
 // (bump SHADER_V on any change below: three.js reuses a compiled program by its cache key)
-export const SHADER_V = 2;
+export const SHADER_V = 3;
 const WIND_VS = `
 attribute vec2 aWind;
 uniform float uTime; uniform float uWind;`;
@@ -1033,7 +1045,14 @@ export function makeLeafMaterial(atlas, { a2c = true } = {}) {
     sh.fragmentShader = sh.fragmentShader
       // far off, mipmaps thin the leaves out: keep their coverage
       .replace('#include <map_fragment>', `#include <map_fragment>
-  diffuseColor.a *= 1.0 + max(0.0, log2(max(fwidth(vMapUv.x), fwidth(vMapUv.y)) * 2048.0)) * 0.3;`)
+  diffuseColor.a *= 1.0 + max(0.0, log2(max(fwidth(vMapUv.x), fwidth(vMapUv.y)) * 2048.0)) * 0.3;${STYLE.plastilina ? `
+  { // (claymation: a crown's balls are plain clay, not painted leaves — on the two crown tiles only; the vertex colour
+    // comes next)
+    vec4 r0 = vec4(${tileRect(TILE.copa).map((v) => v.toFixed(5)).join(', ')}), r1 = vec4(${tileRect(TILE.copa_b).map((v) => v.toFixed(5)).join(', ')});
+    vec2 q0 = (vMapUv - r0.xy) / r0.zw, q1 = (vMapUv - r1.xy) / r1.zw;
+    bool crown = (q0.x >= 0.0 && q0.x <= 1.0 && q0.y >= 0.0 && q0.y <= 1.0) || (q1.x >= 0.0 && q1.x <= 1.0 && q1.y >= 0.0 && q1.y <= 1.0);
+    if (crown) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9), 0.75);
+  }` : ''}`)
       // the diffuse light wraps round the crown and some comes through the leaves from behind (the specular keeps the
       // plain term: a lit back face would blow up the GGX lobe). The anime look keeps its two clean tones instead.
       .replace('#include <lights_physical_pars_fragment>', STYLE.anime ? '#include <lights_physical_pars_fragment>' : THREE.ShaderChunk.lights_physical_pars_fragment.replace(

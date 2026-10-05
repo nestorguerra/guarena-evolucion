@@ -726,6 +726,7 @@ export class CameraRig {
       dist = L * 0.95 + 3.2 + Math.min(2.5, v.vel * 0.05);
       tx = v.x; ty = v.spec.H * 0.75 + 0.9; tz = v.z;
       fovT = 62 + clamp((v.vel - 12) * 0.22, 0, 6); // (a little wider at speed: more distorts what is ahead)
+      if (STYLE.plastilina) { dist += 1.6; fovT -= 8; } // (claymation: the set from a little further and higher)
     } else {
       const aim = g.weapons && g.weapons.aiming && !p.knock;
       const sk = aim ? 0.65 : 1; // finer mouse while aiming
@@ -735,9 +736,13 @@ export class CameraRig {
       const ks = (p.char && p.char.scale) || 1, an = STYLE.anime;
       if (p.knock) { tx = p.pos.x; ty = 0.9; tz = p.pos.z; }
       else { tx = p.pos.x; ty = p.pos.y + (p.mode === 'swim' ? 0.55 : p.mode === 'sit' ? 1.15 : p.crouch ? 1.05 : an ? 1.42 : 1.55) * (an && p.mode !== 'swim' ? ks : 1); tz = p.pos.z; }
-      this.footDist = damp(this.footDist ?? this.dist, aim ? 2.2 : an ? this.dist * 0.8 : this.dist, 9, dt);
+      // (claymation: the miniature street seen from above and further back through a longer lens, the puppet small in
+      // the middle of its set — the user's reference pictures)
+      const clay = STYLE.plastilina && !aim;
+      if (clay && !p.knock && p.mode !== 'swim' && p.mode !== 'sit') ty -= 0.32;
+      this.footDist = damp(this.footDist ?? this.dist, aim ? 2.2 : an ? this.dist * 0.8 : clay ? this.dist * 1.35 : this.dist, 9, dt);
       dist = this.footDist;
-      if (aim) fovT = 50;
+      if (aim) fovT = 50; else if (clay) fovT = 50;
       // shoulder offset to the right (more while aiming)
       const rx = -Math.cos(this.yaw + Math.PI), rz = Math.sin(this.yaw + Math.PI);
       const so = aim ? 0.6 : 0.35;
@@ -762,8 +767,9 @@ export class CameraRig {
     }
     this.fov = damp(this.fov, fovT, fovT < 55 ? 9 : 3, dt);
     // camera position on a sphere behind the target (yaw points from target to camera)
-    const cp = Math.cos(this.pitch);
-    let cx = tx + Math.sin(this.yaw) * cp * dist, cz = tz + Math.cos(this.yaw) * cp * dist, cy = ty - Math.sin(this.pitch) * dist;
+    const pe = STYLE.plastilina && !(g.weapons && g.weapons.aiming) ? clamp(this.pitch - 0.1, -1.2, 0.5) : this.pitch; // (claymation: looking down on the set a little)
+    const cp = Math.cos(pe);
+    let cx = tx + Math.sin(this.yaw) * cp * dist, cz = tz + Math.cos(this.yaw) * cp * dist, cy = ty - Math.sin(pe) * dist;
     const inn = g.interior;
     cy = Math.max((inn && inn.floorY ? inn.floorY(tx, tz, p.pos.y) : 0) + 0.35, cy);
     if (inn && inn.ceilY) cy = Math.min(cy, inn.ceilY(tx, tz, p.pos.y) - 0.18);

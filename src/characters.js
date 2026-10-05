@@ -821,7 +821,7 @@ function makeCharMaterial(uniforms) {
   }`);
     // (claymation: a puppet — its thumbprints at its own scale, retouched at every pose)
     // (CWV: how much of the real fabric's weave shows — a puppet's clothes are modelled clay, not cloth)
-    sh.fragmentShader = (STYLE.plastilina ? '#define CLAY_SCALE 2.4\n#define CLAY_PUPPET\n#define CWV 0.12\n' : '#define CWV 1.0\n') + sh.fragmentShader
+    sh.fragmentShader = (STYLE.plastilina ? '#define CLAY_SCALE 2.4\n#define CLAY_PUPPET\n#define CWV 0.12\n#define CLAY_SET 2\n#define CLAY_TILE 0.3\n#define CLAY_AMP 0.0009\n#define CLAY_CAV 0.08\n' : '#define CWV 1.0\n') + sh.fragmentShader
       .replace('#include <common>', '#include <common>' + CHAR_FS_HEAD + CHAR_FS_CLOTH)
       .replace('#include <color_fragment>', `#include <color_fragment>
 {
@@ -1690,7 +1690,7 @@ const GU_BONES = ['hips', 'spine', 'chest', 'neck', 'head', 'clavL', 'clavR', 'a
 const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
 const _AX = new THREE.Vector3(1, 0, 0), _AY = new THREE.Vector3(0, 1, 0), _AZ = new THREE.Vector3(0, 0, 1);
 // claymation (src/plastilina.js): a puppet's proportions, as bone scales over the person's own build
-export const PUPPET = [['head', 1.1], ['eyeL', 1.42], ['eyeR', 1.42], ['lidL', 1.42], ['lidR', 1.42], ['browL', 1.3], ['browR', 1.3], ['handL', 1.16], ['handR', 1.16]];
+export const PUPPET = [['head', 1.24], ['eyeL', 1.42], ['eyeR', 1.42], ['lidL', 1.42], ['lidR', 1.42], ['browL', 1.3], ['browR', 1.3], ['handL', 1.2], ['handR', 1.2]]; // (a toy's head, as the puppets of the user's pictures)
 export class Character {
   constructor(desc, factory, statue = false) {
     this.desc = desc;

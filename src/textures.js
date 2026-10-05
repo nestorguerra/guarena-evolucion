@@ -693,8 +693,8 @@ function drawGroundLayer(name, S, seed) {
     case 'asphalt':
     case 'asphalt2': {
       // (the diorama's asphalt: a warm grey, darker, its grain finer)
-      const D = STYLE.diorama;
-      base(name === 'asphalt' ? (D ? '#6c675f' : '#7c7a76') : (D ? '#655f58' : '#696866'));
+      const D = STYLE.diorama, PL = STYLE.plastilina; // (claymation: a warm, faintly pink grey clay, as in the user's pictures)
+      base(name === 'asphalt' ? (PL ? '#978179' : D ? '#6c675f' : '#7c7a76') : (PL ? '#8f7a72' : D ? '#655f58' : '#696866'));
       speckle(ctx, S, rnd, S * S * 0.22, D ? ['#58544d', '#7a746b', '#857e74', '#504c46', '#766d62'] : ['#5f5d59', '#8e8b85', '#9c9892', '#55534f', '#857d74'], 0.6, 1.6, 0.6);
       grain(ctx, S, seed, 0.12, 5, 3);
       if (name === 'asphalt') {
@@ -1127,9 +1127,10 @@ export function textCanvas(txt, { w = 512, h = 128, bg = null, fg = '#fff', font
 // kind: 'mamposteria' (rubble masonry), 'sillar' (granite ashlar), 'teja' (roof tiles), 'reloj' (clock face)
 // claymation: the church's stones as pieces of clay pressed into a bed of softer clay — round-cornered, each its own flat
 // colour, lighter where the thumb rounded its top and darker under, a soft groove round each; no speckle, no grain
-function clayStones(ctx, S, rnd, ash) {
+function clayStones(ctx, S, rnd, ash, hx) {
   ctx.fillStyle = ash ? '#a89c86' : '#cdbfa3';
   ctx.fillRect(0, 0, S, S);
+  if (hx) { hx.fillStyle = '#202020'; hx.fillRect(0, 0, S, S); } // (its relief: each stone a bulge, the bed sunk between)
   const rows = ash ? 5 : 7, rh = S / rows;
   for (let r = 0; r < rows; r++) {
     let x = ash ? (r % 2 ? -S / 5 : 0) : -rnd() * rh;
@@ -1151,6 +1152,7 @@ function clayStones(ctx, S, rnd, ash) {
         ctx.fillStyle = gr;
         ctx.beginPath(); ctx.roundRect(x0, y0, ww, hh, rad); ctx.fill();
         ctx.restore();
+        if (hx) { const hv = Math.round(150 + v * 90); hx.fillStyle = `rgb(${hv},${hv},${hv})`; hx.beginPath(); hx.roundRect(x0 + S * 0.006, y0 + S * 0.006, ww - S * 0.012, hh - S * 0.012, rad); hx.fill(); }
       }
       x += w;
     }
@@ -1160,7 +1162,14 @@ export function stoneCanvas(kind, S = 512, seed = 1) {
   const c = canvas(S);
   const ctx = c.getContext('2d');
   const rnd = mulberry32(seed);
-  if (STYLE.plastilina && (kind === 'mamposteria' || kind === 'sillar')) { clayStones(ctx, S, rnd, kind === 'sillar'); return c; }
+  if (STYLE.plastilina && (kind === 'mamposteria' || kind === 'sillar')) {
+    const hc = canvas(S), hx = hc.getContext('2d');
+    clayStones(ctx, S, rnd, kind === 'sillar', hx);
+    // (rounded: the relief blurred a little, so every stone swells from its bed)
+    const bc = canvas(S), bx = bc.getContext('2d'); bx.filter = `blur(${Math.max(1, Math.round(S * 0.008))}px)`; bx.drawImage(hc, 0, 0);
+    c.bump = bc;
+    return c;
+  }
   if (kind === 'mamposteria') {
     ctx.fillStyle = '#c9bca3'; // lime mortar
     ctx.fillRect(0, 0, S, S);

@@ -14,11 +14,11 @@ import * as THREE from 'three';
 export const PLASTILINA = {
   fps: 12, // poses per second (animation «on twos»)
   // the last grade: clay colours are pure, the studio fills the shadows a little, the lens darkens its corners a touch
-  grade: { sat: 1.14, warm: 0.035, contrast: 1.06, lift: 0.03, vignette: 0.16 },
+  grade: { sat: 1.2, warm: 0.045, contrast: 1.1, lift: 0.025, vignette: 0.16 }, // (richer, as the user's pictures)
   flicker: 0.014, // the studio lamps' little flicker from one pose to the next (the frames of a stop-motion film never match)
   // the lens: how soft the far background goes at most (a fraction of the picture's height) and from how far behind the
   // subject it starts and is at its softest (× the subject's distance). Only a little: the user asked for it gentler
-  lens: { blur: 0.0024, from: 2.4, to: 11 },
+  lens: { blur: 0.0034, from: 2.2, to: 10 }, // (the user's reference pictures: a macro lens on a miniature, the far end of a street soft)
   boilMM: 0.002, // how far a puppet's surface boils from one pose to the next (metres)
   grain: 0.045, // «Película»: the film's grain
   // the animator's hand: a puppet put back each pose is never exactly where it was (metres, radians; the player less)
@@ -27,17 +27,95 @@ export const PLASTILINA = {
   boil: null, // the shared uniform (installClayChunks): moved at every pose, for the puppets only
 };
 
+// ---------------------------------------------------------------- the clay's surface, modelled once
+// A tile of modelled clay (1024², wraps on every side), made when the game starts: four kinds of surface, one per
+// channel, each a height (0.5 = flat):
+//  r  a wall's clay — dabs of clay pressed on with the thumb, thumb smears, pits where it did not quite fill, a grain
+//  g  a road's clay — crumbs and grains of grey clay rolled flat, little pits, a low swell
+//  b  a puppet's or a car's — smoothed, a few soft dents where the fingers held it, the finest grain
+//  a  the pores and crumbs close up, for every kind
+// The shader lays it on every surface from the three sides (triplanar, on the thing's own shape) and takes its
+// relief (the light picks out the dabs) and its hollows (darker, so they show in the shade too).
+function rng(seed) { return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+export function clayDetailData(S = 1024) {
+  const ch = [new Float32Array(S * S), new Float32Array(S * S), new Float32Array(S * S), new Float32Array(S * S)];
+  const r = rng(20261005);
+  // a soft dab at (x, y): radius rad (texels), height a, stretched along (dx, dy) by k — wraps round the tile
+  const dab = (F, x, y, rad, a, dx = 1, dy = 0, k = 1) => {
+    const R = Math.ceil(rad * Math.max(1, k)), x0 = Math.floor(x), y0 = Math.floor(y), r2 = 1 / (rad * rad);
+    for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
+      const u = (i * dx + j * dy) / k, v = -i * dy + j * dx, d2 = (u * u + v * v) * r2;
+      if (d2 >= 1) continue;
+      const f = (1 - d2) * (1 - d2);
+      F[(((y0 + j) % S + S) % S) * S + (((x0 + i) % S + S) % S)] += a * f;
+    }
+  };
+  const sc = S / 1024;
+  // r: a wall's clay, smoothed by hand (the tile is ~2.4 m: a texel ~2.3 mm) — broad dabs and swells, long thumb
+  // smears with the ridge they push up, a few pits where it did not fill, the odd fine crack
+  for (let n = 0; n < 900; n++) dab(ch[0], r() * S, r() * S, (30 + r() * 70) * sc, (r() * 1.6 - 0.6) * 0.12);
+  for (let n = 0; n < 1400; n++) dab(ch[0], r() * S, r() * S, (12 + r() * 26) * sc, (r() * 1.6 - 0.5) * 0.08);
+  for (let n = 0; n < 700; n++) {
+    const a = r() * Math.PI * 2, x = r() * S, y = r() * S, w = (10 + r() * 16) * sc, k = 3 + r() * 5, dx = Math.cos(a), dy = Math.sin(a);
+    dab(ch[0], x, y, w, -(0.05 + r() * 0.07), dx, dy, k); // the smear's groove
+    dab(ch[0], x - dy * w * 1.1, y + dx * w * 1.1, w * 0.45, 0.06, dx, dy, k * 1.6); // and the ridge beside it
+  }
+  for (let n = 0; n < 2200; n++) dab(ch[0], r() * S, r() * S, (1.5 + r() * 3) * sc, -(0.12 + r() * 0.2));
+  for (let n = 0; n < 40; n++) { // fine cracks: short wandering grooves
+    let x = r() * S, y = r() * S, a = r() * Math.PI * 2;
+    for (let k = 0, L = 30 + r() * 90; k < L; k++) { a += (r() - 0.5) * 0.5; x += Math.cos(a) * 1.5 * sc; y += Math.sin(a) * 1.5 * sc; dab(ch[0], x, y, 1.6 * sc, -0.12); }
+  }
+  // g: a road's clay
+  for (let n = 0; n < 34000; n++) dab(ch[1], r() * S, r() * S, (1.5 + r() * 4.5) * sc, (r() - 0.45) * 0.3);
+  for (let n = 0; n < 700; n++) dab(ch[1], r() * S, r() * S, (14 + r() * 40) * sc, (r() - 0.5) * 0.12);
+  for (let n = 0; n < 6000; n++) dab(ch[1], r() * S, r() * S, (1.2 + r() * 2.5) * sc, -(0.2 + r() * 0.3));
+  // b: smoothed clay (puppets, cars)
+  for (let n = 0; n < 140; n++) dab(ch[2], r() * S, r() * S, (40 + r() * 80) * sc, -(0.06 + r() * 0.12));
+  for (let n = 0; n < 500; n++) dab(ch[2], r() * S, r() * S, (18 + r() * 40) * sc, (r() - 0.5) * 0.08);
+  // a: pores and crumbs
+  for (let n = 0; n < 26000; n++) dab(ch[3], r() * S, r() * S, (1 + r() * 2.2) * sc, (r() < 0.65 ? -1 : 1) * (0.1 + r() * 0.25));
+  // a fine grain on all (value noise, ~3 texels)
+  const G = 3 * sc, gw = Math.ceil(S / G), gv = new Float32Array(gw * gw);
+  for (let i = 0; i < gv.length; i++) gv[i] = r() - 0.5;
+  const grain = (x, y) => {
+    const fx = x / G, fy = y / G, ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
+    const g = (a, b) => gv[((b % gw) + gw) % gw * gw + ((a % gw) + gw) % gw];
+    return (g(ix, iy) * (1 - tx) + g(ix + 1, iy) * tx) * (1 - ty) + (g(ix, iy + 1) * (1 - tx) + g(ix + 1, iy + 1) * tx) * ty;
+  };
+  const out = new Uint8Array(S * S * 4), gk = [0.035, 0.05, 0.012, 0.0];
+  for (let c = 0; c < 4; c++) {
+    const F = ch[c];
+    let m = 0; for (let i = 0; i < F.length; i++) m += F[i]; m /= F.length;
+    let v = 0; for (let i = 0; i < F.length; i++) v += (F[i] - m) * (F[i] - m); const sd = Math.sqrt(v / F.length) || 1;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const i = y * S + x, h = (F[i] - m) / sd * 0.16 + grain(x, y) * gk[c] / 0.16 * 0.16;
+      out[i * 4 + c] = Math.max(0, Math.min(255, Math.round((0.5 + h) * 255)));
+    }
+  }
+  return out;
+}
+function makeClayDetail(S = 1024) {
+  const t = new THREE.DataTexture(clayDetailData(S), S, S, THREE.RGBAFormat);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true;
+  t.anisotropy = 8; t.colorSpace = THREE.NoColorSpace; t.needsUpdate = true;
+  return t;
+}
+
 // ---------------------------------------------------------------- the clay
 // One plain object shared by every material (three.js copies uniform values that are plain objects by reference),
-// so moving it once moves the boil of every puppet.
+// so moving it once moves the boil of every puppet. (The detail texture is cloned per material, but every clone shares
+// its one upload: same source.)
 export function installClayChunks() {
   const C = THREE.ShaderChunk;
   const boil = { value: { x: 0, y: 0 } };
-  for (const lib of ['standard', 'physical']) THREE.ShaderLib[lib].uniforms.uClayBoil = boil;
+  const detail = makeClayDetail(1024);
+  PLASTILINA.detail = detail;
+  for (const lib of ['standard', 'physical']) { THREE.ShaderLib[lib].uniforms.uClayBoil = boil; THREE.ShaderLib[lib].uniforms.uClayTex = { value: detail }; }
   PLASTILINA.boil = boil.value;
   C.common += `
 #ifdef STANDARD
-varying vec3 vClayP;
+varying vec3 vClayP; varying vec3 vClayN;
 #endif
 `;
   // (the pattern sits on each thing's own shape — its vertices before skinning — so it travels with the cars and people)
@@ -45,7 +123,7 @@ varying vec3 vClayP;
   // quite where it sat — every pose its outline shifts by a millimetre or two, a few centimetres at a time
   C.begin_vertex += `
 #ifdef STANDARD
-vClayP = position;
+vClayP = position; vClayN = objectNormal;
 #if defined(CLAY_PUPPET) && !defined(CLAY_NO_BOIL)
 {
   vec3 bq = position * 26.0 + vec3(uClayBoil.x, uClayBoil.y, uClayBoil.x - uClayBoil.y) * 5.3, bi = floor(bq), bf = fract(bq);
@@ -78,6 +156,29 @@ uniform vec2 uClayBoil;
 #ifndef CLAY_PUPPET
 uniform vec2 uClayBoil;
 #endif
+// the modelled surface (clayDetailData): which kind (CLAY_SET: 0 a wall, 1 a road, 2 smoothed), the tile's size in
+// metres, how deep its relief goes (metres) and how dark its hollows
+#ifndef CLAY_SET
+#define CLAY_SET 2
+#endif
+#ifndef CLAY_TILE
+#define CLAY_TILE 0.6
+#endif
+#ifndef CLAY_AMP
+#define CLAY_AMP 0.0015
+#endif
+#ifndef CLAY_CAV
+#define CLAY_CAV 0.12
+#endif
+uniform sampler2D uClayTex;
+vec4 clayDetail(vec3 p, vec3 n) { // from the three sides, blended by how the surface faces
+  vec3 w = pow(abs(n), vec3(4.0)); w /= max(w.x + w.y + w.z, 1e-4);
+  vec4 t = vec4(0.0);
+  if (w.x > 0.02) t += texture2D(uClayTex, p.zy) * w.x;
+  if (w.y > 0.02) t += texture2D(uClayTex, p.xz + 0.37) * w.y;
+  if (w.z > 0.02) t += texture2D(uClayTex, p.xy + 0.71) * w.z;
+  return t / max(w.x * step(0.02, w.x) + w.y * step(0.02, w.y) + w.z * step(0.02, w.z), 1e-4);
+}
 vec2 gClaySlope; float gClayDark;
 float clayHash(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
 float clayNoise(vec3 p) {
@@ -165,8 +266,14 @@ vec3 clayPerturb(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection)
 #endif
   vec2 dl = vec2(length(dFdx(vClayP)), length(dFdy(vClayP))) * CLAY_SCALE;
   vec3 cl = clayAt(cp, max(dl.x, dl.y));
-  gClaySlope = clamp(vec2(dFdx(cl.x), dFdy(cl.x)) / max(dl, vec2(1e-5)) * CLAY_RELIEF, -0.75, 0.75); // (the sets: CLAY_RELIEF, worked harder)
+  // the modelled surface: its relief in metres (the kind's own, and the pores), in light and in its hollows
+  vec4 ctx = clayDetail(vClayP / CLAY_TILE, dot(vClayN, vClayN) > 1e-8 ? normalize(vClayN) : vec3(0.0, 1.0, 0.0));
+  float cset = CLAY_SET == 0 ? ctx.r : CLAY_SET == 1 ? ctx.g : ctx.b;
+  float chm = ((cset - 0.5) * 2.0 + (ctx.a - 0.5) * 0.35) * CLAY_AMP;
+  vec2 dlr = dl / CLAY_SCALE;
+  gClaySlope = clamp(vec2(dFdx(cl.x), dFdy(cl.x)) / max(dl, vec2(1e-5)) * CLAY_RELIEF + vec2(dFdx(chm), dFdy(chm)) / max(dlr, vec2(1e-5)), -0.85, 0.85); // (the sets: CLAY_RELIEF, worked harder)
   gClayDark = cl.y;
+  diffuseColor.rgb *= (1.0 - CLAY_CAV * smoothstep(0.5, 0.12, cset) - CLAY_CAV * 0.5 * smoothstep(0.5, 0.2, ctx.a)) * (1.0 + CLAY_CAV * 0.25 * smoothstep(0.55, 0.85, cset));
   // the colour never quite even: kneaded by hand, a little marbled
   float mb = clayNoise(vec3(cp.x * 1.1, cp.y * 2.2, cp.z * 1.1) + 3.1);
   diffuseColor.rgb *= (0.95 + 0.1 * mb * CLAY_TONE) * (1.0 - cl.y * CLAY_TONE);
@@ -240,7 +347,9 @@ export const ClayLens = {
     uniform sampler2D tDiffuse, tDepth; uniform vec2 uDir, uRes, uFocusUV; uniform float uNear, uFar, uFocus, uMaxR;
     varying vec2 vUv;
     float viewZ(float d) { float z = d * 2.0 - 1.0; return 2.0 * uNear * uFar / (uFar + uNear - z * (uFar - uNear)); }
-    float coc(vec2 uv, float F) { float z = viewZ(texture2D(tDepth, uv).x); return smoothstep(F * LENS_FROM, F * LENS_TO, z); }
+    // (a macro lens on a miniature: what lies far behind the subject softens, and so does what is right under the lens —
+    // the bottom of the picture a little, as in the user's pictures)
+    float coc(vec2 uv, float F) { float z = viewZ(texture2D(tDepth, uv).x); return max(smoothstep(F * LENS_FROM, F * LENS_TO, z), (1.0 - smoothstep(F * 0.28, F * 0.55, z)) * 0.55); }
     void main() {
       float F = uFocus > 0.0 ? uFocus : viewZ(texture2D(tDepth, uFocusUV).x);
       F = clamp(F, 1.5, 60.0);

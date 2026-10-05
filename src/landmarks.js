@@ -161,7 +161,8 @@ class Landmarks {
     this.overrides = new Map();
     const q = world.q;
     // materials
-    const tex = (kind, seed) => canvasTex(stoneCanvas(kind, q.texSize >= 512 ? 512 : 256, seed), true);
+    const bumps = {};
+    const tex = (kind, seed) => { const cv = stoneCanvas(kind, q.texSize >= 512 ? 512 : 256, seed); if (cv.bump) bumps[kind] = canvasTex(cv.bump, true, false); return canvasTex(cv, true); };
     this.mat = {
       mamp: new THREE.MeshStandardMaterial({ map: tex('mamposteria', 11), roughness: 0.95 }),
       sillar: new THREE.MeshStandardMaterial({ map: tex('sillar', 12), roughness: 0.9 }),
@@ -180,7 +181,10 @@ class Landmarks {
     // roof tile texture from facade array would need the array; draw a small canvas instead
     this.mat.teja.map = canvasTex(this.tileCanvas(), true);
     // (claymation: the church, the town hall and the rest worked by hand like the houses: their marks deeper and in the colour)
-    if (STYLE.plastilina) for (const k of ['mamp', 'sillar', 'teja', 'cal', 'white']) this.mat[k].defines = { CLAY_RELIEF: '2.3', CLAY_TONE: '2.4' };
+    if (STYLE.plastilina) for (const k of ['mamp', 'sillar', 'teja', 'cal', 'white']) this.mat[k].defines = { CLAY_RELIEF: '2.3', CLAY_TONE: '2.4', CLAY_SET: '0', CLAY_TILE: '2.4', CLAY_AMP: '0.012', CLAY_CAV: '0.22' };
+    // (claymation: the church's stones swell from their bed — the relief painted with them, textures.js clayStones)
+    if (bumps.mamposteria) { this.mat.mamp.bumpMap = bumps.mamposteria; this.mat.mamp.bumpScale = 5; }
+    if (bumps.sillar) { this.mat.sillar.bumpMap = bumps.sillar; this.mat.sillar.bumpScale = 4; }
     this.signs = signAtlas();
     this.signTex = canvasTex(this.signs.canvas);
     this.build();
