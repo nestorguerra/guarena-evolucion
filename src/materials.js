@@ -360,18 +360,19 @@ if (uDetNOn > 0.5 && gDetK > 0.01) {
     if (code > 0.5) {
       float k = floor(code / 10000.0 + 1e-4), L = code - k * 10000.0;
       float cs = mod(k, 2.0), ce = floor(k / 2.0 + 1e-4);
-      float a0 = cs * pow(1.0 - smoothstep(0.0, 0.34, vEdge.x), 1.5), a1 = ce * pow(1.0 - smoothstep(0.0, 0.34, L - vEdge.x), 1.5);
-      nB += T * (a1 - a0) * 0.95;
+      // (puffy, as modelled: the wall swells towards its middle — a long soft roll at each corner)
+      float a0 = cs * pow(1.0 - smoothstep(0.0, 0.7, vEdge.x), 1.6), a1 = ce * pow(1.0 - smoothstep(0.0, 0.7, L - vEdge.x), 1.6);
+      nB += T * (a1 - a0) * 1.05;
     }
-    nB.y += pow(1.0 - smoothstep(0.0, 0.24, vWallH - vWPos.y), 1.5) * 0.9;
+    nB.y += pow(1.0 - smoothstep(0.0, 0.42, vWallH - vWPos.y), 1.5) * 0.95;
     if (vRect.z > vRect.x + 0.01) { // the rim of a window or a door: the wall curls into the opening
       vec2 cf = fract(vUvF + 1e-4);
       float dl = (vRect.x - cf.x) * 3.2, dr = (cf.x - vRect.z) * 3.2, db = (vRect.y - cf.y) * 3.1, dt = (cf.y - vRect.w) * 3.1;
-      bool inY = cf.y > vRect.y - 0.025 && cf.y < vRect.w + 0.025, inX = cf.x > vRect.x - 0.025 && cf.x < vRect.z + 0.025;
-      if (inY && dl > 0.0) nB += T * pow(1.0 - smoothstep(0.0, 0.075, dl), 1.5) * 0.85;
-      if (inY && dr > 0.0) nB -= T * pow(1.0 - smoothstep(0.0, 0.075, dr), 1.5) * 0.85;
-      if (inX && dt > 0.0) nB.y -= pow(1.0 - smoothstep(0.0, 0.075, dt), 1.5) * 0.85;
-      if (inX && db > 0.0 && vRect.y > 0.01) nB.y += pow(1.0 - smoothstep(0.0, 0.075, db), 1.5) * 0.85;
+      bool inY = cf.y > vRect.y - 0.04 && cf.y < vRect.w + 0.04, inX = cf.x > vRect.x - 0.04 && cf.x < vRect.z + 0.04;
+      if (inY && dl > 0.0) nB += T * pow(1.0 - smoothstep(0.0, 0.13, dl), 1.5) * 0.9;
+      if (inY && dr > 0.0) nB -= T * pow(1.0 - smoothstep(0.0, 0.13, dr), 1.5) * 0.9;
+      if (inX && dt > 0.0) nB.y -= pow(1.0 - smoothstep(0.0, 0.13, dt), 1.5) * 0.9;
+      if (inX && db > 0.0 && vRect.y > 0.01) nB.y += pow(1.0 - smoothstep(0.0, 0.13, db), 1.5) * 0.9;
     }
     if (floor(vUvF.y + 1e-4) < 0.5 && vTex.x < 63.5) { // the top of the plinth: a strip of clay laid on, its edge rounded
       float dz = uZocH[int(floor(vTex.x / 8.0 + 0.001))] - fract(vUvF.y + 1e-4) * 3.1;

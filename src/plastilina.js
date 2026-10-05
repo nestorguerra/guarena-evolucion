@@ -156,7 +156,7 @@ uniform vec2 uClayBoil;
 #ifndef CLAY_PUPPET
 uniform vec2 uClayBoil;
 #endif
-// the modelled surface (clayDetailData): which kind (CLAY_SET: 0 a wall, 1 a road, 2 smoothed), the tile's size in
+// the modelled surface (clayDetailData): which kind (CLAY_SET: 0 a wall, 1 a road, 2 smoothed, 3 pores), the tile's size in
 // metres, how deep its relief goes (metres) and how dark its hollows
 #ifndef CLAY_SET
 #define CLAY_SET 2
@@ -268,7 +268,7 @@ vec3 clayPerturb(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection)
   vec3 cl = clayAt(cp, max(dl.x, dl.y));
   // the modelled surface: its relief in metres (the kind's own, and the pores), in light and in its hollows
   vec4 ctx = clayDetail(vClayP / CLAY_TILE, dot(vClayN, vClayN) > 1e-8 ? normalize(vClayN) : vec3(0.0, 1.0, 0.0));
-  float cset = CLAY_SET == 0 ? ctx.r : CLAY_SET == 1 ? ctx.g : ctx.b;
+  float cset = CLAY_SET == 0 ? ctx.r : CLAY_SET == 1 ? ctx.g : CLAY_SET == 2 ? ctx.b : ctx.a; // (3: the pores alone — cotton's fibres)
   float chm = ((cset - 0.5) * 2.0 + (ctx.a - 0.5) * 0.35) * CLAY_AMP;
   vec2 dlr = dl / CLAY_SCALE;
   gClaySlope = clamp(vec2(dFdx(cl.x), dFdy(cl.x)) / max(dl, vec2(1e-5)) * CLAY_RELIEF + vec2(dFdx(chm), dFdy(chm)) / max(dlr, vec2(1e-5)), -0.85, 0.85); // (the sets: CLAY_RELIEF, worked harder)

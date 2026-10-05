@@ -255,7 +255,9 @@ function makeClaySkyMaterial(uniforms) {
         col *= 0.97 + 0.06 * fbm(vec2(bp.x * 0.7, bp.y * 3.0));
         vec2 sp = vec2(atan(d.x, d.z) * 260.0, h * 260.0);
         float st0 = fbm(sp), st1 = fbm(sp + vec2(0.0, 0.6));
-        col *= 0.95 + 0.07 * st0 + 0.12 * (st1 - st0);
+        col *= 0.94 + 0.1 * st0 + 0.16 * (st1 - st0);
+        vec2 bs = vec2(atan(d.x, d.z) * 9.0, h * 30.0); // (and the broad strokes of the brush that painted it)
+        col *= 0.95 + 0.1 * fbm(vec2(bs.x * 1.3 + fbm(bs * 0.5) * 2.0, bs.y * 0.4));
         float sd = max(dot(d, uSun), 0.0), up = step(-0.03, uSun.y);
         col += uSunCol * (pow(sd, 8.0) * 0.12 + pow(sd, 64.0) * 0.22) * up;
         col = mix(col, uSunCol * 1.4 + 0.45, smoothstep(0.9993, 0.9996, sd) * up); // (a painted disc)
@@ -288,10 +290,10 @@ function makeClaySkyMaterial(uniforms) {
 function buildCottonClouds() {
   let sd = 77031; const rnd = () => { sd = (sd * 16807) % 2147483647; return (sd - 1) / 2147483646; };
   const balls = [];
-  for (let c = 0; c < 40; c++) {
-    const th = (c / 40) * Math.PI * 2 + (rnd() - 0.5) * 0.25, R = 1300 + rnd() * 400, el = (5 + rnd() * 24) * Math.PI / 180;
+  for (let c = 0; c < 56; c++) {
+    const th = (c / 56) * Math.PI * 2 + (rnd() - 0.5) * 0.2, R = 1300 + rnd() * 400, el = (6 + rnd() * 26) * Math.PI / 180;
     const cx = Math.sin(th) * R, cz = Math.cos(th) * R, cy = Math.tan(el) * R + 30;
-    const S = 80 + rnd() * 75, n = 7 + Math.floor(rnd() * 5), tx = Math.cos(th), tz = -Math.sin(th); // (spread across the view)
+    const S = 48 + rnd() * 46, n = 6 + Math.floor(rnd() * 4), tx = Math.cos(th), tz = -Math.sin(th); // (spread across the view: small compact tufts)
     for (let k = 0; k < n; k++) {
       const u = n > 1 ? k / (n - 1) - 0.5 : 0, mid = 1 - Math.abs(u) * 1.4;
       const r = S * (0.32 + 0.26 * mid + rnd() * 0.12);
@@ -300,8 +302,8 @@ function buildCottonClouds() {
     }
   }
   const geo = new THREE.SphereGeometry(1, 22, 16);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xf7f4ee, roughness: 1, metalness: 0, fog: false });
-  mat.defines = { CLAY_TILE: '30.0', CLAY_AMP: '0.6', CLAY_CAV: '0.1' }; // (its fibres: the clay's grain at the cloud's own size)
+  const mat = new THREE.MeshStandardMaterial({ color: 0xfbf6ec, roughness: 1, metalness: 0, fog: false, emissive: 0x5a5048 });
+  mat.defines = { CLAY_SET: '3', CLAY_TILE: '18.0', CLAY_AMP: '0.9', CLAY_CAV: '0.12' }; // (its fibres: the clay's pores at the cloud's own size; a little glow of its own — lit cotton is never grey)
   const m = new THREE.InstancedMesh(geo, mat, balls.length), M = new THREE.Matrix4(), q = new THREE.Quaternion();
   balls.forEach(([x, y, z, r], i) => m.setMatrixAt(i, M.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(r, r * 0.78, r))));
   m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; m.renderOrder = -90; m.name = 'cotton';

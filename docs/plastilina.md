@@ -185,3 +185,30 @@ Evaluación (este Mac):
 
 Herramientas: `tools/lookcompare.js` `faceVideo` (un muñeco de cerca, 12 poses por segundo: hervor, mano, parpadeos);
 `walkVideo` aplica ya la mano del animador.
+
+## 9. Quinta pasada: las tres imágenes de referencia del usuario
+
+El usuario mandó tres imágenes (una calle estrecha de casas encaladas, una calle ancha con coches aparcados y la
+plaza de la iglesia con una palmera) y pidió «representar exactamente esta estética». `tools/refcompare.js` saca
+tres vistas del juego del mismo tamaño y encuadre parecido, y cada cambio se midió contra ellas (color medio y
+contraste de pared, carretera, árboles y adoquines, sacados con PIL de las referencias).
+
+| En la referencia | Antes | Ahora |
+|---|---|---|
+| Cámara de maqueta: algo alta, objetivo largo | cámara de juego | más lejos (×1,35), 12° más alta, 50° de campo; en coche, más lejos y cerrada |
+| Paredes crema, modeladas a mano, con pegotes y alisados | blancas y casi lisas | superficie de plastilina modelada una vez al arrancar (1024², cuatro canales), en triplanar: pegotes, alisados con su rebaba, poros y grietas finas; huecos más oscuros; crema cálido; esquinas y bordes más «hinchados» |
+| Luz de estudio cálida y suave que modela | sol fuerte, blancos quemados | foco a 40° como máximo, más suave y cálido; grado más rico |
+| Cielo cian pintado sobre yeso, nubes de algodón | nubes pintadas | fondo con el yeso y las pinceladas, y nubes de algodón en 3D delante, pequeñas y compactas |
+| Carretera de arcilla gris cálida, grietas hondas | asfalto gris con baches blancos | arcilla alisada a mano en manchas, grietas de herramienta, sin polvo en la cuneta |
+| Aceras de losas color arena | baldosas pequeñas | losas de 45 cm, irregulares, cada una de su tono |
+| Bordillos de bloques | tira lisa | bloques de 50 cm redondeados con su junta |
+| Plazas de adoquines redondos | baldosa | adoquines de arcilla con juntas oscuras, en plazas y explanadas |
+| Árboles de bolitas | grumos grandes | «brócolis» de bolitas de plastilina verde oliva, cada una sombreada como una bola |
+| Rejas negras gordas, macetas en cada ventana y puerta | algunas | rejas en casi todas las ventanas bajas, más gordas; muchas más macetas; bajantes grises |
+| Tejas que vuelan sobre el alero | borde recto | fila de canales festoneada que vuela 4 cm |
+
+Rendimiento (este Mac, 1280×720, sin otra pestaña del juego abierta): 12–14 ms por imagen, igual que antes. Una
+prueba con bolitas más pequeñas y numerosas subió a 27 ms: se quedaron en 24–70 según el árbol, de 180 triángulos.
+
+Diferencias que quedan, porque son del pueblo y no de la estética: Guareña tiene sus casas de dos y tres plantas y
+su iglesia real (no la de la imagen), y el protagonista de la Evolución es Álex.

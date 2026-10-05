@@ -813,7 +813,7 @@ function clumps(B, sp, sk, rnd, lod) {
   const crownR = Math.cbrt(sk.Rr[0] * sk.Rr[1] * sk.Rr[2]);
   if (STYLE.plastilina && !lod) { // (claymation: the balls laid over the crown's whole envelope, evenly, like a broccoli)
     pts.length = 0;
-    const N = 46, ga = Math.PI * (3 - Math.sqrt(5));
+    const rb = Math.min(crownR * 0.3, 0.45), N = Math.round(clamp(4 * crownR * crownR / (rb * rb) * 0.5, 24, 70)), ga = Math.PI * (3 - Math.sqrt(5));
     for (let k = 0; k < N; k++) {
       const y = 1 - (k + 0.5) / N * 1.75, r = Math.sqrt(Math.max(0, 1 - y * y)), a = k * ga + rnd() * 0.3;
       pts.push([sk.C[0] + Math.cos(a) * r * sk.Rr[0] * 1.06, sk.C[1] + y * sk.Rr[1] * 1.06, sk.C[2] + Math.sin(a) * r * sk.Rr[2] * 1.06]);
@@ -821,13 +821,13 @@ function clumps(B, sp, sk, rnd, lod) {
   }
   // (claymation: the crown made of many small balls of clay, as in the user's pictures)
   // (claymation: every tree a broccoli of small balls of clay, ~25 cm whatever its size — the user's pictures)
-  const rc = STYLE.plastilina && !lod ? Math.min(crownR * 0.33, 0.62) : crownR * (lod ? 0.5 : 0.42) * (sp.clump || 1), sq = clamp(sk.Rr[1] / Math.max(sk.Rr[0], 0.1), 0.55, 1.2);
+  const rc = STYLE.plastilina && !lod ? Math.min(crownR * 0.3, 0.45) : crownR * (lod ? 0.5 : 0.42) * (sp.clump || 1), sq = clamp(sk.Rr[1] / Math.max(sk.Rr[0], 0.1), 0.55, 1.2);
   const cs = [];
   for (const p0 of pts) {
     const p = add(sk.C, scl(sub(p0, sk.C), 0.84)); // (a little inside the envelope: the lumps reach out to it)
     if (cs.some((c) => Math.hypot(c[0] - p[0], (c[1] - p[1]) / sq, c[2] - p[2]) < rc * (STYLE.plastilina && !lod ? 0.9 : 1.05))) continue;
     cs.push(p);
-    if (cs.length >= (lod ? 9 : STYLE.plastilina ? 46 : 13)) break; // (the far ones stay light: thousands of them)
+    if (cs.length >= (lod ? 9 : STYLE.plastilina ? 70 : 13)) break; // (the far ones stay light: thousands of them)
   }
   // a core, so no sky shows through the middle of the crown
   blob(B, sk.C, crownR * 0.62, sq, col.map((v) => v * 0.82), sk, rnd, lod ? 1 : 2, TILE.copa, 0.25, 0.2);
