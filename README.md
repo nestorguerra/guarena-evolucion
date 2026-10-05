@@ -49,9 +49,12 @@ La **Plastilina** es Guareña como una película de stop motion de plastilina (c
 - La iglesia y los edificios de piedra, con piedras de plastilina metidas en una masa más blanda.
 - Cielo de decorado con nubes de algodón, humo de algodón, luz de estudio cálida con sombras suaves y, como en una
   maqueta fotografiada, el fondo lejano apenas suave.
-- **Stop motion**: personas, perros y coches posan 12 veces por segundo (el agua, el viento y el humo también) y se
-  retocan en cada pose; la cámara, tu personaje y tu coche van fluidos, para jugar igual que siempre. Se puede quitar en
-  *Ajustes › Stop motion*.
+- **Stop motion**: personas, perros y coches posan 12 veces por segundo (el agua, el viento y el humo también); en cada
+  pose la superficie de los muñecos «hierve» un milímetro o dos y quedan un poco distintos, como recolocados a mano. La
+  cámara, tu personaje y tu coche van fluidos, para jugar igual que siempre. *Ajustes › Stop motion*: Sí, **Película**
+  (tú también a doses, la cámara a las 24 imágenes por segundo del cine, grano de película y bandas negras) o No.
+- Pelo de plastilina con surcos de palillo y ropa modelada (sin el tejido de la ropa de verdad); un contraluz cálido de
+  estudio separa a los muñecos del decorado. En calidad alta, a la resolución completa de la pantalla.
 
 Todo está en `src/plastilina.js` y en las ramas `STYLE.plastilina` de casas, fachadas, árboles, personajes, coches y
 cielo (las cabezas de muñeco, en `charbuild.js`: `MH_PUPPET` y `puppetShape`). `tools/lookcompare.js` saca las vistas
