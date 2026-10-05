@@ -413,6 +413,11 @@ function emitRun(c, run, p, info, H, facade) {
         const [wx, wz] = at(b + (rr[0] + rr[2]) / 2);
         facade.ground.push({ x: wx, z: wz, nx, nz, r: ((rr[2] - rr[0]) * bw) / 2 + 0.35, type, bid: p.b, style: info.style });
       }
+      // (claymation: the ground-floor windows too, for the pots set out under them — the user's pictures)
+      if (LOOK.plastilina && f === 0 && facade && type === CT.WIN_G && info.style !== 'nave') {
+        const bw = run.L / uTot, rr = rect || [0.3, 0.3, 0.7, 0.8], [wx, wz] = at(b + (rr[0] + rr[2]) / 2);
+        (facade.groundWin || (facade.groundWin = [])).push({ x: wx, z: wz, nx, nz, w: (rr[2] - rr[0]) * bw });
+      }
       if (!holes || !rect) { piece(ua, ub, ya, yb, sBase + type, rect || NORECT); continue; }
       tris += emitHoleCell(c, run, at, piece, b, f, type, rect, p, info, sBase, H, nF, facade);
     }

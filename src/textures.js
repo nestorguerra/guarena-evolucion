@@ -1128,7 +1128,7 @@ export function textCanvas(txt, { w = 512, h = 128, bg = null, fg = '#fff', font
 // claymation: the church's stones as pieces of clay pressed into a bed of softer clay — round-cornered, each its own flat
 // colour, lighter where the thumb rounded its top and darker under, a soft groove round each; no speckle, no grain
 function clayStones(ctx, S, rnd, ash, hx) {
-  ctx.fillStyle = ash ? '#a89c86' : '#cdbfa3';
+  ctx.fillStyle = ash ? '#a89c86' : '#ddd0b4'; // (2026-10-05: a pale bed of mortar between warm stones, as in the pictures)
   ctx.fillRect(0, 0, S, S);
   if (hx) { hx.fillStyle = '#202020'; hx.fillRect(0, 0, S, S); } // (its relief: each stone a bulge, the bed sunk between)
   const rows = ash ? 5 : 7, rh = S / rows;
@@ -1136,8 +1136,9 @@ function clayStones(ctx, S, rnd, ash, hx) {
     let x = ash ? (r % 2 ? -S / 5 : 0) : -rnd() * rh;
     while (x < S) {
       const w = ash ? S * (0.26 + rnd() * 0.16) : rh * (1 + rnd() * 0.9);
-      const v = ash ? 0.88 + rnd() * 0.14 : 0.72 + rnd() * 0.26, warm = rnd() < 0.45;
-      const b = (ash ? [196, 186, 164] : warm ? [178, 150, 112] : [152, 144, 128]).map((k) => k * v);
+      // (each stone its own colour, as the pictures' church: ochre, cream, orange, a brown, a grey-beige)
+      const v = ash ? 0.88 + rnd() * 0.14 : 0.82 + rnd() * 0.2, kc = rnd();
+      const b = (ash ? [196, 186, 164] : kc < 0.4 ? [200, 150, 98] : kc < 0.62 ? [214, 188, 148] : kc < 0.8 ? [194, 128, 80] : kc < 0.92 ? [166, 118, 86] : [176, 156, 126]).map((k) => k * v);
       const pad = S * (ash ? 0.012 : 0.01 + rnd() * 0.012), ww = w - 2 * pad, hh = rh - 2 * pad - (ash ? 0 : rnd() * rh * 0.12);
       const y0 = r * rh + pad, rad = Math.min(ww, hh) * (ash ? 0.2 : 0.38 + rnd() * 0.1);
       for (const ox of [0, -S, S]) {

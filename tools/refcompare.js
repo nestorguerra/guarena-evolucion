@@ -26,10 +26,11 @@ export async function spots() {
     if (!best || score > best.score) best = { e, score };
   }
   if (best) { map.sample(best.e, Math.min(20, best.e.len * 0.25), tmp); out.push({ name: 'Calle ancha', street: best.e.name, x: tmp.x, z: tmp.z, h: Math.atan2(tmp.dx, tmp.dz), hour: 12.7, pitch: -0.18 }); }
-  // (the open square east of the tower, where «Santa María» is always photographed from)
-  const t = g.world.landmarks.poi.churchTower || { x: -180.5, z: -38.1 };
-  const ax = t.x + 40, az = t.z + 7;
-  out.push({ name: 'Iglesia', x: ax, z: az, h: Math.atan2(t.x - ax, t.z - az), hour: 13.0, pitch: -0.18 });
+  // (the third picture's own spot: Santa María from the east across its square — the round tower and the belfry on the
+  // left, the palm on the right, broccoli trees and lamp posts between; found 2026-10-05 from the palm by the square)
+  // (the picture looks more level: the horizon low in it, the belfry's cross in the sky)
+  const ax = -104, az = -62;
+  out.push({ name: 'Iglesia', x: ax, z: az, h: Math.atan2(-166 - ax, -57 - az), hour: 13.0, pitch: -0.05 });
   return out;
 }
 

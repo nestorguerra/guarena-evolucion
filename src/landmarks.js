@@ -506,9 +506,12 @@ class Landmarks {
     const au = apse.attributes.uv; for (let i = 0; i < au.count; i++) au.setXY(i, au.getX(i) * 12, au.getY(i) * (H - 1) / 3.2);
     const am = this.put(g, apse, M.mamp, xa, (H - 1) / 2, 0);
     am.rotation.y = 0;
-    // apse roof (half cone)
-    const aroof = new THREE.ConeGeometry(nw + 0.4, 4.5, 7, 1, true, 0, Math.PI);
-    this.put(g, aroof, M.teja, xa, H - 1 + 2.25, 0);
+    // apse roof (half cone) — in the claymation taller, its tiles at their size, so that it hides the nave's stone gable
+    // behind it, as in the user's third picture (a stone triangle stood up out of it like a cone of stones)
+    const aH = STYLE.plastilina ? 6.6 : 4.5;
+    const aroof = new THREE.ConeGeometry(nw + 0.4, aH, 7, 1, true, 0, Math.PI);
+    if (STYLE.plastilina) { const ru = aroof.attributes.uv; for (let i = 0; i < ru.count; i++) ru.setXY(i, ru.getX(i) * 9, ru.getY(i) * 3); }
+    this.put(g, aroof, M.teja, xa, H - 1 + aH / 2, 0);
     // nave roof
     const roof = gableRoof(naveLen, nw * 2, 5.2, 0.5);
     this.put(g, roof, M.teja, x0 + naveLen / 2, H, 0);

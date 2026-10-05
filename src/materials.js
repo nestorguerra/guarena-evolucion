@@ -59,7 +59,7 @@ export function arrayTexture(data, size, layers, { srgb = true, aniso = 8 } = {}
 export function makeBuildingMaterial(facadeTex, detail = null) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0.0, side: THREE.DoubleSide });
   if (STYLE.anime) m.defines = { ANIME: '' };
-  else if (STYLE.plastilina) m.defines = { DIORAMA: '', CLAY: '', CLAY_RELIEF: '2.3', CLAY_TONE: '2.8', CLAY_SET: '0', CLAY_TILE: '2.4', CLAY_AMP: '0.06', CLAY_CAV: '0.12' }; // (a set: worked hard by hand; its marks in the colour too, for the shade and the whitewash)
+  else if (STYLE.plastilina) m.defines = { DIORAMA: '', CLAY: '', CLAY_RELIEF: '1.6', CLAY_TONE: '1.8', CLAY_SET: '0', CLAY_TILE: '2.4', CLAY_AMP: '0.062', CLAY_CAV: '0.12' }; // (a set: worked hard by hand; its marks in the colour too, for the shade and the whitewash)
   else if (STYLE.diorama) m.defines = { DIORAMA: '' };
   const dOn = detail && detail.on ? 1 : 0;
   const nOn = detail && detail.on && detail.normals ? 1 : 0;
@@ -337,7 +337,9 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
   #endif
   diffuseColor.rgb *= col;
   #ifdef CLAY
-  if (!isRoof) diffuseColor.rgb *= vec3(0.93, 0.83, 0.72); // (claymation: the whitewash is cream-coloured clay, warm as in the user's pictures)
+  // (claymation: the whitewash is cream-coloured clay, warm as in the user's pictures — the lime itself a peach cream,
+  // measured against them; coloured bands and doors keep the lighter warm cast)
+  if (!isRoof) diffuseColor.rgb *= mix(vec3(0.93, 0.83, 0.72), vec3(0.6, 0.49, 0.47), smoothstep(0.35, 0.7, dot(col, vec3(0.2126, 0.7152, 0.0722))));
   #endif
   float isShop = lt > 6.5 ? 1.0 : 0.0;
   float litChance = isShop > 0.5 ? 0.7 : uNightLit;
@@ -526,7 +528,7 @@ mat3 gCotangent(vec3 N, vec3 p, vec2 uv) {
 
 export function makeGroundMaterial(groundTex, { polygonOffset = 0, roughness = 0.95, transparentEdges = false, fx = null } = {}) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness, metalness: 0 });
-  if (STYLE.diorama) m.defines = STYLE.plastilina ? { DIORAMA: '', CLAY_RELIEF: '1.8', CLAY_TONE: '2.0', CLAY_SET: '1', CLAY_TILE: '6.0', CLAY_AMP: '0.02', CLAY_CAV: '0.45' } : { DIORAMA: '' }; // (the ground's clay crumbly at a model's scale, as in the user's pictures)
+  if (STYLE.diorama) m.defines = STYLE.plastilina ? { DIORAMA: '', CLAY_RELIEF: '1.8', CLAY_TONE: '2.0', CLAY_SET: '1', CLAY_TILE: '6.0', CLAY_AMP: '0.016', CLAY_CAV: '0.25' } : { DIORAMA: '' }; // (the ground's clay crumbly at a model's scale, as in the user's pictures)
   if (polygonOffset) {
     m.polygonOffset = true;
     m.polygonOffsetFactor = -polygonOffset;
@@ -771,13 +773,13 @@ ${GROUND_GLSL}`)
       vec2 ef = min(sf, 1.0 - sf); float e = min(ef.x, ef.y) * 0.45;
       float sq = smoothstep(4.8, 6.8, fld.a * 20.0 + (gNoise(wp * 0.3) - 0.5) * 1.6); clSq = sq; // (well away from any front: a square)
       gGH += 0.009 * smoothstep(0.0, 0.05, e) * (1.0 - sq);
-      col *= mix(vec3(1.0), vec3(1.06, 0.95, 0.78) * mix(0.58, 1.0, smoothstep(0.003, 0.014, e)) * (0.9 + 0.18 * gHash2(sid + 8.8)), 1.0 - sq);
+      col *= mix(vec3(1.0), vec3(1.11, 0.97, 0.97) * mix(0.58, 1.0, smoothstep(0.003, 0.014, e)) * (0.9 + 0.18 * gHash2(sid + 8.8)), 1.0 - sq);
       if (sq > 0.0) {
         vec2 cq = wp / 0.36 + vec2(gNoise(wp * 0.8), gNoise(wp * 0.8 + 7.0)) * 0.6;
         vec2 cv = gVor(cq);
         float bulge = 1.0 - pow(1.0 - smoothstep(0.0, 0.5, cv.x), 2.0);
-        vec3 stone = vec3(0.17, 0.148, 0.138) * (0.82 + 0.3 * cv.y) * (0.92 + 0.16 * gNoise(wp * 3.0));
-        col = mix(col, mix(vec3(0.15, 0.125, 0.11), stone, smoothstep(0.03, 0.09, cv.x)) * mix(0.72, 1.0, bulge), sq);
+        vec3 stone = vec3(0.15, 0.138, 0.155) * (0.82 + 0.3 * cv.y) * (0.92 + 0.16 * gNoise(wp * 3.0));
+        col = mix(col, mix(vec3(0.06, 0.052, 0.05), stone, smoothstep(0.035, 0.08, cv.x)) * mix(0.8, 1.0, bulge), sq);
         gGH += 0.026 * bulge * sq;
       }
     }
@@ -880,7 +882,7 @@ ${GROUND_GLSL}`)
   #ifdef CLAY_RELIEF
   // claymation: the road's clay smoothed by hand in patches — lighter and darker smears half a metre to two across;
   // its crumbs and pits on the road only (slabs and kerbs are smoother pieces)
-  if (layer < 1.5) col *= 0.84 + 0.2 * gNoise(wp * 0.55 + 3.3) + 0.12 * gNoise(wp * 1.7 + 9.1);
+  if (layer < 1.5) col *= (0.84 + 0.2 * gNoise(wp * 0.55 + 3.3) + 0.12 * gNoise(wp * 1.7 + 9.1)) * vec3(1.18, 1.24, 1.5); // (a pinkish grey under the warm studio light, as in the pictures — not brown)
   gClayCavK = layer < 1.5 ? 1.0 : 0.3;
   if (gGRough < 0.0) gGRough = 0.8; // (the ground's clay is matt: no sheen of the low sun washing it white)
   if ((layer > 2.5 && layer < 3.5) || (layer > 14.5 && layer < 15.5)) {
@@ -889,9 +891,18 @@ ${GROUND_GLSL}`)
     vec2 cq = wp / 0.34 + vec2(gNoise(wp * 0.8), gNoise(wp * 0.8 + 7.0)) * 0.6;
     vec2 cv = gVor(cq);
     float bulge = 1.0 - pow(1.0 - smoothstep(0.0, 0.5, cv.x), 2.0);
-    vec3 stone = vec3(0.17, 0.148, 0.138) * (0.82 + 0.3 * cv.y) * (0.92 + 0.16 * gNoise(wp * 3.0));
-    col = mix(vec3(0.15, 0.125, 0.11), stone, smoothstep(0.03, 0.09, cv.x)) * mix(0.72, 1.0, bulge);
+    vec3 stone = vec3(0.15, 0.138, 0.155) * (0.82 + 0.3 * cv.y) * (0.92 + 0.16 * gNoise(wp * 3.0)); // (warm grey stones under the light, dark joints: the pictures)
+    col = mix(vec3(0.06, 0.052, 0.05), stone, smoothstep(0.035, 0.08, cv.x)) * mix(0.8, 1.0, bulge);
     gGH += 0.026 * bulge;
+  }
+  if (layer > 4.5 && layer < 5.5) {
+    // claymation: the sanded squares and gardens (albero) laid with big flags of sandstone clay, soft joints between —
+    // the third picture's square
+    vec2 aq = wp / 0.75 + vec2(gNoise(wp * 0.9), gNoise(wp * 0.9 + 5.0)) * 0.35;
+    vec2 av = gVor(aq);
+    vec3 flag = vec3(0.84, 0.64, 0.42) * (0.88 + 0.22 * av.y) * (0.94 + 0.12 * gNoise(wp * 2.3));
+    col = mix(vec3(0.42, 0.34, 0.24), flag, smoothstep(0.02, 0.07, av.x));
+    gGH += 0.014 * smoothstep(0.0, 0.25, av.x);
   }
   #endif
   // macro variation

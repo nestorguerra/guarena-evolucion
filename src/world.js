@@ -96,6 +96,7 @@ export class World {
     shared.uNearDist.value = 0;
     // every planned front door / garage / shop front on the street facades (with or without real holes)
     this.facadeGround = facade.ground;
+    this.facadeWindows = facade.groundWin || []; // (claymation only: the ground-floor windows, for pots under them)
     this.facadeDoors = [];
     for (const o of facade.ground) {
       if (o.type !== CT.DOOR) continue;

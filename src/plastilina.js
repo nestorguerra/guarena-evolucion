@@ -53,22 +53,26 @@ export function clayDetailData(S = 1024) {
   const sc = S / 1024;
   // r: a wall's clay, smoothed by hand (the tile is ~2.4 m: a texel ~2.3 mm) — broad dabs and swells, long thumb
   // smears with the ridge they push up, a few pits where it did not fill, the odd fine crack
-  for (let n = 0; n < 500; n++) dab(ch[0], r() * S, r() * S, (50 + r() * 60) * sc, (r() * 1.6 - 0.6) * 0.08);
-  for (let n = 0; n < 2200; n++) dab(ch[0], r() * S, r() * S, (15 + r() * 30) * sc, (r() * 1.4 - 0.4) * 0.1);
-  for (let n = 0; n < 700; n++) {
-    const a = r() * Math.PI * 2, x = r() * S, y = r() * S, w = (10 + r() * 16) * sc, k = 3 + r() * 5, dx = Math.cos(a), dy = Math.sin(a);
-    dab(ch[0], x, y, w, -(0.05 + r() * 0.07), dx, dy, k); // the smear's groove
-    dab(ch[0], x - dy * w * 1.1, y + dx * w * 1.1, w * 0.45, 0.06, dx, dy, k * 1.6); // and the ridge beside it
+  // (2026-10-05, sixth pass: broader and fewer marks — the pictures' walls are smoothed by hand, soft swells a palm to
+  // an arm across, not the crumpled paper the many small dabs made)
+  for (let n = 0; n < 320; n++) dab(ch[0], r() * S, r() * S, (80 + r() * 150) * sc, (r() * 1.6 - 0.6) * 0.08);
+  for (let n = 0; n < 700; n++) dab(ch[0], r() * S, r() * S, (20 + r() * 34) * sc, (r() * 1.4 - 0.4) * 0.06);
+  // (a few broad smears of the thumb, a soft lip beside each: many narrow ones crossing each other read as wrinkles)
+  for (let n = 0; n < 45; n++) {
+    const a = r() * Math.PI * 2, x = r() * S, y = r() * S, w = (28 + r() * 36) * sc, k = 2.5 + r() * 3, dx = Math.cos(a), dy = Math.sin(a);
+    dab(ch[0], x, y, w, -(0.04 + r() * 0.05), dx, dy, k); // the smear's groove
+    dab(ch[0], x - dy * w * 1.1, y + dx * w * 1.1, w * 0.6, 0.025, dx, dy, k * 1.4); // and the soft lip beside it
   }
-  for (let n = 0; n < 900; n++) dab(ch[0], r() * S, r() * S, (1.5 + r() * 3) * sc, -(0.08 + r() * 0.12));
-  for (let n = 0; n < 40; n++) { // fine cracks: short wandering grooves
+  for (let n = 0; n < 250; n++) dab(ch[0], r() * S, r() * S, (1.5 + r() * 3) * sc, -(0.08 + r() * 0.12));
+  for (let n = 0; n < 12; n++) { // fine cracks: short wandering grooves
     let x = r() * S, y = r() * S, a = r() * Math.PI * 2;
     for (let k = 0, L = 30 + r() * 90; k < L; k++) { a += (r() - 0.5) * 0.5; x += Math.cos(a) * 1.5 * sc; y += Math.sin(a) * 1.5 * sc; dab(ch[0], x, y, 1.6 * sc, -0.12); }
   }
   // g: a road's clay
-  for (let n = 0; n < 34000; n++) dab(ch[1], r() * S, r() * S, (1.5 + r() * 4.5) * sc, (r() - 0.45) * 0.3);
-  for (let n = 0; n < 700; n++) dab(ch[1], r() * S, r() * S, (14 + r() * 40) * sc, (r() - 0.5) * 0.12);
-  for (let n = 0; n < 6000; n++) dab(ch[1], r() * S, r() * S, (1.2 + r() * 2.5) * sc, -(0.2 + r() * 0.3));
+  // (sixth pass: smoother — the pictures' road is a smoothed grey clay with hairline cracks, hardly a pore)
+  for (let n = 0; n < 14000; n++) dab(ch[1], r() * S, r() * S, (1.5 + r() * 4.5) * sc, (r() - 0.45) * 0.2);
+  for (let n = 0; n < 900; n++) dab(ch[1], r() * S, r() * S, (14 + r() * 40) * sc, (r() - 0.5) * 0.14);
+  for (let n = 0; n < 1500; n++) dab(ch[1], r() * S, r() * S, (1.2 + r() * 2.5) * sc, -(0.2 + r() * 0.3));
   // b: smoothed clay (puppets, cars)
   for (let n = 0; n < 140; n++) dab(ch[2], r() * S, r() * S, (40 + r() * 80) * sc, -(0.06 + r() * 0.12));
   for (let n = 0; n < 500; n++) dab(ch[2], r() * S, r() * S, (18 + r() * 40) * sc, (r() - 0.5) * 0.08);
@@ -82,7 +86,7 @@ export function clayDetailData(S = 1024) {
     const g = (a, b) => gv[((b % gw) + gw) % gw * gw + ((a % gw) + gw) % gw];
     return (g(ix, iy) * (1 - tx) + g(ix + 1, iy) * tx) * (1 - ty) + (g(ix, iy + 1) * (1 - tx) + g(ix + 1, iy + 1) * tx) * ty;
   };
-  const out = new Uint8Array(S * S * 4), gk = [0.035, 0.05, 0.012, 0.0];
+  const out = new Uint8Array(S * S * 4), gk = [0.02, 0.035, 0.012, 0.0];
   for (let c = 0; c < 4; c++) {
     const F = ch[c];
     let m = 0; for (let i = 0; i < F.length; i++) m += F[i]; m /= F.length;

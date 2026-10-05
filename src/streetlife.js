@@ -118,6 +118,12 @@ export function makeStreetGeometries() {
     paint(at(new THREE.CylinderGeometry(0.04, 0.045, 0.22, 6), 0.1, 0.52, 0), '#4f7a3a'),
     paint(at(new THREE.CylinderGeometry(0.04, 0.045, 0.16, 6), -0.09, 0.46, 0.02), '#4f7a3a'),
   ]);
+  // a little cypress clipped to a cone in a clay pot (claymation: along the house fronts, as in the user's pictures)
+  G.macetaCipres = merged([
+    paint(at(new THREE.CylinderGeometry(0.17, 0.13, 0.3, 9), 0, 0.15, 0), '#b5552e', 0.1, rnd),
+    paint(at(new THREE.SphereGeometry(0.19, 9, 7), 0, 0.44, 0), '#3d6b33', 0.12, rnd),
+    paint(at(new THREE.ConeGeometry(0.2, 0.72, 9), 0, 0.82, 0), '#3d6b33', 0.12, rnd),
+  ]);
   // big concrete planter with a shrub
   G.maceton = merged([paint(at(new THREE.BoxGeometry(0.9, 0.5, 0.9), 0, 0.25, 0), '#b9b3a6', 0.05, rnd), at(flowerBlob(0.5, rnd, '#3f6f35', '#e0c040', 0.08, 0.75), 0, 0.72, 0)]);
   // orange butane cylinder (bombona de butano)
@@ -402,6 +408,19 @@ export function buildStreetLife(world, map, q) {
     if (r() < 0.035) { const [x, z] = P(side * (0.5 + r() * 0.3), 0.45); if (free(x, z, 0.15)) put(r() < 0.6 ? 'gatoSentado' : 'gatoTumbado', x, 0.13, z, ang + (r() - 0.5) * 2, 1, pick(CAT_COLS)); }
   }
   world.frescoSpots = frescoSpots;
+  // (claymation: pots set out under the ground-floor windows too — geraniums, a clipped cypress, an aspidistra — as the
+  // user's pictures have them every few steps along the walls)
+  if (STYLE.plastilina) for (const wd of world.facadeWindows || []) {
+    const r = mulberry32(Math.floor(hash1(Math.floor(wd.x * 29 + wd.z * 13) * 5 + 7) * 1e9));
+    if (r() > 0.45) continue;
+    const tx = -wd.nz, tz = wd.nx, ang = Math.atan2(wd.nx, wd.nz), n = r() < 0.6 ? 1 : 2;
+    for (let i = 0; i < n; i++) {
+      const along = (n === 1 ? (r() - 0.5) * 0.4 : i ? 0.32 : -0.32) * Math.min(1, wd.w), x = wd.x + tx * along + wd.nx * 0.26, z = wd.z + tz * along + wd.nz * 0.26;
+      if (!free(x, z, 0.14) || nearOpening(x, z, 0.1)) continue;
+      put(pick(['macetaGeranio', 'macetaCipres', 'macetaCipres', 'macetaAspidistra', 'macetaGitanilla']), x, 0, z, ang + r() * 6.28, 0.9 + r() * 0.25);
+      stats.doorItems++;
+    }
+  }
 
   // ---- waste containers: add the glass igloo, bags, boxes and litter around each set
   const conts = (world.breakables || []).filter((b) => b.kind === 'cont');

@@ -228,6 +228,15 @@ function frond(ctx, alpha, rnd, col) { // a pinnate palm frond, rachis up the mi
     }
   }
 }
+// claymation: the frond as in the pictures — few fat leaflets of rolled clay, overlapping into one serrated green leaf
+function clayFrond(ctx, alpha, rnd, col) {
+  const S = LT;
+  twig(ctx, alpha, [[S * 0.5, S], [S * 0.5, S * 0.02]], 7, [150, 135, 70]);
+  for (let i = 0; i < 22; i++) {
+    const u = i / 22, y = S * (0.97 - u * 0.93), L = S * 0.47 * Math.sin(Math.PI * (0.12 + u * 0.85)) * (0.9 + rnd() * 0.15);
+    for (const side of [-1, 1]) leaf(ctx, alpha, 'lance', S * 0.5, y, side * (0.85 + rnd() * 0.12), L, 9.5, col, rnd, { vein: 0.15 });
+  }
+}
 function fan(ctx, alpha, rnd, col) { // a fan palm leaf: pleated segments radiating from the stalk
   const S = LT, cx = S * 0.5, cy = S * 0.92;
   twig(ctx, alpha, [[cx, S], [cx, cy]], 5, [150, 120, 70]);
@@ -254,7 +263,7 @@ const LEAF_RECIPES = {
   chopo_a: (c, a, r) => spray(c, a, r, { shape: 'tri', L: 38, W: 16, col: hex('#6f9c42'), under: hex('#b9c7a4'), twigs: 5, per: 6, spread: 0.9, fan: 1.2 }),
   higuera_a: (c, a, r) => scatter(c, a, r, { shape: 'fig', L: 110, W: 56, cols: [hex('#5f8c38'), hex('#6a9a3e')], n: 6, twigs: 3, vein: 0.45 }),
   cipres_a: (c, a, r) => scatter(c, a, r, { shape: 'lance', L: 26, W: 5, cols: [hex('#2d4628'), hex('#355430'), hex('#28402a')], n: 260, twigs: 2, vein: 0 }),
-  palma_hoja: (c, a, r) => frond(c, a, r, hex('#56823a')),
+  palma_hoja: (c, a, r) => (STYLE.plastilina ? clayFrond : frond)(c, a, r, hex('#56823a')),
   abanico: (c, a, r) => fan(c, a, r, hex('#5d8a44')),
   adelfa_rosa: (c, a, r) => { spray(c, a, r, { shape: 'lance', L: 56, W: 6.5, col: hex('#44643a'), twigs: 5, per: 6, spread: 0.6 }); umbels(c, a, r, 4, hex('#e2709a'), 30); },
   adelfa_blanca: (c, a, r) => { spray(c, a, r, { shape: 'lance', L: 56, W: 6.5, col: hex('#44643a'), twigs: 5, per: 6, spread: 0.6 }); umbels(c, a, r, 4, hex('#f4f0e8'), 30); },
@@ -767,7 +776,7 @@ const ANIME_DOTS = { naranjo: [['#f28c1c', 16, 0.075]], limonero: [['#eed63c', 1
 const lin = (h) => hex(h).map((v) => Math.pow(v / 255, 2.2));
 // (claymation: the same greens as plasticine — more saturated; the anime look keeps its own)
 // (claymation: the deep olive greens of modelling clay, as in the user's pictures — darker, a touch warm)
-const clayGreen = (c) => { if (!STYLE.plastilina) return c; const L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; return c.map((v, i) => Math.max(0, (L + (v - L) * 1.0) * 0.47 * [1.12, 1.0, 1.0][i])); };
+const clayGreen = (c) => { if (!STYLE.plastilina) return c; const L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; return c.map((v, i) => Math.max(0, (L + (v - L) * 1.0) * 0.47 * [1.0, 1.12, 1.0][i])); }; // (a fresh green, as the pictures' broccoli trees — olive read as dry)
 const ICO = [];
 function icoMesh(detail) { // a unit icosphere with shared vertices (smooth normals, lumps that stay closed)
   if (ICO[detail]) return ICO[detail];
@@ -833,7 +842,9 @@ function clumps(B, sp, sk, rnd, lod) {
   blob(B, sk.C, crownR * 0.62, sq, col.map((v) => v * 0.82), sk, rnd, lod ? 1 : 2, TILE.copa, 0.25, 0.2);
   cs.forEach((c, i) => {
     const vk = 0.9 + rnd() * 0.2 + (c[1] > sk.C[1] ? 0.06 : -0.04);
-    blob(B, c, rc * (0.9 + rnd() * 0.4), sq * (0.85 + rnd() * 0.2), col.map((v) => v * vk), sk, rnd, lod ? 1 : STYLE.plastilina ? 2 : 3, i % 3 ? TILE.copa : TILE.copa_b, 0.45, STYLE.plastilina ? 0.2 : 0.26);
+    // (claymation: each ball round, as rolled between the palms — squashed with a wide crown they read as pillows)
+    const sb = STYLE.plastilina && !lod ? Math.max(sq, 0.92) : sq;
+    blob(B, c, rc * (0.9 + rnd() * 0.4), sb * (0.85 + rnd() * 0.2), col.map((v) => v * vk), sk, rnd, lod ? 1 : STYLE.plastilina ? 2 : 3, i % 3 ? TILE.copa : TILE.copa_b, 0.45, STYLE.plastilina ? 0.2 : 0.26);
   });
   // fruit, flowers: little balls sitting on the clumps
   if (!lod && ANIME_DOTS[name]) for (const [h, n, r] of ANIME_DOTS[name]) {
@@ -912,10 +923,10 @@ function buildPalm(sp, rnd, lod) {
   const pts = [], rad = [];
   for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push([Math.sin(az) * bend * t * t * H, t * H, Math.cos(az) * bend * t * t * H]); rad.push(r * (1.12 - 0.12 * t + (i === 8 ? 0.15 : 0))); }
   tube(bark, { pts, rad, depth: 0, flare: 1.25 }, lod ? 8 : 12, BARK[sp.bark], tint3(sp.barkTint), sk, 0.2);
-  const top = pts[8], nF = Math.round(R(rnd, sp.fronds) * (lod ? 0.5 : 1)), tile = TILE.palma_hoja, [u0, v0, du, dv] = tileRect(tile);
+  const top = pts[8], nF = Math.round(R(rnd, sp.fronds) * (lod ? 0.5 : 1) * (STYLE.plastilina ? 0.6 : 1)), tile = TILE.palma_hoja, [u0, v0, du, dv] = tileRect(tile); // (claymation: fewer, fatter fronds)
   for (let f = 0; f < nF; f++) {
     const a = f * 2.39996 + rnd() * 0.3, e = 1.1 - (f / nF) * 1.55 + (rnd() - 0.5) * 0.2; // young fronds up, old ones hang
-    const L = R(rnd, sp.frondL) * (1 - 0.15 * (f / nF)), Wd = R(rnd, sp.frondW) * (lod ? 1.3 : 1);
+    const L = R(rnd, sp.frondL) * (1 - 0.15 * (f / nF)), Wd = R(rnd, sp.frondW) * (lod ? 1.3 : 1) * (STYLE.plastilina ? 1.25 : 1);
     let d = nrm([Math.sin(a) * Math.cos(e), Math.sin(e), Math.cos(a) * Math.cos(e)]);
     const side = nrm(cross([0, 1, 0], d));
     let p = add(top, scl(d, r * 0.6));

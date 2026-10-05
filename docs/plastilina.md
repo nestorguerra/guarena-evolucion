@@ -229,3 +229,52 @@ Colores medidos (zona central de cada imagen, media de la imagen / saturación /
 
 Diferencias que quedan, porque son del pueblo y no de la estética: Guareña tiene sus casas de dos y tres plantas y
 su iglesia real (no la de la imagen), y el protagonista de la Evolución es Álex.
+
+## 10. Sexta pasada: medir cada superficie contra las referencias
+
+Medido el 5 de octubre de 2026, con `tools/refcompare.js` y parches de cada superficie (la calzada, una pared al sol,
+la acera, los adoquines). Las imágenes del juego se toman con todo cargado: la primera captura tras empezar salía con
+la calzada mucho más oscura, (73,55,45) frente a (111,91,78), y las pasadas anteriores la midieron así. La vista de la
+iglesia se toma ahora desde el sitio de la tercera imagen: al este de la plaza, con la torre redonda y el campanario a
+la izquierda y la palmera a la derecha.
+
+| Superficie | Referencia | Antes | Ahora |
+|---|---|---|---|
+| Calzada (calle estrecha) | (126,108,104), sat. 0,17 | (111,92,79), sat. 0,29, parda | (125,106,104), sat. 0,17 |
+| Calzada (calle ancha) | (138,123,117) | (121,100,86) | (136,117,113) |
+| Pared al sol | (215,191,163), tono 32° | (239,225,199), casi blanca, 39° | (222,194,162), 32° |
+| Acera | (216,191,163) | (210,187,144), amarilla | (212,189,156) |
+| Adoquines | (139,123,117), gris con juntas oscuras | (151,129,108), pardos con juntas claras | (141,122,114) |
+
+| Vista | Referencia: luminancia / contraste / saturación | Juego |
+|---|---|---|
+| Calle estrecha | 145,9 / 51,5 / 0,283 | 153,1 / 47,3 / 0,300 |
+| Calle ancha | 146,1 / 45,2 / 0,285 | 149,1 / 45,5 / 0,290 |
+| Iglesia | 153,8 / 37,8 / 0,323 | 157,7 / 36,2 / 0,290 |
+
+Qué se cambió:
+- **Calzada y adoquines:**
+  - Gris rosado, como la arcilla de las imágenes (`materials.js`). Bajo la luz cálida del estudio, el gris neutro
+    salía pardo.
+  - Menos poros (la textura `g` de `clayDetailData` y `CLAY_CAV` 0,25).
+  - Los adoquines de las plazas, grises con juntas oscuras.
+- **Paredes:**
+  - El encalado de color crema (el tinte depende de lo claro que sea el color: las bandas de color y las puertas se
+    quedan como estaban).
+  - Su modelado, sin «papel arrugado». Lo provocaban cientos de restregones estrechos de dedo, con su surco y su
+    reborde, que se cruzaban. Ahora son 45 anchos y suaves, y hay bultos grandes de un palmo a un brazo
+    (`clayDetailData` canal `r`).
+  - Las marcas, más tranquilas: `CLAY_RELIEF` 1,6 y `CLAY_TONE` 1,8.
+- **Aceras:** losas de arena menos amarillas.
+- **Albero de plazas y jardines:** losas grandes de arenisca de plastilina con su junta, como la plaza de la iglesia.
+- **Árboles:** cada bola redonda (aplastadas, en las copas anchas, parecían almohadas) y de un verde fresco, en vez de
+  oliva.
+- **Palmera:** menos frondas, más anchas, de hojuelas gordas de plastilina.
+- **Iglesia:**
+  - Piedras de colores variados (ocre, crema, naranja, pardo, gris) con la junta clara.
+  - El cono de tejas del ábside, más alto y con sus tejas a tamaño: tapa el piñón de piedra de la nave, que asomaba
+    como un cono de piedra.
+- **Macetas:** también bajo las ventanas de la planta baja, con geranios, cipresitos recortados en tiesto de barro y
+  aspidistras, en casi la mitad de ellas (`buildings.js` registra las ventanas bajas solo en la Plastilina).
+
+Rendimiento: igual que antes (14–19 ms por imagen a 1280×720 en este Mac, con y sin la pasada, medido igual).
