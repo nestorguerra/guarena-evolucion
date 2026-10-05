@@ -59,7 +59,7 @@ export function arrayTexture(data, size, layers, { srgb = true, aniso = 8 } = {}
 export function makeBuildingMaterial(facadeTex, detail = null) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0.0, side: THREE.DoubleSide });
   if (STYLE.anime) m.defines = { ANIME: '' };
-  else if (STYLE.plastilina) m.defines = { DIORAMA: '', CLAY: '', CLAY_RELIEF: '2.3', CLAY_TONE: '2.8', CLAY_SET: '0', CLAY_TILE: '2.4', CLAY_AMP: '0.035', CLAY_CAV: '0.34' }; // (a set: worked hard by hand; its marks in the colour too, for the shade and the whitewash)
+  else if (STYLE.plastilina) m.defines = { DIORAMA: '', CLAY: '', CLAY_RELIEF: '2.3', CLAY_TONE: '2.8', CLAY_SET: '0', CLAY_TILE: '2.4', CLAY_AMP: '0.06', CLAY_CAV: '0.12' }; // (a set: worked hard by hand; its marks in the colour too, for the shade and the whitewash)
   else if (STYLE.diorama) m.defines = { DIORAMA: '' };
   const dOn = detail && detail.on ? 1 : 0;
   const nOn = detail && detail.on && detail.normals ? 1 : 0;
@@ -162,6 +162,12 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
   bool paneLayer = kind < 0.5 && (lt < 1.5 || (lt > 2.5 && lt < 4.5) || lt > 6.5);
   gGlass = paneLayer ? step(0.3, tx.a) * (1.0 - wallMask) : 0.0;
   vec3 col = mix(tx.rgb, tx.rgb * vTint, wallMask);
+  #ifdef CLAY
+  if (!isRoof && wallMask > 0.5) { // (claymation: one clean piece of clay — the paint's damp stains and grime smoothed away)
+    vec4 txm = textureLod(uFacade, vec3(fuv, layer), 4.0);
+    col = mix(col, txm.rgb * vTint, 0.7 * smoothstep(0.86, 0.98, txm.a));
+  }
+  #endif
   if (isRoof) col *= vTint; // roofs: tint variation
   // ---- photo-scanned detail (CC0): modulates painted walls, replaces brick/stone/tiles
   gDetK = 0.0; gDetL = 0.0; gDetUV = vec2(0.0);
@@ -331,7 +337,7 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
   #endif
   diffuseColor.rgb *= col;
   #ifdef CLAY
-  if (!isRoof) diffuseColor.rgb *= vec3(0.95, 0.85, 0.72); // (claymation: the whitewash is cream-coloured clay, warm as in the user's pictures)
+  if (!isRoof) diffuseColor.rgb *= vec3(0.93, 0.83, 0.72); // (claymation: the whitewash is cream-coloured clay, warm as in the user's pictures)
   #endif
   float isShop = lt > 6.5 ? 1.0 : 0.0;
   float litChance = isShop > 0.5 ? 0.7 : uNightLit;
@@ -520,7 +526,7 @@ mat3 gCotangent(vec3 N, vec3 p, vec2 uv) {
 
 export function makeGroundMaterial(groundTex, { polygonOffset = 0, roughness = 0.95, transparentEdges = false, fx = null } = {}) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness, metalness: 0 });
-  if (STYLE.diorama) m.defines = STYLE.plastilina ? { DIORAMA: '', CLAY_RELIEF: '1.8', CLAY_TONE: '2.0', CLAY_SET: '0', CLAY_TILE: '3.4', CLAY_AMP: '0.016', CLAY_CAV: '0.34' } : { DIORAMA: '' }; // (the ground smoothed by hand at a model's scale — broad dents and swells, as in the user's pictures)
+  if (STYLE.diorama) m.defines = STYLE.plastilina ? { DIORAMA: '', CLAY_RELIEF: '1.8', CLAY_TONE: '2.0', CLAY_SET: '1', CLAY_TILE: '6.0', CLAY_AMP: '0.02', CLAY_CAV: '0.45' } : { DIORAMA: '' }; // (the ground's clay crumbly at a model's scale, as in the user's pictures)
   if (polygonOffset) {
     m.polygonOffset = true;
     m.polygonOffsetFactor = -polygonOffset;
@@ -611,7 +617,7 @@ ${GROUND_GLSL}`)
     float cr = smoothstep(hw - 0.12 - 0.22 * gNoise(vec2(s * 1.3, eid)), hw, at) * (0.25 + dmg);
     #ifdef CLAY_RELIEF
     // (claymation: the road's clay meets the kerb clean, in the kerb's soft shadow — the pale dust read as a glow)
-    col *= 1.0 - 0.22 * smoothstep(hw - 0.35, hw - 0.02, at);
+    col *= 1.0 - 0.3 * smoothstep(hw - 0.22, hw - 0.01, at);
     cr = 0.0;
     #else
     col = mix(col, col * vec3(0.93, 0.87, 0.76) * (0.82 + 0.3 * gNoise(wp * 6.0)), gut * 0.65);
@@ -852,21 +858,27 @@ ${GROUND_GLSL}`)
     gGH = 0.11 * (1.0 - onFace) * (1.0 - ramp * 0.8);
     gGRough = paint > 0.5 ? 0.6 : 0.85;
     #ifdef CLAY_RELIEF
-    { // claymation: the kerb in blocks of cream clay half a metre long, each rounded at its ends and along its top, a
-      // dark gap between them (the user's pictures)
+    { // claymation: the kerb in fat blocks of pale grey clay half a metre long, each rounded at its ends and along its
+      // top, a dark gap between them — and painted as raised: its face (towards the road) in shade, its rounded top
+      // edge catching the light, its shadow on the road (the user's pictures)
       float bi = floor(s / 0.5), be = min(fract(s / 0.5), 1.0 - fract(s / 0.5)) * 0.5;
-      float gap = 1.0 - smoothstep(0.004, 0.016, be);
-      vec3 cc = vec3(0.86, 0.79, 0.68) * (0.9 + 0.14 * gHash2(vec2(bi, 5.0)));
-      col = cc * mix(1.0, 0.6, onFace) * (1.0 - 0.6 * gap);
+      float gap = 1.0 - smoothstep(0.006, 0.02, be);
+      float fw = mix(0.13, 0.03, ramp);                                       // (the face, seen from the road)
+      float f = 1.0 - smoothstep(fw - 0.01, fw + 0.01, t);
+      float lip = smoothstep(fw, fw + 0.03, t) * (1.0 - smoothstep(fw + 0.03, fw + 0.09, t)); // (the rounded top edge)
+      vec3 cc = vec3(0.8, 0.77, 0.71) * (0.9 + 0.14 * gHash2(vec2(bi, 5.0)));
+      col = cc * mix(1.0, mix(0.38, 0.62, t / max(fw, 1e-3)), f) * (1.0 + 0.16 * lip) * (1.0 - 0.65 * gap);
       col = mix(col, vec3(0.92, 0.74, 0.08), paint * 0.9);
-      gGH = 0.11 * (1.0 - onFace) * (1.0 - ramp * 0.8) * (1.0 - 0.6 * gap) + 0.025 * smoothstep(0.0, 0.07, be) * smoothstep(face, face + 0.06, t);
+      gGH = 0.11 * (1.0 - f) * (1.0 - ramp * 0.8) * (1.0 - 0.6 * gap) + 0.025 * smoothstep(0.0, 0.07, be) * smoothstep(fw, fw + 0.06, t);
       gGRough = 0.8;
     }
     #endif
   }
   #ifdef CLAY_RELIEF
-  // claymation: the road's clay smoothed by hand in patches — lighter and darker smears half a metre to two across
+  // claymation: the road's clay smoothed by hand in patches — lighter and darker smears half a metre to two across;
+  // its crumbs and pits on the road only (slabs and kerbs are smoother pieces)
   if (layer < 1.5) col *= 0.84 + 0.2 * gNoise(wp * 0.55 + 3.3) + 0.12 * gNoise(wp * 1.7 + 9.1);
+  gClayCavK = layer < 1.5 ? 1.0 : 0.3;
   if ((layer > 2.5 && layer < 3.5) || (layer > 14.5 && layer < 15.5)) {
     // claymation: the squares paved with rounded clay cobbles (the user's pictures) — each its own warm grey, swelling
     // from a sandy joint

@@ -11,7 +11,7 @@ const step = (n, dt = 1 / 30) => { const g = G(); for (let i = 0; i < n; i++) { 
 export async function spots() {
   const g = G(), map = g.map, tmp = {};
   const v = await views();
-  const out = [{ name: 'Calle estrecha', x: v[1].x, z: v[1].z, h: v[1].h, hour: 12.25, pitch: -0.13 }];
+  const out = [{ name: 'Calle estrecha', x: v[1].x, z: v[1].z, h: v[1].h, hour: 12.25, pitch: -0.18 }];
   // a wider street of the centre with lane lines and cars parked along it
   const P = g.world.landmarks.poi.plaza;
   let best = null;
@@ -25,11 +25,11 @@ export async function spots() {
     const score = (cover / Math.max(1, n)) * 100 - d * 0.05;
     if (!best || score > best.score) best = { e, score };
   }
-  if (best) { map.sample(best.e, Math.min(20, best.e.len * 0.25), tmp); out.push({ name: 'Calle ancha', street: best.e.name, x: tmp.x, z: tmp.z, h: Math.atan2(tmp.dx, tmp.dz), hour: 12.7, pitch: -0.1 }); }
+  if (best) { map.sample(best.e, Math.min(20, best.e.len * 0.25), tmp); out.push({ name: 'Calle ancha', street: best.e.name, x: tmp.x, z: tmp.z, h: Math.atan2(tmp.dx, tmp.dz), hour: 12.7, pitch: -0.18 }); }
   // (the open square east of the tower, where «Santa María» is always photographed from)
   const t = g.world.landmarks.poi.churchTower || { x: -180.5, z: -38.1 };
   const ax = t.x + 40, az = t.z + 7;
-  out.push({ name: 'Iglesia', x: ax, z: az, h: Math.atan2(t.x - ax, t.z - az), hour: 13.0, pitch: 0.02 });
+  out.push({ name: 'Iglesia', x: ax, z: az, h: Math.atan2(t.x - ax, t.z - az), hour: 13.0, pitch: -0.18 });
   return out;
 }
 

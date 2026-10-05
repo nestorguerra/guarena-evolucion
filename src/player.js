@@ -739,8 +739,8 @@ export class CameraRig {
       // (claymation: the miniature street seen from above and further back through a longer lens, the puppet small in
       // the middle of its set — the user's reference pictures)
       const clay = STYLE.plastilina && !aim;
-      if (clay && !p.knock && p.mode !== 'swim' && p.mode !== 'sit') ty -= 0.32;
-      this.footDist = damp(this.footDist ?? this.dist, aim ? 2.2 : an ? this.dist * 0.8 : clay ? this.dist * 1.35 : this.dist, 9, dt);
+      if (clay && !p.knock && p.mode !== 'swim' && p.mode !== 'sit') ty += 0.2;
+      this.footDist = damp(this.footDist ?? this.dist, aim ? 2.2 : an ? this.dist * 0.8 : clay ? this.dist * 1.25 : this.dist, 9, dt);
       dist = this.footDist;
       if (aim) fovT = 50; else if (clay) fovT = 50;
       // shoulder offset to the right (more while aiming)
@@ -767,7 +767,7 @@ export class CameraRig {
     }
     this.fov = damp(this.fov, fovT, fovT < 55 ? 9 : 3, dt);
     // camera position on a sphere behind the target (yaw points from target to camera)
-    const pe = STYLE.plastilina && !(g.weapons && g.weapons.aiming) ? clamp(this.pitch - 0.1, -1.2, 0.5) : this.pitch; // (claymation: looking down on the set a little)
+    const pe = STYLE.plastilina && !(g.weapons && g.weapons.aiming) && !(p.mode === 'car' || rideV) ? clamp(this.pitch + 0.06, -1.2, 0.5) : this.pitch; // (claymation: a street-level look along the set, as in the user's pictures)
     const cp = Math.cos(pe);
     let cx = tx + Math.sin(this.yaw) * cp * dist, cz = tz + Math.cos(this.yaw) * cp * dist, cy = ty - Math.sin(pe) * dist;
     const inn = g.interior;

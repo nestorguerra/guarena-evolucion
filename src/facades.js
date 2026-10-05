@@ -350,7 +350,7 @@ function buildingStyle(o) {
   bs.stone = D && o.style !== 'piedra' ? C.sandstone : C.granite;
   if (D && bs.sill === C.marble) bs.sill = C.sandSill;
   bs.recercado = !bs.surround && (trad || o.style === 'color') && r() < 0.35 ? hexC(pickR(r, D ? RECERCADO_D : RECERCADO)) : null;
-  bs.pots = (trad || o.style === 'renovada' || o.style === 'color' || o.style === 'piedra') ? (LOOK.plastilina ? 0.72 : 0.45) : (LOOK.plastilina ? 0.25 : 0.12);
+  bs.pots = (trad || o.style === 'renovada' || o.style === 'color' || o.style === 'piedra') ? (LOOK.plastilina ? 0.88 : 0.45) : (LOOK.plastilina ? 0.6 : 0.12); // (claymation: geraniums on most sills, as in the user's pictures)
   bs.shutters = trad || o.style === 'piedra';
   bs.curtain = hexC(pickR(r, CURTAINS));
   bs.pipe = r() < 0.6 ? C.pipe : r() < 0.5 ? hexC('#e8e8e4') : hexC('#a65a3a');

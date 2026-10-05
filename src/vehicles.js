@@ -650,7 +650,7 @@ float wn(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
       diffuseColor.rgb = mix(diffuseColor.rgb, grn * 1.4, sd * step(0.66, y) * step(y, 0.72) * step(-1.2, z) * step(z, 1.6));
     }
   }
-  float wear = vWear;
+  float wear = vWear${STYLE.plastilina ? ' * 0.0' : ''}; // (claymation: a clay car is never rusty nor faded)
   float n1 = wn(vOP * 3.1), n2 = wn(vOP * 11.0 + 7.0);
   // sun: faded, chalky on the flat tops
   float top = smoothstep(0.55, 0.95, vON.y);

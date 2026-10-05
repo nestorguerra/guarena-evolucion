@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { GROUND, GROUND_SCALE } from './textures.js';
 import { offsetPolyline, mulberry32, hash1, hash2, ringArea, pointInRing, polySample, clamp, orientedRect } from './util.js';
+import { STYLE } from './style.js';
+const KW = () => (STYLE.plastilina ? 0.42 : 0.28); // the kerb's width (claymation: fat blocks, as in the user's pictures)
 
 // Parking lots (like the one by Santa María): rows of 2.5 x 5 m bays along the lot's long side, 6 m aisles between
 // back-to-back rows. Computed once; the painted lines and the parked cars both use them.
@@ -90,8 +92,8 @@ export class GroundBuilder {
     const s = GROUND_SCALE[layer] || 5;
     const i0 = this.n;
     for (let i = 0; i < n; i++) {
-      this.vert(inner[i * 2], y, inner[i * 2 + 1], inner[i * 2] / s, inner[i * 2 + 1] / s, layer, tint, [along[i], 0, 0.28, flags[i]]);
-      this.vert(outer[i * 2], y, outer[i * 2 + 1], outer[i * 2] / s, outer[i * 2 + 1] / s, layer, tint, [along[i], 0.28, 0.28, flags[i]]);
+      this.vert(inner[i * 2], y, inner[i * 2 + 1], inner[i * 2] / s, inner[i * 2 + 1] / s, layer, tint, [along[i], 0, KW(), flags[i]]);
+      this.vert(outer[i * 2], y, outer[i * 2 + 1], outer[i * 2] / s, outer[i * 2 + 1] / s, layer, tint, [along[i], KW(), KW(), flags[i]]);
     }
     for (let i = 0; i < n - 1; i++) {
       const a = i0 + i * 2, b = a + 1, c = a + 2, d = a + 3;
@@ -350,7 +352,7 @@ export function buildGround(map, materials, opts = {}) {
       const cum = [0];
       for (let i = 2; i < dp.length; i += 2) cum.push(cum[cum.length - 1] + Math.hypot(dp[i] - dp[i - 2], dp[i + 1] - dp[i - 1]));
       for (const side of [1, -1]) {
-        const inner = offsetPolyline(dp, side * hw), outer = offsetPolyline(dp, side * (hw + 0.28));
+        const inner = offsetPolyline(dp, side * hw), outer = offsetPolyline(dp, side * (hw + KW()));
         const flags = new Float32Array(inner.length / 2);
         for (let i = 0; i < flags.length; i++) flags[i] = curbRamp(inner[i * 2], inner[i * 2 + 1], ramps);
         trimStrip(inner, outer, e, map, (a, b, idx) => curbs.curbStrip(a, b, idx.map((k) => cum[k]), idx.map((k) => flags[k]), 0, GROUND.bordillo, [1, 1, 1]));

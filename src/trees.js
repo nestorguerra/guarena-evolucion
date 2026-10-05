@@ -791,7 +791,7 @@ function blob(B, c, r, sq, col, sk, rnd, detail, tile, flexK, lump = 0.34, box =
       const e = box.n, q = Math.pow(Math.pow(Math.abs(d[0]), e) + Math.pow(Math.abs(d[1]), e) + Math.pow(Math.abs(d[2]), e), -1 / e);
       P = [c[0] + d[0] * q * box.h[0] * kk, c[1] + d[1] * q * box.h[1] * kk, c[2] + d[2] * q * box.h[2] * kk];
     }
-    const own = STYLE.plastilina && detail <= 2 && sk.C ? 0.8 : 0.5; // (claymation: each ball shaded as a ball — they read one by one)
+    const own = STYLE.plastilina && detail <= 2 && sk.C ? 0.7 : 0.5; // (claymation: each ball shaded as a ball — they read one by one)
     const n = nrm(add(scl(d, own), scl(nrm(sub(P, cc)), 1 - own)));
     const dd = sk.C ? ellD(P, sk.C, sk.Rr) : 1;
     const ao = (0.62 + 0.38 * sstep(0.2, 1.0, dd)) * (0.86 + 0.14 * (0.5 + 0.5 * d[1]));
@@ -833,7 +833,7 @@ function clumps(B, sp, sk, rnd, lod) {
   blob(B, sk.C, crownR * 0.62, sq, col.map((v) => v * 0.82), sk, rnd, lod ? 1 : 2, TILE.copa, 0.25, 0.2);
   cs.forEach((c, i) => {
     const vk = 0.9 + rnd() * 0.2 + (c[1] > sk.C[1] ? 0.06 : -0.04);
-    blob(B, c, rc * (0.9 + rnd() * 0.4), sq * (0.85 + rnd() * 0.2), col.map((v) => v * vk), sk, rnd, lod ? 1 : STYLE.plastilina ? 2 : 3, i % 3 ? TILE.copa : TILE.copa_b, 0.45, STYLE.plastilina ? 0.12 : 0.26);
+    blob(B, c, rc * (0.9 + rnd() * 0.4), sq * (0.85 + rnd() * 0.2), col.map((v) => v * vk), sk, rnd, lod ? 1 : STYLE.plastilina ? 2 : 3, i % 3 ? TILE.copa : TILE.copa_b, 0.45, STYLE.plastilina ? 0.2 : 0.26);
   });
   // fruit, flowers: little balls sitting on the clumps
   if (!lod && ANIME_DOTS[name]) for (const [h, n, r] of ANIME_DOTS[name]) {

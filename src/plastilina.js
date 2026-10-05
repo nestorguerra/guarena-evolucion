@@ -14,7 +14,7 @@ import * as THREE from 'three';
 export const PLASTILINA = {
   fps: 12, // poses per second (animation «on twos»)
   // the last grade: clay colours are pure, the studio fills the shadows a little, the lens darkens its corners a touch
-  grade: { sat: 1.2, warm: 0.045, contrast: 1.1, lift: 0.025, vignette: 0.16 }, // (richer, as the user's pictures)
+  grade: { sat: 1.1, warm: 0.045, contrast: 1.1, lift: 0.025, vignette: 0.16, tint: [1.0, 0.955, 0.95] }, // (richer and rosier, as the user's pictures)
   flicker: 0.014, // the studio lamps' little flicker from one pose to the next (the frames of a stop-motion film never match)
   // the lens: how soft the far background goes at most (a fraction of the picture's height) and from how far behind the
   // subject it starts and is at its softest (× the subject's distance). Only a little: the user asked for it gentler
@@ -53,14 +53,14 @@ export function clayDetailData(S = 1024) {
   const sc = S / 1024;
   // r: a wall's clay, smoothed by hand (the tile is ~2.4 m: a texel ~2.3 mm) — broad dabs and swells, long thumb
   // smears with the ridge they push up, a few pits where it did not fill, the odd fine crack
-  for (let n = 0; n < 900; n++) dab(ch[0], r() * S, r() * S, (30 + r() * 70) * sc, (r() * 1.6 - 0.6) * 0.12);
-  for (let n = 0; n < 1400; n++) dab(ch[0], r() * S, r() * S, (12 + r() * 26) * sc, (r() * 1.6 - 0.5) * 0.08);
+  for (let n = 0; n < 500; n++) dab(ch[0], r() * S, r() * S, (50 + r() * 60) * sc, (r() * 1.6 - 0.6) * 0.08);
+  for (let n = 0; n < 2200; n++) dab(ch[0], r() * S, r() * S, (15 + r() * 30) * sc, (r() * 1.4 - 0.4) * 0.1);
   for (let n = 0; n < 700; n++) {
     const a = r() * Math.PI * 2, x = r() * S, y = r() * S, w = (10 + r() * 16) * sc, k = 3 + r() * 5, dx = Math.cos(a), dy = Math.sin(a);
     dab(ch[0], x, y, w, -(0.05 + r() * 0.07), dx, dy, k); // the smear's groove
     dab(ch[0], x - dy * w * 1.1, y + dx * w * 1.1, w * 0.45, 0.06, dx, dy, k * 1.6); // and the ridge beside it
   }
-  for (let n = 0; n < 2200; n++) dab(ch[0], r() * S, r() * S, (1.5 + r() * 3) * sc, -(0.12 + r() * 0.2));
+  for (let n = 0; n < 900; n++) dab(ch[0], r() * S, r() * S, (1.5 + r() * 3) * sc, -(0.08 + r() * 0.12));
   for (let n = 0; n < 40; n++) { // fine cracks: short wandering grooves
     let x = r() * S, y = r() * S, a = r() * Math.PI * 2;
     for (let k = 0, L = 30 + r() * 90; k < L; k++) { a += (r() - 0.5) * 0.5; x += Math.cos(a) * 1.5 * sc; y += Math.sin(a) * 1.5 * sc; dab(ch[0], x, y, 1.6 * sc, -0.12); }
@@ -179,7 +179,7 @@ vec4 clayDetail(vec3 p, vec3 n) { // from the three sides, blended by how the su
   if (w.z > 0.02) t += texture2D(uClayTex, p.xy + 0.71) * w.z;
   return t / max(w.x * step(0.02, w.x) + w.y * step(0.02, w.y) + w.z * step(0.02, w.z), 1e-4);
 }
-vec2 gClaySlope; float gClayDark;
+vec2 gClaySlope; float gClayDark; float gClayCavK = 1.0;
 float clayHash(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
 float clayNoise(vec3 p) {
   vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -273,7 +273,7 @@ vec3 clayPerturb(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection)
   vec2 dlr = dl / CLAY_SCALE;
   gClaySlope = clamp(vec2(dFdx(cl.x), dFdy(cl.x)) / max(dl, vec2(1e-5)) * CLAY_RELIEF + vec2(dFdx(chm), dFdy(chm)) / max(dlr, vec2(1e-5)), -0.85, 0.85); // (the sets: CLAY_RELIEF, worked harder)
   gClayDark = cl.y;
-  diffuseColor.rgb *= (1.0 - CLAY_CAV * smoothstep(0.5, 0.12, cset) - CLAY_CAV * 0.5 * smoothstep(0.5, 0.2, ctx.a)) * (1.0 + CLAY_CAV * 0.25 * smoothstep(0.55, 0.85, cset));
+  diffuseColor.rgb *= (1.0 - CLAY_CAV * gClayCavK * (smoothstep(0.5, 0.12, cset) + 0.5 * smoothstep(0.5, 0.2, ctx.a))) * (1.0 + CLAY_CAV * gClayCavK * 0.25 * smoothstep(0.55, 0.85, cset));
   // the colour never quite even: kneaded by hand, a little marbled
   float mb = clayNoise(vec3(cp.x * 1.1, cp.y * 2.2, cp.z * 1.1) + 3.1);
   diffuseColor.rgb *= (0.95 + 0.1 * mb * CLAY_TONE) * (1.0 - cl.y * CLAY_TONE);

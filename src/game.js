@@ -221,7 +221,7 @@ export class Game {
       this.composer.addPass(this.grade);
       if (STYLE.plastilina) { // (claymation: pure clay colours, the studio's fill in the shadows, a touch of lens)
         const G = PLASTILINA.grade, U = this.grade.uniforms;
-        U.uSat.value = G.sat; U.uWarm.value = G.warm; U.uContrast.value = G.contrast; U.uLift.value = G.lift; U.uVignette.value = G.vignette;
+        U.uSat.value = G.sat; U.uWarm.value = G.warm; U.uContrast.value = G.contrast; U.uLift.value = G.lift; U.uVignette.value = G.vignette; if (G.tint && U.uTint) U.uTint.value = new THREE.Vector3(...G.tint);
         this.setStopMotion(this.save.stopMotion);
         if (this.qKey !== 'baja') this.lens = [0, 1].map((k) => { // (the far background a little soft, as through a real lens)
           const pass = new ShaderPass(ClayLens), pr = pass.render.bind(pass);
@@ -792,6 +792,7 @@ export class Game {
       this.bloom.strength = lerp(0.05, 0.6, night);
       this.bloom.threshold = lerp(1.8, 0.85, night);
       this.bloom.radius = lerp(0.3, 0.6, night);
+      if (STYLE.plastilina) { this.bloom.strength = lerp(0.14, 0.6, night); this.bloom.threshold = lerp(0.95, 0.85, night); this.bloom.radius = lerp(0.75, 0.6, night); } // (claymation: the soft halation of a photographed set)
     }
     // claymation: the puppets not due a new pose are drawn as they were at the last one (the player keeps its place);
     // at each pose the lamps flicker a hair

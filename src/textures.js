@@ -694,8 +694,8 @@ function drawGroundLayer(name, S, seed) {
     case 'asphalt2': {
       // (the diorama's asphalt: a warm grey, darker, its grain finer)
       const D = STYLE.diorama, PL = STYLE.plastilina; // (claymation: a warm, faintly pink grey clay, as in the user's pictures)
-      base(name === 'asphalt' ? (PL ? '#978179' : D ? '#6c675f' : '#7c7a76') : (PL ? '#8f7a72' : D ? '#655f58' : '#696866'));
-      speckle(ctx, S, rnd, S * S * 0.22, D ? ['#58544d', '#7a746b', '#857e74', '#504c46', '#766d62'] : ['#5f5d59', '#8e8b85', '#9c9892', '#55534f', '#857d74'], 0.6, 1.6, 0.6);
+      base(name === 'asphalt' ? (PL ? '#7b716c' : D ? '#6c675f' : '#7c7a76') : (PL ? '#746a65' : D ? '#655f58' : '#696866'));
+      speckle(ctx, S, rnd, S * S * (PL ? 0.1 : 0.22), PL ? ['#5d5450', '#665c57', '#4f4744'] : D ? ['#58544d', '#7a746b', '#857e74', '#504c46', '#766d62'] : ['#5f5d59', '#8e8b85', '#9c9892', '#55534f', '#857d74'], 0.6, 1.6, 0.6); // (claymation: no light specks — the clay is one grey)
       grain(ctx, S, seed, 0.12, 5, 3);
       if (name === 'asphalt') {
         // patches & cracks
