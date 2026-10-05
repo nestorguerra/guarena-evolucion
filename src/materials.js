@@ -888,11 +888,11 @@ ${GROUND_GLSL}`)
   if ((layer > 2.5 && layer < 3.5) || (layer > 14.5 && layer < 15.5)) {
     // claymation: the squares paved with rounded clay cobbles (the user's pictures) — each its own warm grey, swelling
     // from a sandy joint
-    vec2 cq = wp / 0.34 + vec2(gNoise(wp * 0.8), gNoise(wp * 0.8 + 7.0)) * 0.6;
+    vec2 cq = wp / 0.24 + vec2(gNoise(wp * 0.8), gNoise(wp * 0.8 + 7.0)) * 0.6; // (stones of a palm and a half, as the pictures' squares)
     vec2 cv = gVor(cq);
     float bulge = 1.0 - pow(1.0 - smoothstep(0.0, 0.5, cv.x), 2.0);
-    vec3 stone = vec3(0.15, 0.138, 0.155) * (0.82 + 0.3 * cv.y) * (0.92 + 0.16 * gNoise(wp * 3.0)); // (warm grey stones under the light, dark joints: the pictures)
-    col = mix(vec3(0.06, 0.052, 0.05), stone, smoothstep(0.035, 0.08, cv.x)) * mix(0.8, 1.0, bulge);
+    vec3 stone = vec3(0.15, 0.138, 0.155) * (0.82 + 0.3 * cv.y) * (0.92 + 0.16 * gNoise(wp * 3.0)); // (warm grey stones under the light, darker joints: the pictures)
+    col = mix(vec3(0.095, 0.085, 0.085), stone, smoothstep(0.025, 0.065, cv.x)) * mix(0.87, 1.0, bulge);
     gGH += 0.026 * bulge;
   }
   if (layer > 4.5 && layer < 5.5) {

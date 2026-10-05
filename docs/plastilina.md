@@ -278,3 +278,30 @@ Qué se cambió:
   aspidistras, en casi la mitad de ellas (`buildings.js` registra las ventanas bajas solo en la Plastilina).
 
 Rendimiento: igual que antes (14–19 ms por imagen a 1280×720 en este Mac, con y sin la pasada, medido igual).
+
+## 11. Séptima pasada: lo que aún distinguía las imágenes
+
+Faltaba lo que hay en las imágenes y no en las superficies:
+- **Calles empedradas en torno a Santa María:** a 85 m de la iglesia, solo en la Plastilina, con adoquines de un palmo
+  y medio y juntas suaves, como la plaza de la tercera imagen.
+- **Líneas de las calles anchas:** desde 6,8 m de anchura, un rulo continuo de plastilina blanca, de 26 cm, a 1,95 m
+  de cada bordillo (el carril de aparcar), como en la segunda imagen. La discontinua central es más gruesa.
+- **Faroles de pared:** el doble de cerca (el espaciado ×0,65).
+- **Macetas:**
+  - En la puerta de casi todas las casas (86 %).
+  - Bajo el 60 % de las ventanas de la planta baja: geranios, cipresitos recortados y aspidistras.
+- **Árboles:** copas de cogollos de un palmo (hasta 36 cm, hasta 84 por árbol), como los brócolis de las imágenes.
+
+| Vista | Referencia: luminancia / contraste / saturación | Juego |
+|---|---|---|
+| Calle estrecha | 145,9 / 51,5 / 0,283 | 152,2 / 48,3 / 0,300 |
+| Calle ancha | 146,1 / 45,2 / 0,285 | 150,8 / 46,5 / 0,289 |
+| Iglesia | 153,8 / 37,8 / 0,323 | 148,6 / 42,5 / 0,297 |
+
+Rendimiento igual: 14–18 ms por imagen a 1280×720, medido con el juego recién cargado (medido tras varias capturas
+seguidas sale más alto, con o sin estos cambios).
+
+Lo que queda distinto no es de la estética sino del pueblo y del juego:
+- Las casas de Guareña tienen la altura que les da el Catastro.
+- Los coches aparcados y la gente están donde los pone el juego.
+- El protagonista de la Evolución es Álex.

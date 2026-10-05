@@ -147,7 +147,10 @@ void main(){
 
     // ---------------- ground
     await step('Arando los campos de las Vegas…', 0.5);
-    const G = buildGround(map, null, { garages: this.facadeGround.filter((o) => o.type === CT.GARAGE) });
+    // (claymation: the streets round Santa María cobbled — the square of the user's third picture)
+    const ch = this.landmarks.poi;
+    const cobbles = STYLE.plastilina && ch.churchNorth && ch.churchTower ? [(ch.churchNorth.x + ch.churchTower.x + ch.churchSouth.x) / 3, (ch.churchNorth.z + ch.churchTower.z + ch.churchSouth.z) / 3, 85] : null;
+    const G = buildGround(map, null, { garages: this.facadeGround.filter((o) => o.type === CT.GARAGE), cobbles });
     this.groundData = G;
     // CC0 photo-scanned ground (asphalt, concrete, dry earth, gravel, grass) + the zone map for the imperfections
     const gS = q.photo || (q.texSize >= 512 ? 512 : 256);
@@ -345,7 +348,7 @@ void main(){
       if (e.dirt) continue;
       const inTown = map.inTown(e.pts[0], e.pts[1]) || map.inTown(e.pts[e.pts.length - 2], e.pts[e.pts.length - 1]);
       if (!inTown && e.cls !== 'primary') continue;
-      const spacing = e.facade && e.facade < 14 ? 24 : 30;
+      const spacing = (e.facade && e.facade < 14 ? 24 : 30) * (STYLE.plastilina ? 0.65 : 1); // (claymation: a lantern every few houses, as in the user's pictures)
       let side = hash1(e.id) < 0.5 ? 1 : -1;
       for (let s = 8; s < e.len - 4; s += spacing) {
         polySample(e.pts, e.cum, s, tmp);

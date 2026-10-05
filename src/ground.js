@@ -348,6 +348,11 @@ export function buildGround(map, materials, opts = {}) {
     else if (e.cls === 'footway' || e.cls === 'cycleway' || e.cls === 'steps') { layer = GROUND.acera; B = levels[3]; }
     else if (e.cls === 'path') { layer = GROUND.tierra; B = dirt; tint = [1.05, 1.02, 0.98]; }
     else layer = GROUND.asphalt;
+    // (claymation: the streets round the church cobbled, as the square in the user's third picture)
+    if (opts.cobbles && layer <= GROUND.asphalt2 && !e.dirt) {
+      const [cx, cz, cr] = opts.cobbles, m = Math.floor(e.pts.length / 4) * 2;
+      if (Math.hypot(e.pts[m] - cx, e.pts[m + 1] - cz) < cr) { layer = GROUND.adoquin; e.cobbled = true; }
+    }
     const hw = e.w / 2;
     const L = offsetPolyline(e.pts, hw), R = offsetPolyline(e.pts, -hw);
     if (B === asphalt) {
@@ -435,7 +440,7 @@ export function buildMarkings(map) {
   const tmp = {};
   // centre lines
   for (const e of map.edges) {
-    if (e.dirt || e.oneway || e.walkOnly) continue;
+    if (e.dirt || e.oneway || e.walkOnly || e.cobbled) continue;
     if (!['primary', 'secondary', 'tertiary', 'unclassified', 'primary_link'].includes(e.cls)) continue;
     if (e.w < 5.8) continue;
     const na = map.nodes[e.a], nb = map.nodes[e.b];
@@ -443,10 +448,25 @@ export function buildMarkings(map) {
     const dash = 4.5; // one texture repeat = dash + gap = 9 m
     for (let s = s0; s < s1 - 1; s += 2) {
       const a = polySample(e.pts, e.cum, s, {}), b = polySample(e.pts, e.cum, Math.min(s + 2, s1), {});
-      const hw = 0.08;
+      const hw = STYLE.plastilina ? 0.11 : 0.08; // (claymation: a fat roll of white clay)
       const nxa = -a.dz * hw, nza = a.dx * hw, nxb = -b.dz * hw, nzb = b.dx * hw;
       const u0 = (s - s0) / (dash * 2), u1 = (Math.min(s + 2, s1) - s0) / (dash * 2);
       addQuad([a.x + nxa, a.z + nza], [b.x + nxb, b.z + nzb], [b.x - nxb, b.z - nzb], [a.x - nxa, a.z - nza], u0, 0.845, u1, 0.905);
+    }
+  }
+  // (claymation: on the wide streets a continuous roll of white clay a parking lane in from each kerb, as in the user's
+  // second picture)
+  if (STYLE.plastilina) for (const e of map.edges) {
+    if (e.dirt || e.walkOnly || e.cobbled || !e.drive || e.w < 6.8) continue;
+    const na = map.nodes[e.a], nb = map.nodes[e.b];
+    const s0 = na.degree > 1 ? na.radius + 3 : 1, s1 = e.len - (nb.degree > 1 ? nb.radius + 3 : 1);
+    for (const side of [-1, 1]) {
+      const off = side * (e.w / 2 - 1.95);
+      for (let s = s0; s < s1 - 0.5; s += 2) {
+        const a = polySample(e.pts, e.cum, s, {}), b = polySample(e.pts, e.cum, Math.min(s + 2, s1), {}), hw = 0.13;
+        const ax = a.x - a.dz * off, az = a.z + a.dx * off, bx = b.x - b.dz * off, bz = b.z + b.dx * off;
+        addQuad([ax - a.dz * hw, az + a.dx * hw], [bx - b.dz * hw, bz + b.dx * hw], [bx + b.dz * hw, bz - b.dx * hw], [ax + a.dz * hw, az - a.dx * hw], 0.02, 0.6, 0.98, 0.65);
+      }
     }
   }
   // zebra crossings at OSM crossing nodes

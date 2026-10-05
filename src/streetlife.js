@@ -388,7 +388,7 @@ export function buildStreetLife(world, map, q) {
       if (ok && seats.length >= 2) { frescoSpots.push({ x: d.x, z: d.z, seats, kind: r() < 0.55 ? 'sillaPlastico' : r() < 0.6 ? 'sillaEnea' : 'sillaEneaVerde', seed: h, used: false }); stats.fresco++; continue; }
     }
     // pots on the ground beside the door (claymation: on most doorsteps, as in the user's pictures)
-    if (r() < (STYLE.plastilina ? 0.78 : 0.42)) {
+    if (r() < (STYLE.plastilina ? 0.86 : 0.42)) {
       const n = 1 + Math.floor(r() * 3);
       for (let i = 0; i < n; i++) {
         const [x, z] = P(-side * (0.95 + i * 0.38), 0.24);
@@ -412,7 +412,7 @@ export function buildStreetLife(world, map, q) {
   // user's pictures have them every few steps along the walls)
   if (STYLE.plastilina) for (const wd of world.facadeWindows || []) {
     const r = mulberry32(Math.floor(hash1(Math.floor(wd.x * 29 + wd.z * 13) * 5 + 7) * 1e9));
-    if (r() > 0.45) continue;
+    if (r() > 0.6) continue;
     const tx = -wd.nz, tz = wd.nx, ang = Math.atan2(wd.nx, wd.nz), n = r() < 0.6 ? 1 : 2;
     for (let i = 0; i < n; i++) {
       const along = (n === 1 ? (r() - 0.5) * 0.4 : i ? 0.32 : -0.32) * Math.min(1, wd.w), x = wd.x + tx * along + wd.nx * 0.26, z = wd.z + tz * along + wd.nz * 0.26;
