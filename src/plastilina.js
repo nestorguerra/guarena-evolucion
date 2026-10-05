@@ -15,6 +15,7 @@ export const PLASTILINA = {
   fps: 12, // poses per second (animation «on twos»)
   // the last grade: clay colours are pure, the studio fills the shadows a little, the lens darkens its corners a touch
   grade: { sat: 1.14, warm: 0.035, contrast: 1.06, lift: 0.03, vignette: 0.16 },
+  flicker: 0.014, // the studio lamps' little flicker from one pose to the next (the frames of a stop-motion film never match)
   // the clay of the sets (metres): lumps, prints, cuts, lint; the puppets take theirs at their own scale (CLAY_SCALE)
   boil: null, // the shared uniform (installClayChunks): moved at every pose, for the puppets only
 };

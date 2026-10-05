@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { smokeCanvas, radialCanvas } from './textures.js';
 import { clamp } from './util.js';
+import { STYLE } from './style.js';
 import { casingMesh } from './gunmodels.js';
 
 class Particles {
@@ -112,14 +113,30 @@ class SkidMarks {
   cut(key) { this.last.delete(key); }
 }
 
+// claymation: a flame cut from cellophane — three nested tongues, orange, yellow and a pale heart, with clean edges
+function flameCanvas(S) {
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const x = c.getContext('2d');
+  const tongue = (k, col) => {
+    const w = S * 0.36 * k, h = S * 0.86 * k, cx = S / 2, by = S * 0.95 - (1 - k) * S * 0.12;
+    x.fillStyle = col; x.beginPath(); x.moveTo(cx, by - h);
+    x.bezierCurveTo(cx + w * 0.35, by - h * 0.62, cx + w, by - h * 0.38, cx + w * 0.82, by - h * 0.14);
+    x.bezierCurveTo(cx + w * 0.62, by, cx - w * 0.62, by, cx - w * 0.82, by - h * 0.14);
+    x.bezierCurveTo(cx - w, by - h * 0.38, cx - w * 0.35, by - h * 0.62, cx, by - h);
+    x.fill();
+  };
+  tongue(1, 'rgba(236,112,34,0.88)'); tongue(0.68, 'rgba(250,186,48,0.92)'); tongue(0.38, 'rgba(255,240,170,0.95)');
+  return c;
+}
+
 export class Effects {
   constructor(game) {
     this.game = game;
     const scene = game.scene;
     const smoke = new THREE.CanvasTexture(smokeCanvas(128));
-    const glow = new THREE.CanvasTexture(radialCanvas(64, [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,220,150,0.8)'], [1, 'rgba(255,120,40,0)']]));
+    const glow = new THREE.CanvasTexture(STYLE.plastilina ? flameCanvas(64) : radialCanvas(64, [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,220,150,0.8)'], [1, 'rgba(255,120,40,0)']]));
     this.smoke = new Particles(scene, 900, smoke, false);
-    this.fire = new Particles(scene, 500, glow, true);
+    this.fire = new Particles(scene, 500, glow, !STYLE.plastilina); // (claymation: flames of cut cellophane, not light)
     this.skids = new SkidMarks(scene);
     this.debris = [];
     this.flash = new THREE.PointLight(0xffa040, 0, 40, 1.5);

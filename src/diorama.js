@@ -24,13 +24,13 @@ export const DIORAMA = {
 // the last grade, in linear light before the tone curve: a little more colour, the white balance of a warm afternoon,
 // a touch of contrast round the middle greys (the model's light, not a filter: no outlines, no grain, no wash)
 export const DioramaGrade = {
-  uniforms: { tDiffuse: { value: null }, uSat: { value: 1.04 }, uWarm: { value: 0.03 }, uContrast: { value: 1.04 }, uLift: { value: 0 }, uVignette: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uSat: { value: 1.04 }, uWarm: { value: 0.03 }, uContrast: { value: 1.04 }, uLift: { value: 0 }, uVignette: { value: 0 }, uGain: { value: 1 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uSat, uWarm, uContrast, uLift, uVignette; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uSat, uWarm, uContrast, uLift, uVignette, uGain; varying vec2 vUv;
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
-      vec3 col = max(c.rgb, 0.0);
+      vec3 col = max(c.rgb, 0.0) * uGain; // (uGain: the claymation's lamps, a hair brighter or dimmer at each pose)
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = mix(vec3(l), col, uSat);
       col *= vec3(1.0 + uWarm, 1.0 + uWarm * 0.3, 1.0 - uWarm * 0.7);

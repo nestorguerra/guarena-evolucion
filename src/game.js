@@ -783,8 +783,13 @@ export class Game {
       this.bloom.threshold = lerp(1.8, 0.85, night);
       this.bloom.radius = lerp(0.3, 0.6, night);
     }
-    // claymation: the puppets not due a new pose are drawn as they were at the last one (the player keeps its place)
-    if (STYLE.plastilina) { if (this.player && this.player.char) SM.setSmooth(this.player.char.object, true); SM.hold(); }
+    // claymation: the puppets not due a new pose are drawn as they were at the last one (the player keeps its place);
+    // at each pose the lamps flicker a hair
+    if (STYLE.plastilina) {
+      if (this.player && this.player.char) SM.setSmooth(this.player.char.object, true);
+      if (this.grade && SM.tick) this.grade.uniforms.uGain.value = SM.on ? 1 + (Math.random() - 0.5) * PLASTILINA.flicker : 1;
+      SM.hold();
+    }
     const wv = this.interior && this.windowView && this.windowView.render(); // the street, drawn for the windows
     this.renderView(this.camera);
     if (wv) this.windowView.after();

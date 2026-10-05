@@ -95,6 +95,9 @@ Estado: plan aprobado para ejecutar en la versión Evolución (5 de octubre de 2
 - **Fotografías**: ninguna en casas, suelo ni interiores.
 - **Rendimiento** (este Mac, 1280×720, alta, con otra pestaña del juego abierta): Plastilina ≈ Diorama +5 %.
 
-**Pendiente** (siguientes capas): caras de muñeco esculpidas (boca, nariz), tejados de teja de churro en 3D, bordes
-redondeados en los edificios singulares (iglesia, ayuntamiento), fuego de celofán, y un parpadeo de luz de estudio
-opcional.
+Segunda pasada: boca de muñeco más ancha con una sonrisa leve; tejas árabes como churros de plastilina (cobijas y
+canales con su relieve y el labio de cada fila); fuego de celofán (lenguas recortadas, no luz); y el parpadeo de los
+focos de estudio de una pose a otra (±0,7 %), como en el stop motion de verdad.
+
+**Pendiente**: caras esculpidas de verdad (nariz de bola, boca de recambio), y bordes redondeados en la geometría propia
+de los edificios singulares (iglesia, ayuntamiento).

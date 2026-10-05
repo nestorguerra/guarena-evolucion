@@ -365,6 +365,14 @@ if (uDetNOn > 0.5 && gDetK > 0.01) {
     }
     normal = normalize(normal + mat3(viewMatrix) * (normalize(nB) - nW));
   }
+  // the roof's Arab tiles as rolls of clay: convex covers and hollow channels in turn down the slope, each row's lip
+  if (abs(vTex.y - 1.0) < 0.5 && vTex.x - ${ROOF_BASE_VALUE}.0 < 0.5) {
+    mat3 tb = cotangentFrame(normal, -vViewPosition, vUvF);
+    float cu = vUvF.x * 16.0, f = fract(cu), side = mod(floor(cu), 2.0) < 0.5 ? 1.0 : -1.0;
+    float dh = side * cos(3.14159 * f) * 0.75;                       // d/du of ±sin(πu): the roll's slope across it
+    float fr = fract(vUvF.y * 7.0), lip = smoothstep(0.0, 0.12, fr) * (1.0 - smoothstep(0.12, 0.3, fr));
+    normal = normalize(normal - tb[0] * dh + tb[1] * lip * 0.5);
+  }
 }
 #endif`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>

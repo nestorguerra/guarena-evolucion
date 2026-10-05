@@ -2347,7 +2347,8 @@ export class Character {
     const hk = this.headK;
     const lift = (F.lift + stress * 0.0026) * hk, knit = F.knit - stress * 0.05;
     O('browL', 0, lift, 0); O('browR', 0, lift, 0); R('browL', 0, 0, knit); R('browR', 0, 0, -knit);
-    const sm = F.smile * hk, wd = (F.wide - round) * hk;
+    // (claymation: a puppet's mouth — wider, with a little smile in it)
+    const sm = (F.smile + (STYLE.plastilina ? 0.0015 : 0)) * hk, wd = (F.wide - round + (STYLE.plastilina ? 0.006 : 0)) * hk;
     O('mouthL', wd + sm * 0.4, sm, -Math.abs(sm) * 0.3); O('mouthR', -wd - sm * 0.4, sm, -Math.abs(sm) * 0.3);
     // --- hands: relaxed curl, a loose fist running, tight fists fighting, gripping the wheel, open palms
     const relaxed = lerp(0.42, 0.75, rb) + 0.05 * wb; // relaxed hands: the fingers curl a little, more towards the little finger
