@@ -882,6 +882,7 @@ ${GROUND_GLSL}`)
   // its crumbs and pits on the road only (slabs and kerbs are smoother pieces)
   if (layer < 1.5) col *= 0.84 + 0.2 * gNoise(wp * 0.55 + 3.3) + 0.12 * gNoise(wp * 1.7 + 9.1);
   gClayCavK = layer < 1.5 ? 1.0 : 0.3;
+  if (gGRough < 0.0) gGRough = 0.8; // (the ground's clay is matt: no sheen of the low sun washing it white)
   if ((layer > 2.5 && layer < 3.5) || (layer > 14.5 && layer < 15.5)) {
     // claymation: the squares paved with rounded clay cobbles (the user's pictures) — each its own warm grey, swelling
     // from a sandy joint

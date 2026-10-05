@@ -53,6 +53,10 @@ La **Plastilina** es Guareña como una película de stop motion de plastilina (c
   pose la superficie de los muñecos «hierve» un milímetro o dos y quedan un poco distintos, como recolocados a mano. La
   cámara, tu personaje y tu coche van fluidos, para jugar igual que siempre. *Ajustes › Stop motion*: Sí, **Película**
   (tú también a doses, la cámara a las 24 imágenes por segundo del cine, grano de película y bandas negras) o No.
+- Como las imágenes de referencia del usuario: cámara de maqueta a la altura de la calle, paredes crema modeladas a
+  mano, carretera de arcilla gris con su grano, aceras de losas color arena, bordillos de rulo de plastilina, plazas
+  de adoquines, árboles como brócolis de bolitas, rejas negras gordas, geranios en los alféizares y nubes de algodón
+  delante de un cielo pintado (`tools/refcompare.js` las compara con las referencias).
 - Pelo de plastilina con surcos de palillo y ropa modelada (sin el tejido de la ropa de verdad); un contraluz cálido de
   estudio separa a los muñecos del decorado. En calidad alta, a la resolución completa de la pantalla.
 
