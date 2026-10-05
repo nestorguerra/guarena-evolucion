@@ -99,5 +99,52 @@ Segunda pasada: boca de muñeco más ancha con una sonrisa leve; tejas árabes c
 canales con su relieve y el labio de cada fila); fuego de celofán (lenguas recortadas, no luz); y el parpadeo de los
 focos de estudio de una pose a otra (±0,7 %), como en el stop motion de verdad.
 
-**Pendiente**: caras esculpidas de verdad (nariz de bola, boca de recambio), y bordes redondeados en la geometría propia
-de los edificios singulares (iglesia, ayuntamiento).
+## 7. Tercera pasada: cabezas esculpidas, piedras de plastilina, la mano en el color
+
+Lo que la evaluación señaló como más flojo eran las caras: seguían siendo caras realistas de MakeHuman con ojos de
+cuenta. Ahora cada cabeza se esculpe como la de un muñeco, a partir de la de la propia persona (cada uno sigue
+siendo él mismo):
+
+| Qué | Cómo (`charbuild.js`) |
+|---|---|
+| Caricatura de muñeco | Los rasgos propios de MakeHuman empujados (`MH_PUPPET`): cabeza más redonda, mejillas llenas, nariz grande y redonda, boca mucho más ancha con las comisuras hacia arriba y los labios como un churro, ojos más abiertos y sin bolsas, orejas más grandes y redondas. Se desvanece hacia el cuello, así la costura con el cuerpo no se mueve. |
+| Modelado a mano | `puppetShape`: la nariz se infla como una bola (a lo largo de la piel, desde su centro) y se alisa hasta que desaparecen las aletas y el pliegue de al lado; luego toda la cara se alisa como alisa un pulgar la plastilina (sin pliegues, bolsas ni huesos marcados), sin tocar los párpados, la boca por dentro ni el cuello. Alisado de Taubin, que no encoge la cabeza. |
+| Expresión | Cejas de muñeco abiertas y amables (un poco más altas, con el extremo interior levantado); la sonrisa en reposo. |
+| Piel | Sin pelusa ni cortes de espátula en las caras y manos (de cerca parecían heridas); las huellas y el hervor siguen. |
+
+También para el protagonista (su cabeza sale del mismo constructor). El constructor pasa a la versión 31, así las
+cabezas guardadas en el navegador se vuelven a hacer.
+
+Al revisar las caras de muy cerca salieron dos defectos, ya corregidos:
+
+- **Dientes que asomaban** por las comisuras al ensanchar la boca: ahora quedan 6 mm más adentro.
+- **Pliegues de la malla** (un triángulo dado la vuelta, que no se dibuja y deja ver la calle a través): algunos venían
+  ya de antes, de caras con rasgos muy marcados (la de Álex, en la comisura). Ahora, en todas las estéticas, cada cabeza
+  se compara con la cara base de MakeHuman y los pliegues se relajan hasta quedar planos (sin tocar el interior de la
+  boca ni las cuencas de los ojos). Herramientas: `tools/puppetlab.js` (`sheet`, `flips`, `holes`, que pone la cabeza
+  sola delante de un fondo magenta).
+
+**Fondo menos desenfocado** (petición del usuario: «solo algo desenfocado, pero no tanto»): el objetivo ablanda el
+fondo como mucho 0,24 % de la altura de la imagen (antes 0,55 %) y empieza más lejos, a 2,4 veces la distancia del
+personaje (antes 1,8), llegando al máximo a 11 veces (antes 7). En `PLASTILINA.lens`.
+
+Los decorados:
+
+- **Iglesia, ayuntamiento y demás edificios singulares**: la mampostería y la sillería se pintan como piedras de
+  plastilina metidas en una masa más blanda: bordes redondeados, cada una de su color, más clara arriba donde la
+  redondeó el pulgar, con su surco blando alrededor (sin el granulado fotográfico). Sus materiales tienen el relieve y
+  las marcas de los decorados.
+- **Casas y suelo**: las marcas de la mano también en el color (CLAY_TONE 2,8 en las casas, 2,0 en el suelo), para
+  que se vean a la sombra y en la cal blanca, donde el relieve solo apenas se nota. Limpio, sin parecer sucio.
+
+Evaluación de esta pasada (mismas vistas, mismo equipo):
+
+- **Personajes**: ya se leen como muñecos de plastimación (nariz de bola, boca ancha y sonriente, ojos de cuenta,
+  cabeza y manos grandes); cada uno conserva su cara. Comisuras sin grietas de cerca.
+- **Iglesia**: de piedra fotografiada a maqueta de piedras de plastilina.
+- **Calles**: de cerca la cal muestra huellas y amasado suaves; de lejos, igual que antes (una maqueta limpia).
+- **Rendimiento**: 11–13 ms por fotograma a 1280×720 (igual que antes; el esculpido solo cuesta al construir cada
+  cabeza, en los workers).
+
+**Pendiente**: bocas de recambio (fonemas al hablar), las líneas rectas de los tejados y las aristas algo onduladas,
+como en un decorado hecho a mano.

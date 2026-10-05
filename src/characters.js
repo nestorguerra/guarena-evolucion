@@ -93,9 +93,10 @@ export function shapeSpec(desc) {
     hq: !!desc.hq, // playable characters: finer sculpt
     hqHead: !desc.hq && !!desc.pedHead, // pedestrians: a finer head only
     mh: mhSpec(desc, g, elderly), // the MakeHuman head (charbuild.js mhHead)
+    clay: STYLE.plastilina || undefined, // claymation: the head sculpted as a puppet's
   };
   spec.key = [spec.g, spec.S, spec.W, spec.elderly ? 'o' : 'y', spec.belly, spec.M, top, bottom, hair, hat, spec.beard, spec.topMat || '', bag ? 'b' : '', spec.glasses ? 'g' : '', spec.earrings ? 'e' : '', spec.watch ? 'w' : '',
-    spec.cane ? 'c' : '', shoe, spec.socks ? 's' : '', spec.tucked ? 't' : '', spec.cop ? 'p' : '', spec.belt ? 'l' : '', spec.bust || '', spec.face ? spec.face.join(',') : ''].join('|') + (spec.slim ? '|sl' + spec.slim : '') + (spec.skirtShort ? '|ss' : '') + (spec.hq ? '|hq' : spec.hqHead ? '|hh' : '') + (spec.hk !== 1 ? '|hk' + spec.hk : '');
+    spec.cane ? 'c' : '', shoe, spec.socks ? 's' : '', spec.tucked ? 't' : '', spec.cop ? 'p' : '', spec.belt ? 'l' : '', spec.bust || '', spec.face ? spec.face.join(',') : ''].join('|') + (spec.slim ? '|sl' + spec.slim : '') + (spec.skirtShort ? '|ss' : '') + (spec.hq ? '|hq' : spec.hqHead ? '|hh' : '') + (spec.hk !== 1 ? '|hk' + spec.hk : '') + (spec.clay ? '|clay' : '');
   const m = spec.mh;
   m.hair = mhHairFor(spec);
   spec.key += `|mh${m.g},${m.age},${m.eth.join(',')},${m.wt},${m.mu},${m.seed},${m.brow},${m.lash},${m.hair || ''}`;
@@ -2345,10 +2346,11 @@ export class Character {
     const stress = ta * Math.pow(Math.max(0, Math.sin(this.t * 1.9 + this.seed * 3)), 6);
     R('jaw', (this.shape && this.shape.neckY != null ? 0.004 : 0.015) + F.jaw + ta * (0.04 + 0.07 * syl)); // (a MakeHuman mouth rests closed)
     const hk = this.headK;
-    const lift = (F.lift + stress * 0.0026) * hk, knit = F.knit - stress * 0.05;
+    const clayB = STYLE.plastilina ? 1 : 0; // (claymation: a puppet's open, friendly brows — a touch up, the inner ends raised)
+    const lift = (F.lift + stress * 0.0026 + clayB * 0.0014) * hk, knit = F.knit - stress * 0.05 - clayB * 0.09;
     O('browL', 0, lift, 0); O('browR', 0, lift, 0); R('browL', 0, 0, knit); R('browR', 0, 0, -knit);
-    // (claymation: a puppet's mouth — wider, with a little smile in it)
-    const sm = (F.smile + (STYLE.plastilina ? 0.0015 : 0)) * hk, wd = (F.wide - round + (STYLE.plastilina ? 0.006 : 0)) * hk;
+    // (claymation: a puppet's mouth — its width is in the sculpt, charbuild.js MH_PUPPET; here a little smile in it)
+    const sm = (F.smile + (STYLE.plastilina ? 0.0012 : 0)) * hk, wd = (F.wide - round) * hk;
     O('mouthL', wd + sm * 0.4, sm, -Math.abs(sm) * 0.3); O('mouthR', -wd - sm * 0.4, sm, -Math.abs(sm) * 0.3);
     // --- hands: relaxed curl, a loose fist running, tight fists fighting, gripping the wheel, open palms
     const relaxed = lerp(0.42, 0.75, rb) + 0.05 * wb; // relaxed hands: the fingers curl a little, more towards the little finger

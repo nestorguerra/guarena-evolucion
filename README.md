@@ -43,8 +43,10 @@ La **Plastilina** es Guareña como una película de stop motion de plastilina (c
 - Formas blandas: las casas con las esquinas redondeadas, el canto de arriba, el zócalo y los huecos de puertas y
   ventanas blandos; marcos, balcones, muebles y bancos como losas de plastilina; rejas de churro; árboles de bolas;
   coches gorditos con ventanas pintadas.
-- Muñecos: piel lisa de plastilina, ojos de cuenta, cejas de churro, pelo modelado con surcos de peine y algo más de
-  cabeza y manos.
+- Muñecos: cada cabeza esculpida como la de un muñeco de plastimación a partir de la cara de la persona (nariz de
+  bola, boca ancha y sonriente, mejillas llenas, la cara alisada como con el pulgar), piel lisa de plastilina, ojos de
+  cuenta, cejas de churro, pelo modelado con surcos de peine y algo más de cabeza y manos.
+- La iglesia y los edificios de piedra, con piedras de plastilina metidas en una masa más blanda.
 - Cielo de decorado con nubes de algodón, humo de algodón, luz de estudio cálida con sombras suaves y, como en una
   maqueta fotografiada, el fondo lejano apenas suave.
 - **Stop motion**: personas, perros y coches posan 12 veces por segundo (el agua, el viento y el humo también) y se
@@ -52,7 +54,9 @@ La **Plastilina** es Guareña como una película de stop motion de plastilina (c
   *Ajustes › Stop motion*.
 
 Todo está en `src/plastilina.js` y en las ramas `STYLE.plastilina` de casas, fachadas, árboles, personajes, coches y
-cielo. `tools/lookcompare.js` saca las vistas fijas, los primeros planos (`closeups`) y vídeos del juego (`walkVideo`).
+cielo (las cabezas de muñeco, en `charbuild.js`: `MH_PUPPET` y `puppetShape`). `tools/lookcompare.js` saca las vistas
+fijas, los primeros planos (`closeups`) y vídeos del juego (`walkVideo`); `tools/puppetlab.js`, las caras sin y con el
+esculpido de muñeco.
 
 ![Guareña desde el aire: la Iglesia de Santa María y la Plaza de España con el Ayuntamiento](docs/portada.jpg)
 

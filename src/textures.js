@@ -1125,10 +1125,42 @@ export function textCanvas(txt, { w = 512, h = 128, bg = null, fg = '#fff', font
 
 // ================================================================ stone & special textures for landmarks
 // kind: 'mamposteria' (rubble masonry), 'sillar' (granite ashlar), 'teja' (roof tiles), 'reloj' (clock face)
+// claymation: the church's stones as pieces of clay pressed into a bed of softer clay — round-cornered, each its own flat
+// colour, lighter where the thumb rounded its top and darker under, a soft groove round each; no speckle, no grain
+function clayStones(ctx, S, rnd, ash) {
+  ctx.fillStyle = ash ? '#a89c86' : '#cdbfa3';
+  ctx.fillRect(0, 0, S, S);
+  const rows = ash ? 5 : 7, rh = S / rows;
+  for (let r = 0; r < rows; r++) {
+    let x = ash ? (r % 2 ? -S / 5 : 0) : -rnd() * rh;
+    while (x < S) {
+      const w = ash ? S * (0.26 + rnd() * 0.16) : rh * (1 + rnd() * 0.9);
+      const v = ash ? 0.88 + rnd() * 0.14 : 0.72 + rnd() * 0.26, warm = rnd() < 0.45;
+      const b = (ash ? [196, 186, 164] : warm ? [178, 150, 112] : [152, 144, 128]).map((k) => k * v);
+      const pad = S * (ash ? 0.012 : 0.01 + rnd() * 0.012), ww = w - 2 * pad, hh = rh - 2 * pad - (ash ? 0 : rnd() * rh * 0.12);
+      const y0 = r * rh + pad, rad = Math.min(ww, hh) * (ash ? 0.2 : 0.38 + rnd() * 0.1);
+      for (const ox of [0, -S, S]) {
+        const x0 = x + pad + ox;
+        if (x0 > S || x0 + ww < 0) continue;
+        ctx.save();
+        ctx.shadowColor = 'rgba(40,30,20,0.45)'; ctx.shadowBlur = S * 0.012; ctx.shadowOffsetY = S * 0.005; // (its groove)
+        const gr = ctx.createLinearGradient(x0, y0, x0 + ww * 0.35, y0 + hh);
+        gr.addColorStop(0, `rgb(${b.map((k) => Math.min(255, Math.round(k * 1.13))).join(',')})`);
+        gr.addColorStop(0.45, `rgb(${b.map(Math.round).join(',')})`);
+        gr.addColorStop(1, `rgb(${b.map((k) => Math.round(k * 0.84)).join(',')})`);
+        ctx.fillStyle = gr;
+        ctx.beginPath(); ctx.roundRect(x0, y0, ww, hh, rad); ctx.fill();
+        ctx.restore();
+      }
+      x += w;
+    }
+  }
+}
 export function stoneCanvas(kind, S = 512, seed = 1) {
   const c = canvas(S);
   const ctx = c.getContext('2d');
   const rnd = mulberry32(seed);
+  if (STYLE.plastilina && (kind === 'mamposteria' || kind === 'sillar')) { clayStones(ctx, S, rnd, kind === 'sillar'); return c; }
   if (kind === 'mamposteria') {
     ctx.fillStyle = '#c9bca3'; // lime mortar
     ctx.fillRect(0, 0, S, S);

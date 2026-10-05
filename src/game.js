@@ -227,7 +227,7 @@ export class Game {
           pass.material.depthTest = pass.material.depthWrite = false;
           pass.uniforms.uDir.value.set(k ? 0 : 1, k ? 1 : 0);
           pass.render = (renderer, wb, rb, dt, mask) => {
-            const U = pass.uniforms; U.tDepth.value = this.sceneDepth; U.uRes.value.set(rb.width, rb.height); U.uMaxR.value = 0.0055 * rb.height;
+            const U = pass.uniforms; U.tDepth.value = this.sceneDepth; U.uRes.value.set(rb.width, rb.height); U.uMaxR.value = PLASTILINA.lens.blur * rb.height;
             pr(renderer, wb, rb, dt, mask);
           };
           this.composer.addPass(pass);

@@ -76,7 +76,7 @@ export class Hero extends Character {
     const B = HD.body, m = s.mh;
     m.g = +B.g.toFixed(2); m.age = 24; m.eth = [0, 0, 1]; m.wt = +B.wt.toFixed(2); m.mu = +B.mu.toFixed(2);
     Object.assign(s, { headOnly: true, mhA: [0, 0, 0], S: 1, hk: 1, top: 'hero', bottom: 'hero', bag: false, glasses: null, hat: null, cane: false, watch: false, earrings: false, socks: false });
-    s.key = 'hero2|' + [m.g, m.age, m.wt, m.mu, m.seed, m.brow, m.lash, m.hair || '', (m.face || []).join(',')].join('|');
+    s.key = 'hero2|' + [m.g, m.age, m.wt, m.mu, m.seed, m.brow, m.lash, m.hair || '', (m.face || []).join(',')].join('|') + (s.clay ? '|clay' : '');
     return s;
   }
   // the hero's skeleton (body bones from the data, then the old face and hand bones)

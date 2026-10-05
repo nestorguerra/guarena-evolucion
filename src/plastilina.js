@@ -16,6 +16,9 @@ export const PLASTILINA = {
   // the last grade: clay colours are pure, the studio fills the shadows a little, the lens darkens its corners a touch
   grade: { sat: 1.14, warm: 0.035, contrast: 1.06, lift: 0.03, vignette: 0.16 },
   flicker: 0.014, // the studio lamps' little flicker from one pose to the next (the frames of a stop-motion film never match)
+  // the lens: how soft the far background goes at most (a fraction of the picture's height) and from how far behind the
+  // subject it starts and is at its softest (× the subject's distance). Only a little: the user asked for it gentler
+  lens: { blur: 0.0024, from: 2.4, to: 11 },
   // the clay of the sets (metres): lumps, prints, cuts, lint; the puppets take theirs at their own scale (CLAY_SCALE)
   boil: null, // the shared uniform (installClayChunks): moved at every pose, for the puppets only
 };
@@ -99,6 +102,9 @@ vec3 clayAt(vec3 p, float px) {
     }
   }
   if (px > 0.015) return vec3(h, dark, lint);
+#ifdef CLAY_PUPPET
+  return vec3(h, dark, lint); // (a puppet's face and hands are smoothed: no cut nor speck to read as a scar)
+#endif
   // spatula cuts: a short straight stroke in some cells of 0.8 m, a fine groove with a soft lip
   vec3 e = floor(p / 0.8);
   if (clayHash(e + 31.0) < 0.38) {
@@ -200,7 +206,7 @@ function pillow(g) {
 // anything nearer stay sharp (no band, no blurred foreground: the game must read as clearly as ever). Two passes
 // (across, then down); the pixels round a sharp thing do not take its colour.
 export const ClayLens = {
-  defines: { TAPS: 8 },
+  defines: { TAPS: 8, LENS_FROM: PLASTILINA.lens.from.toFixed(2), LENS_TO: PLASTILINA.lens.to.toFixed(2) },
   uniforms: {
     tDiffuse: { value: null }, tDepth: { value: null }, uDir: { value: new THREE.Vector2(1, 0) }, uRes: { value: new THREE.Vector2(1280, 720) },
     uNear: { value: 0.25 }, uFar: { value: 4200 }, uFocus: { value: 6 }, uFocusUV: { value: new THREE.Vector2(0.5, 0.5) }, uMaxR: { value: 4 },
@@ -210,7 +216,7 @@ export const ClayLens = {
     uniform sampler2D tDiffuse, tDepth; uniform vec2 uDir, uRes, uFocusUV; uniform float uNear, uFar, uFocus, uMaxR;
     varying vec2 vUv;
     float viewZ(float d) { float z = d * 2.0 - 1.0; return 2.0 * uNear * uFar / (uFar + uNear - z * (uFar - uNear)); }
-    float coc(vec2 uv, float F) { float z = viewZ(texture2D(tDepth, uv).x); return smoothstep(F * 1.8, F * 7.0, z); }
+    float coc(vec2 uv, float F) { float z = viewZ(texture2D(tDepth, uv).x); return smoothstep(F * LENS_FROM, F * LENS_TO, z); }
     void main() {
       float F = uFocus > 0.0 ? uFocus : viewZ(texture2D(tDepth, uFocusUV).x);
       F = clamp(F, 1.5, 60.0);

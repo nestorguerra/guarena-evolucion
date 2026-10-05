@@ -1591,6 +1591,128 @@ export function charBuilderMain(mhLib) {
   // desc.face's five: jaw width, chin, cheekbones, nose size, brow ridge
   const MH_FACE = [['chin/chin-bones', 'head/head-square'], ['chin/chin-prominent', 'chin/chin-height'], ['cheek/cheek-bones', 'cheek/cheek-volume'], ['nose/nose-scale-vert', 'nose/nose-scale-horiz'], ['eyebrows/eyebrows-angle', 'forehead/forehead-nubian']];
   const MH_MAT = { skin: 17, eye: 18, brow: 19, lash: 20, teeth: 21, hair: 22 };
+  // claymation: the person's own head sculpted over as a stop-motion puppet's — rounder, full cheeks, a big soft nose,
+  // a wide smiling mouth with rolled lips, big eye openings with no bags, ears that show — eased to nothing down the
+  // neck (the seam stays)
+  const MH_PUPPET = {
+    'head/head-round': 0.7, 'cheek/l-cheek-volume-incr': 0.7, 'cheek/r-cheek-volume-incr': 0.7, 'cheek/l-cheek-bones-decr': 0.5, 'cheek/r-cheek-bones-decr': 0.5,
+    'nose/nose-volume-incr': 1, 'nose/nose-point-width-incr': 1, 'nose/nose-scale-horiz-incr': 0.5, 'nose/nose-hump-decr': 0.6, 'nose/nose-flaring-decr': 0.6, 'nose/nose-nostrils-width-decr': 0.4,
+    'mouth/mouth-scale-horiz-incr': 2.3, 'mouth/mouth-angles-up': 0.85, 'mouth/mouth-trans-forward': 0.8, 'mouth/mouth-scale-vert-incr': 0.4,
+    'mouth/mouth-upperlip-volume-incr': 0.6, 'mouth/mouth-lowerlip-volume-incr': 0.2, 'mouth/mouth-cupidsbow-decr': 0.8, 'mouth/mouth-philtrum-volume-decr': 0.6,
+    'eyes/l-eye-scale-incr': 0.7, 'eyes/r-eye-scale-incr': 0.7, 'eyes/l-eye-bag-decr': 1, 'eyes/r-eye-bag-decr': 1,
+    'ears/l-ear-scale-incr': 0.5, 'ears/r-ear-scale-incr': 0.5, 'ears/l-ear-shape-round': 0.6, 'ears/r-ear-shape-round': 0.6,
+  };
+  function puppetSculpt(D, p, W) {
+    const pp = MHL.morphMH(D, W); // (the targets alone over the base mesh: their deltas)
+    const body = D.index.subarray(0, D.nBody);
+    let ring = 1e9;
+    for (let t = 0; t < body.length; t++) ring = Math.min(ring, p[D.map[body[t]] * 3 + 1]);
+    for (let i = 0; i < D.nR; i++) {
+      const f = sstep(ring + 0.25, ring + 0.6, p[i * 3 + 1]); // (base mesh units: decimetres)
+      for (let a = 0; a < 3; a++) p[i * 3 + a] += (pp[i * 3 + a] - D.base[i * 3 + a]) * f;
+    }
+  }
+  // ...then modelled by hand, in head-bone metres: the nose blown up into a soft ball (inflated along the skin's normal
+  // round its middle, then smoothed till the wings and the crease beside them are gone) and the whole face smoothed the
+  // way a thumb smooths plasticine (the folds, bags and bones of a real face go), away from the eyes' rims, the mouth's
+  // slit and inside, and the neck (the seam). o: { nose: inflate (× H metres), ball: its radius, smooth: the face's }
+  function mhAdj(D) { // the skin's neighbours, once
+    if (!D._adj) {
+      const map = D.map, body = D.index.subarray(0, D.nBody), s = Array.from({ length: D.nR }, () => new Set());
+      for (let t = 0; t < body.length; t += 3) { const a = map[body[t]], b = map[body[t + 1]], c = map[body[t + 2]]; s[a].add(b).add(c); s[b].add(a).add(c); s[c].add(a).add(b); }
+      D._adj = s.map((x) => Uint16Array.from(x));
+    }
+    return D._adj;
+  }
+  function puppetShape(D, q, H, o = {}) {
+    const n = D.nR, map = D.map, body = D.index.subarray(0, D.nBody);
+    const adj = mhAdj(D), J = (name) => MHL.jointMH(D, q, name);
+    const eL = J('joint-l-eye'), eR = J('joint-r-eye'), lip = J('lm-lipline'), eyeY = (eL[1] + eR[1]) / 2;
+    let ring = 1e9, tip = -1;
+    for (let t = 0; t < body.length; t++) {
+      const v = map[body[t]], x = q[v * 3], y = q[v * 3 + 1], z = q[v * 3 + 2];
+      if (y < ring) ring = y;
+      if (Math.abs(x) < 0.012 * H && y < eyeY - 0.012 * H && y > lip[1] + 0.012 * H && (tip < 0 || z > q[tip * 3 + 2])) tip = v;
+    }
+    if (tip < 0) return;
+    const keep = new Uint8Array(n); // (the mouth's slit and inside stay)
+    for (const nm of ['lm-mouthin', 'lm-lipline', 'lm-teethlow']) for (const i of D.joints[nm] || []) keep[i] = 1;
+    const used = new Uint8Array(n);
+    for (let t = 0; t < body.length; t++) used[map[body[t]]] = 1;
+    const T = [q[tip * 3], q[tip * 3 + 1], q[tip * 3 + 2]], C = [0, T[1] - 0.004 * H, T[2] - 0.011 * H];
+    const R = (o.ball || 0.027) * H, A = (o.nose ?? 0.0065) * H, Rs = R * 1.35;
+    const mw = Math.abs(J('lm-mouthL')[0]) + 0.012 * H; // (round the mouth the lips keep their shape: the teeth stay behind them)
+    const teeth = new Uint8Array(n);
+    for (let t = D.nBody; t < D.index.length; t++) teeth[map[D.index[t]]] = 1;
+    for (let i = 0; i < n; i++) if (teeth[i] && !used[i]) q[i * 3 + 2] -= (o.teeth ?? 0.006) * H; // (the teeth further in: at the widened corners they showed through the cheek)
+    const wS = new Float32Array(n), wN = new Float32Array(n), N = new Float32Array(n * 3);
+    for (let t = 0; t < body.length; t += 3) {
+      const a = map[body[t]], b = map[body[t + 1]], c = map[body[t + 2]];
+      const ux = q[b * 3] - q[a * 3], uy = q[b * 3 + 1] - q[a * 3 + 1], uz = q[b * 3 + 2] - q[a * 3 + 2], vx = q[c * 3] - q[a * 3], vy = q[c * 3 + 1] - q[a * 3 + 1], vz = q[c * 3 + 2] - q[a * 3 + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      for (const v of [a, b, c]) { N[v * 3] += nx; N[v * 3 + 1] += ny; N[v * 3 + 2] += nz; }
+    }
+    for (let i = 0; i < n; i++) {
+      if (!used[i] || keep[i]) continue;
+      const x = q[i * 3], y = q[i * 3 + 1], z = q[i * 3 + 2];
+      const de = Math.min(Math.hypot(x - eL[0], y - eL[1], z - eL[2]), Math.hypot(x - eR[0], y - eR[1], z - eR[2]));
+      const low = sstep(ring + 0.02 * H, ring + 0.045 * H, y), eye = sstep(0.017 * H, 0.026 * H, de);
+      const mouth = sstep(0.85, 1.5, Math.hypot(x / mw, (y - lip[1]) / (0.014 * H)));
+      const dn = Math.hypot(x - C[0], y - C[1], z - C[2]), fn = dn < Rs ? (1 - (dn / Rs) ** 2) ** 2 : 0;
+      wS[i] = low * eye * mouth * (o.smooth ?? 0.4);
+      wN[i] = low * eye * mouth * fn;
+      if (dn < R) { // inflate the nose
+        const f = A * (1 - (dn / R) ** 2) ** 2 * eye, l = Math.hypot(N[i * 3], N[i * 3 + 1], N[i * 3 + 2]) || 1;
+        q[i * 3] += (N[i * 3] / l) * f; q[i * 3 + 1] += (N[i * 3 + 1] / l) * f; q[i * 3 + 2] += (N[i * 3 + 2] / l) * f;
+      }
+    }
+    // Taubin's smoothing (a shrink and a swell each time, so the volume stays)
+    const d = new Float32Array(n * 3), its = o.its || 14;
+    for (let it = 0; it < its * 2; it++) {
+      const f = it % 2 ? -0.53 : 0.5;
+      for (let i = 0; i < n; i++) {
+        const w = Math.min(1, wS[i] + wN[i]);
+        if (!w) continue;
+        const nb = adj[i]; let sx = 0, sy = 0, sz = 0;
+        for (let k = 0; k < nb.length; k++) { const j = nb[k]; sx += q[j * 3]; sy += q[j * 3 + 1]; sz += q[j * 3 + 2]; }
+        const k = 1 / nb.length;
+        d[i * 3] = (sx * k - q[i * 3]) * f * w; d[i * 3 + 1] = (sy * k - q[i * 3 + 1]) * f * w; d[i * 3 + 2] = (sz * k - q[i * 3 + 2]) * f * w;
+      }
+      for (let i = 0; i < n; i++) if (wS[i] + wN[i]) { q[i * 3] += d[i * 3]; q[i * 3 + 1] += d[i * 3 + 1]; q[i * 3 + 2] += d[i * 3 + 2]; }
+    }
+  }
+  // where the targets (strong ones on some faces: a corner of the mouth) or the puppet's sculpt folded the skin over
+  // itself — a triangle facing the other way from MakeHuman's own base face: drawn it is culled, a hole with the street
+  // seen through it — its corners are eased towards their neighbours till it lies flat again (the inside of the mouth
+  // and the eye sockets, never seen, are left as they are)
+  function untangle(D, q, its = self.__untangleIts || 80) {
+    const body = D.index.subarray(0, D.nBody), map = D.map, adj = mhAdj(D), ref = D.base;
+    if (!D._inner) { D._inner = new Uint8Array(D.nR); for (const nm of ['lm-mouthin', 'lm-sockL', 'lm-sockR', 'lm-teethlow']) for (const i of D.joints[nm] || []) D._inner[i] = 1; }
+    const inner = D._inner;
+    const turned = (P, a, b, c) => {
+      const ux = P[b * 3] - P[a * 3], uy = P[b * 3 + 1] - P[a * 3 + 1], uz = P[b * 3 + 2] - P[a * 3 + 2], vx = P[c * 3] - P[a * 3], vy = P[c * 3 + 1] - P[a * 3 + 1], vz = P[c * 3 + 2] - P[a * 3 + 2];
+      return [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+    };
+    for (let it = 0; it < its; it++) {
+      const bad = new Set();
+      for (let t = 0; t < body.length; t += 3) {
+        const a = map[body[t]], b = map[body[t + 1]], c = map[body[t + 2]];
+        if (inner[a] || inner[b] || inner[c]) continue;
+        if (dot(turned(q, a, b, c), turned(ref, a, b, c)) < 0) { bad.add(a); bad.add(b); bad.add(c); }
+      }
+      if (self.__puppetDbg) self.__puppetDbg.push(bad.size); // (dev: tools/puppetlab.js)
+      if (!bad.size) return;
+      const move = new Set(bad);
+      if (it > 3) for (const v of bad) for (const j of adj[v]) move.add(j); // (a stubborn fold: its ring too)
+      const to = [];
+      for (const v of move) {
+        const nb = adj[v]; let sx = 0, sy = 0, sz = 0;
+        for (let k = 0; k < nb.length; k++) { const j = nb[k]; sx += q[j * 3]; sy += q[j * 3 + 1]; sz += q[j * 3 + 2]; }
+        to.push(v, sx / nb.length, sy / nb.length, sz / nb.length);
+      }
+      for (let k = 0; k < to.length; k += 4) { const v = to[k]; for (let a = 0; a < 3; a++) q[v * 3 + a] += (to[k + 1 + a] - q[v * 3 + a]) * 0.6; }
+    }
+  }
   function mhHead(spec) {
     const D = MHD, m = spec.mh, H = (spec.S || 1) * (spec.hk || 1);
     const w = MHL.macroWeights(m.g, m.age, { african: m.eth[0], asian: m.eth[1], caucasian: m.eth[2] }, m.wt, m.mu);
@@ -1610,10 +1732,13 @@ export function charBuilderMain(mhLib) {
     }
     if (m.face) m.face.forEach((v, i) => { for (const n of MH_FACE[i]) add(byName[n], v * 0.5); });
     const p = MHL.morphMH(D, w);
+    if (spec.clay) puppetSculpt(D, p, spec.clay === true ? MH_PUPPET : spec.clay); // (an object: weights to try, dev)
     const J = MHL.jointMH(D, p, 'joint-head'), k = 0.1 * H;
     const q = new Float32Array(D.nR * 3);
     const A0 = spec.mhA || MH_A;
     for (let i = 0; i < D.nR; i++) for (let a = 0; a < 3; a++) q[i * 3 + a] = (p[i * 3 + a] - J[a]) * k + A0[a] * H;
+    if (spec.clay) puppetShape(D, q, H, spec.clayShape);
+    untangle(D, q);
     const at = (name) => MHL.jointMH(D, q, name);
     const eyeL = at('joint-l-eye'), eyeR = at('joint-r-eye');
     // the skull under the hair: how high, wide, far back and forward the crown goes above the brows
@@ -2287,5 +2412,5 @@ export function charBuilderMain(mhLib) {
   // bone rest offsets and bind (A-pose) rotations for a spec, without building any geometry
   function rig(spec) { return makeRig(spec).bones.map((b) => ({ name: b.name, parent: b.parent, off: b.off, rot: b.rot })); }
   const landmarks = (g) => baseLandmarks({ f: g === 'f' });
-  return { build, rig, transferables, landmarks, setMH, REG, MAT, BONES, VERSION: 24, _dbg: { makeRig, hairLayer, headLayer, headLandmarks, mhHead } };
+  return { build, rig, transferables, landmarks, setMH, REG, MAT, BONES, VERSION: 31, _dbg: { makeRig, hairLayer, headLayer, headLandmarks, mhHead } };
 }

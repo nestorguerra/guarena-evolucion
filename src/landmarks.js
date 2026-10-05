@@ -11,6 +11,7 @@ import { westPortal, southPortal, northPortal } from './churchdoors.js';
 import { fountain, plazaDetails, updateWater, cultura, mercadoFront, corbacho, pabellonFront, entranceLetters, meridaRoad, avenida } from './townplus.js';
 import { buildSchools } from './schools.js';
 import { buildPools } from './pools.js';
+import { STYLE } from './style.js';
 
 const toLocal = (lat, lon, origin) => {
   const R = 6378137, KX = Math.cos((origin[0] * Math.PI) / 180) * R * Math.PI / 180, KZ = R * Math.PI / 180;
@@ -178,6 +179,8 @@ class Landmarks {
     };
     // roof tile texture from facade array would need the array; draw a small canvas instead
     this.mat.teja.map = canvasTex(this.tileCanvas(), true);
+    // (claymation: the church, the town hall and the rest worked by hand like the houses: their marks deeper and in the colour)
+    if (STYLE.plastilina) for (const k of ['mamp', 'sillar', 'teja', 'cal', 'white']) this.mat[k].defines = { CLAY_RELIEF: '2.3', CLAY_TONE: '2.4' };
     this.signs = signAtlas();
     this.signTex = canvasTex(this.signs.canvas);
     this.build();
