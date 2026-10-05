@@ -12,11 +12,13 @@
 import * as THREE from 'three';
 import { Character, palette, PUPPET } from './characters.js';
 import { STYLE } from './style.js';
+import { STEADY_BOIL } from './plastilina.js';
 import { parseHero } from './herodata.js';
 import { parseMoves, MotionDB, MotionPlayer } from './heromotion.js';
 import { loadAssetBytes } from './assets.js';
 import { dressHero } from './herowear.js';
 import { solveTwoBone } from './heroik.js';
+import { springDamper } from './springs.js';
 import { clamp, lerp, smoothstep } from './util.js';
 
 let HD = null, HDP = null;
@@ -62,8 +64,24 @@ const ARM_ACTIONS = new Set(['jab', 'cross', 'hookL', 'upper', 'bat', 'push', 'w
 const FULL_BASES = new Set(['sit', 'drive', 'lie', 'sitTalk', 'sitFan', 'moto', 'bici', 'dance', 'swim']);
 
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4(), _v = new THREE.Vector3();
+const _e = new THREE.Euler(), _qw = new THREE.Quaternion(), _qpw = new THREE.Quaternion(), _qro = new THREE.Quaternion();
 const _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3(), _t3 = new THREE.Vector3(), _t4 = new THREE.Vector3(), _h = new THREE.Vector3(), _k = new THREE.Vector3(), _a = new THREE.Vector3();
 const _X = new THREE.Vector3(1, 0, 0), _Z = new THREE.Vector3(0, 0, 1), _q0 = new THREE.Quaternion();
+const _wa = new THREE.Vector3(), _wb = new THREE.Vector3();
+// foot locking (m above the ground under the body): the ball of the foot lifting off (above this it is not held), and
+// the lowest the ball and the ankle may go
+const TOE_LIFT = 0.06, TOE_MIN = 0.012, ANKLE_MIN = 0.055;
+const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const _tq = new THREE.Quaternion(), _tw = new THREE.Quaternion(), _tp = new THREE.Quaternion();
+// a bone turned by ang about an axis given in the world (its children with it)
+function turnBone(b, axis, ang) {
+  if (!b || !b.parent) return;
+  _tw.setFromAxisAngle(axis, ang);
+  b.parent.getWorldQuaternion(_tp);
+  // the new local turn: P⁻¹ · W · P · L
+  _tq.copy(_tp).invert().multiply(_tw).multiply(_tp).multiply(b.quaternion);
+  b.quaternion.copy(_tq);
+}
 const _qt = new THREE.Quaternion(), _qs = new THREE.Quaternion(), _qf = new THREE.Quaternion(), _qp = new THREE.Quaternion(), _qu = new THREE.Quaternion(), _ql = new THREE.Quaternion();
 
 export class Hero extends Character {
@@ -186,6 +204,7 @@ export class Hero extends Character {
     this.heroGeos = [gb, gh]; this.heroRegs = [reg.slice(0, h0), reg.slice(h0, N)];
     this.paint();
     this.mat = this.statue ? this.factory.bronze : this.factory.material(this.desc);
+    if (STYLE.plastilina && !this.statue && !this.mat.userData.u.uClayBoil) { this.mat.userData.u.uClayBoil = STEADY_BOIL; this.mat.needsUpdate = true; } // (the protagonist's clay holds still: no boil)
     if (!this.statue) {
       const u = this.mat.userData.u;
       u.uNeckY.value = -10; // (no sculpted neck to fade into)
@@ -286,7 +305,7 @@ export class Hero extends Character {
     procHips.copy(B.hips.position);
     // the capture
     const mm = opts.mm || this.ctrlFrom(speed, opts, dt);
-    this.simSpeed = speed;
+    this.simSpeed = speed; this.simVel = mm.vel;
     const pose = this.mp.update(dt, mm);
     // how much of each part is the procedural pose: whole bases (seated, lying, on a bike, dancing), the air, crouching;
     // the arms for upper-body bases (aiming, phone, talking with the hands…) and arm actions
@@ -353,44 +372,91 @@ export class Hero extends Character {
   // capture has a foot down, the ball of that foot stays where it touched the ground — whatever small difference there
   // is between the animation's pace and the body's, or a turn — and the leg is solved (two bones, the knee kept in the
   // plane it was animated in) to reach it; when the foot lifts, it eases back into the animation.
+  //  - only along the ground: the height is the capture's (a heel strike lands with the ball up; held up there, the
+  //    foot would hover through the whole step), and never under the ground (a lean tilts the stride)
+  //  - once a step: a lock let go (the ball lifting, or dragged too far) is not taken again until the next footfall —
+  //    taken again at once, the foot would jump from where it was held to where the capture has it
+  //  - eased in and out with a smoothstep (no kink in the foot's speed where the lock starts or ends)
   afterMove() {
     if (!this.ready || !this.mp || this.rag || this.gu || !HD) return;
     const B = this.bones, dt = this.dt || 1 / 60, w = this.lockW || 0;
-    const L = this.locks || (this.locks = { L: { on: false, w: 0, pos: new THREE.Vector3(), off: 0 }, R: { on: false, w: 0, pos: new THREE.Vector3(), off: 0 } });
-    if (w < 0.01) { L.L.on = L.R.on = false; L.L.w = L.R.w = 0; return; }
+    const mk = () => ({ on: false, w: 0, pos: new THREE.Vector3(), armed: false, was: false, h: 0 });
+    const L = this.locks || (this.locks = { L: mk(), R: mk() });
+    if (w < 0.01) { for (const lk of [L.L, L.R]) { lk.on = lk.armed = lk.was = false; lk.w = 0; } if (this.owS) this.owS.x = this.owS.v = 0; return; }
     this.object.updateMatrixWorld(true);
     const gy = this.object.position.y;
+    const mp = this.mp, f0 = mp.frame, db = mp.db, va = Math.hypot(db.vel[f0 * 2], db.vel[f0 * 2 + 1]) * mp.rate, vs = this.simSpeed || 0;
+    // orientation warping (as Unreal's locomotion does it): the capture runs the way its body faces, the body may be
+    // going somewhat another way (cutting from side to side, the run swung round by the camera) — the legs are turned
+    // to run where the body really goes, the spine turned back so the chest and head still face ahead (up to ~35°;
+    // nothing for a body going the other way from the capture's)
+    const sv = this.simVel, ow = this.owS || (this.owS = { x: 0, v: 0 });
+    let th = 0;
+    if (sv && va > 0.5) {
+      const ss = Math.hypot(sv[0], sv[1]), a = wrapA(Math.atan2(sv[0], sv[1]) - Math.atan2(db.vel[f0 * 2 + 1], db.vel[f0 * 2]));
+      if (ss > 1) th = clamp(a, -0.6, 0.6) * smoothstep(1.2, 2.6, ss) * smoothstep(1.9, 1.3, Math.abs(a));
+    }
+    springDamper(ow, th * w, 0.08, dt);
+    if (Math.abs(ow.x) > 0.004) {
+      const up = _wa.set(0, 1, 0).applyQuaternion(this.object.quaternion);
+      turnBone(B.hips, up, ow.x);
+      turnBone(B.spine, up, -ow.x * 0.35); turnBone(B.spine2, up, -ow.x * 0.35); turnBone(B.chest, up, -ow.x * 0.3);
+      B.hips.updateMatrixWorld(true);
+    }
     // stride warping: a body going faster than the capture it plays (a sprint beyond the fastest run captured) takes
     // longer strides — each foot's reach ahead of and behind the hips stretched along the way it goes, the hips a
-    // little lower to make the reach
-    const mp = this.mp, f0 = mp.frame, db = mp.db, va = Math.hypot(db.vel[f0 * 2], db.vel[f0 * 2 + 1]) * mp.rate, vs = this.simSpeed || 0;
+    // little lower to make the reach (the feet kept at the capture's height: lower legs, not feet in the ground)
     const warp = va > 1.5 && vs > va ? Math.min(1.35, vs / va) : 1;
     this.warpK = lerp(this.warpK || 1, warp, Math.min(1, dt * 5));
     if (this.warpK > 1.01) {
-      const k = this.warpK - 1;
+      const k = this.warpK - 1, sy = this.object.rotation.y + ow.x; // (along the legs' own way)
+      const hp = B.hips.getWorldPosition(_t1), fw = _t2.set(Math.sin(sy), 0, Math.cos(sy));
+      const aL = B.footL.getWorldPosition(_wa), aR = B.footR.getWorldPosition(_wb);
+      const dL = (aL.x - hp.x) * fw.x + (aL.z - hp.z) * fw.z, dR = (aR.x - hp.x) * fw.x + (aR.z - hp.z) * fw.z;
       B.hips.position.y -= 0.05 * k;
       B.hips.updateMatrixWorld(true);
-      const hp = B.hips.getWorldPosition(_t1).clone(), fw = _t2.set(Math.sin(this.object.rotation.y), 0, Math.cos(this.object.rotation.y));
-      for (const s of ['L', 'R']) {
-        const ank = B['foot' + s].getWorldPosition(_t3), d = (ank.x - hp.x) * fw.x + (ank.z - hp.z) * fw.z;
-        this.legIK(s, _t4.copy(ank).addScaledVector(fw, d * k * w));
-      }
+      this.legIK('L', aL.addScaledVector(fw, dL * k * w));
+      this.legIK('R', aR.addScaledVector(fw, dR * k * w));
     }
+    // (the lean tilts the whole body about the root, feet and all: a foot's height above the ground is taken in the
+    // body's own frame — the capture's — and the foot is put back at it, so the body leans over feet still on the ground)
+    _m.copy(this.object.matrixWorld).invert();
+    const sc = this.object.scale.y;
     for (const s of ['L', 'R']) {
-      const lk = L[s], contact = s === 'L' ? this.mp.contactL : this.mp.contactR;
-      const toe = B['toe' + s].getWorldPosition(_t1);
-      if (contact && !lk.on && lk.w < 0.5) { lk.on = true; lk.pos.copy(toe); lk.pos.y = Math.max(gy + 0.02, toe.y); }
-      else if (!contact && lk.on) lk.on = false;
-      if (lk.on && toe.distanceTo(lk.pos) > 0.35) lk.on = false; // (dragged too far: let it go)
-      lk.w = lk.on ? Math.min(1, lk.w + dt * 14) : Math.max(0, lk.w - dt * 7);
-      const k = lk.w * w;
-      if (k < 0.01) continue;
-      // where the ankle must go so the ball of the foot lands on the lock, the foot keeping its own angle
-      const ank = B['foot' + s].getWorldPosition(_t2);
-      _t3.copy(lk.pos).sub(toe).multiplyScalar(k);
-      const target = _t4.copy(ank).add(_t3);
-      this.legIK(s, target);
+      const lk = L[s], contact = s === 'L' ? mp.contactL : mp.contactR;
+      const toe = B['toe' + s].getWorldPosition(_t1), ank = B['foot' + s].getWorldPosition(_t2);
+      const h = (lk.h = _wa.copy(toe).applyMatrix4(_m).y * sc), ha = _wb.copy(ank).applyMatrix4(_m).y * sc;
+      if (contact && !lk.was) lk.armed = true; // (a footfall: this foot may be locked once)
+      if (!contact) lk.armed = false;
+      lk.was = contact;
+      if (lk.armed && !lk.on && lk.w < 0.1 && h < TOE_LIFT) { lk.on = true; lk.armed = false; lk.pos.copy(toe); }
+      if (lk.on && (!contact || h > TOE_LIFT + 0.02 || Math.hypot(toe.x - lk.pos.x, toe.z - lk.pos.z) > 0.3)) lk.on = false;
+      lk.w = lk.on ? Math.min(1, lk.w + dt * 16) : Math.max(0, lk.w - dt * 7);
+      const k = lk.w * lk.w * (3 - 2 * lk.w) * w;
+      // where the ankle must go: the ball of the foot held on its spot (as much as k), the foot keeping its own angle,
+      // at the capture's height, and lifted if the toe or the heel would be under the ground
+      const dy = Math.max((gy + h - toe.y + gy + ha - ank.y) * 0.5, gy + TOE_MIN - toe.y, gy + ANKLE_MIN - ank.y);
+      _t3.set((lk.pos.x - toe.x) * k, dy * w, (lk.pos.z - toe.z) * k);
+      if (_t3.lengthSq() < 1e-8) continue;
+      this.legIK(s, _t4.copy(ank).add(_t3));
     }
+    this.steadyHead();
+  }
+  // Leaning into a run (the player's controller tilts the whole body at the feet: into a turn, forwards when speeding
+  // up and in a sprint) the eyes stay level, as a runner's do — most of the tilt is taken back at the neck. leanP and
+  // leanR: the lean (rad) about the body's own right and forward axes.
+  steadyHead() {
+    const lp = this.leanP || 0, lr = this.leanR || 0;
+    if (Math.abs(lp) + Math.abs(lr) < 1e-4) return;
+    const neck = this.bones.neck; if (!neck || !neck.parent) return;
+    // the correction about the body's own axes, as a turn in the world: W = R · C · R⁻¹ (R the body's own turn)
+    this.object.getWorldQuaternion(_qro);
+    _q.setFromEuler(_e.set(-lp * 0.65, 0, -lr * 0.7, 'YXZ'));
+    _qw.copy(_qro).multiply(_q).multiply(_q2.copy(_qro).invert());
+    // the neck's new local turn: P⁻¹ · W · P · L (P its parent's world turn)
+    neck.parent.getWorldQuaternion(_qpw);
+    _q.copy(_qpw).invert().multiply(_qw).multiply(_qpw).multiply(neck.quaternion);
+    neck.quaternion.copy(_q);
   }
   // two-bone IK on one leg towards an ankle position (world), keeping the foot's world rotation
   legIK(s, target) {

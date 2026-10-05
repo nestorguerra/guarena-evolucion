@@ -242,8 +242,10 @@ export class Fleet {
       const key = front * 100 + rear * 10 + extra;
       if (key !== v._lightKey || v.siren) { rend.setLights(v, front, rear, extra); v._lightKey = key; }
     }
-    // (claymation: the cars go pose by pose — only the one you drive keeps up with the camera between poses)
-    if (STYLE.plastilina && SM.on && !SM.tick) rend.flushOnly(this.game.cine ? null : this.game.player && this.game.player.vehicle); // («Película»: your car on twos too)
+    // (claymation: the cars go pose by pose — only the one you drive keeps up with the camera between poses. A frame
+    // that gave out or took back slots sends them all: a car just come, or moved into a freed slot, would otherwise show
+    // what was last sent for its slot until the next pose — wheels without their body, a body somewhere else)
+    if (STYLE.plastilina && SM.on && !SM.tick && !rend.changed) rend.flushOnly(this.game.cine ? null : this.game.player && this.game.player.vehicle); // («Película»: your car on twos too)
     else rend.flush();
   }
 

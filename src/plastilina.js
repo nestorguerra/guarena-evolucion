@@ -384,9 +384,11 @@ export class StopMotion {
     this.items = new Map(); // root -> { nodes, held, live, smooth }
     this.ticks = 0;
   }
-  add(root, { smooth = false } = {}) { this.items.set(root, { nodes: null, held: null, live: null, smooth, n: -1 }); }
+  add(root, { smooth = false } = {}) { this.items.set(root, { nodes: null, held: null, live: null, smooth, free: false, n: -1 }); }
   remove(root) { this.items.delete(root); }
   setSmooth(root, smooth) { const it = this.items.get(root); if (it) it.smooth = smooth; }
+  // free: not held at all — moved and posed every frame (the protagonist, so it runs as fluidly as the camera follows it)
+  setFree(root, free) { const it = this.items.get(root); if (it) it.free = free; }
   // once a frame, with the frame's real time: is this frame a new pose?
   advance(dt) {
     if (!this.on) { this.tick = true; return true; }
@@ -431,7 +433,7 @@ export class StopMotion {
     if (!this.on) return;
     const J = PLASTILINA.jitter;
     for (const [root, it] of this.items) {
-      if (!root.parent || !root.visible) { it.held = null; continue; }
+      if (!root.parent || !root.visible || it.free) { it.held = null; continue; }
       // (the node list is gathered again when the tree changes: a hat put on, a level of detail swapped)
       let count = 0; root.traverse(() => count++);
       if (!it.nodes || count !== it.n) { it.nodes = this.nodesOf(root); it.n = count; it.held = null; }
@@ -456,3 +458,5 @@ export class StopMotion {
 }
 
 export const SM = new StopMotion();
+// the protagonist's clay does not boil: its own, still copy of the boil uniform (characters.js / hero.js)
+export const STEADY_BOIL = { value: { x: 0, y: 0 } };

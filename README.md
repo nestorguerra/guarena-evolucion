@@ -51,8 +51,9 @@ La **Plastilina** es Guareña como una película de stop motion de plastilina (c
   maqueta fotografiada, el fondo lejano apenas suave.
 - **Stop motion**: personas, perros y coches posan 12 veces por segundo (el agua, el viento y el humo también); en cada
   pose la superficie de los muñecos «hierve» un milímetro o dos y quedan un poco distintos, como recolocados a mano. La
-  cámara, tu personaje y tu coche van fluidos, para jugar igual que siempre. *Ajustes › Stop motion*: Sí, **Película**
-  (tú también a doses, la cámara a las 24 imágenes por segundo del cine, grano de película y bandas negras) o No.
+  cámara, tu personaje (su pose también, en cada fotograma: corre fluido) y tu coche van fluidos, para jugar igual que
+  siempre. *Ajustes › Stop motion*: Sí, **Película** (tú también a doses, la cámara a las 24 imágenes por segundo del
+  cine, grano de película y bandas negras) o No.
 - Como las imágenes de referencia del usuario: cámara de maqueta a la altura de la calle, paredes crema modeladas a
   mano, carretera de arcilla gris con su grano, aceras de losas color arena, bordillos de rulo de plastilina, plazas
   de adoquines, árboles como brócolis de bolitas, rejas negras gordas, geranios en los alféizares y nubes de algodón
@@ -64,6 +65,17 @@ Todo está en `src/plastilina.js` y en las ramas `STYLE.plastilina` de casas, fa
 cielo (las cabezas de muñeco, en `charbuild.js`: `MH_PUPPET` y `puppetShape`). `tools/lookcompare.js` saca las vistas
 fijas, los primeros planos (`closeups`) y vídeos del juego (`walkVideo`); `tools/puppetlab.js`, las caras sin y con el
 esculpido de muñeco.
+
+**Cómo corre Álex** (en [docs/carrera.md](docs/carrera.md), con lo investigado en otros juegos y las medidas):
+- Captura de movimiento real elegida por *motion matching*, con bucles de esprint, rectos y en curva.
+- Pies que no patinan: bloqueados al suelo en cada pisada, con zancada alargada al esprintar y piernas giradas hacia
+  donde va el cuerpo en curvas y quiebros (*stride* y *orientation warping*, como en Unreal).
+- Se inclina en las curvas y al acelerar, con la cabeza nivelada.
+- Pisadas con su ruido y, al esprintar, una pizca de polvo.
+- La cámara le sigue con muelles: suave, mirando un poco por delante, detrás de él al correr, algo más abierta al
+  esprintar y sin tirones contra postes ni paredes.
+
+`tools/runlab.js` juega carreras de prueba y las mide.
 
 ![Guareña desde el aire: la Iglesia de Santa María y la Plaza de España con el Ayuntamiento](docs/portada.jpg)
 
@@ -128,7 +140,8 @@ python3 tools/build_map.py          # regenera data/map.json desde OpenStreetMap
   Catastro se descargan con `tools/fetch_catastro.py`)
 - `tools/` — empaquetado, servidor local, mapa y pruebas automáticas: `audit.js` recorre todas las calles a pie
   y en coche, `missionbot.js` juega las misiones, `playtest.js` conduce, pelea, hace de taxista… `faces.js`
-  retrata a los personajes de cerca
+  retrata a los personajes de cerca, `runlab.js` graba y mide carreras (pies, cámara, temblor) y `mocaplab.js`
+  adapta la captura de movimiento (`appendDB` añade tomas sin tocar las que ya hay)
 - `multijugador/` — el servidor de la sala · `.github/workflows/pages.yml` — publica el juego en GitHub Pages
 
 Si defines la variable de repositorio `GUARENA_MP_URL` con la dirección de un servidor propio, las copias que no

@@ -193,10 +193,18 @@ export class MotionPlayer {
   update(dt, ctrl) {
     const db = this.db;
     this.searchT -= dt;
+    this.dwell = (this.dwell || 0) + dt;
     let jumped = false;
     // (a take running out — less than a second of it left — must hand over now: it cannot go on)
     const ending = !db.ok[this.frame];
-    if (this.searchT <= 0 || ctrl.force || ending) {
+    // what is asked: when it changes (a new direction, speeding up, stopping), a new take may be looked for at once;
+    // while it holds steady, the take playing is kept at least a few strides' worth — a steady run settles into its
+    // own cycle instead of hopping between takes ten times a second (each hop a small hitch however well blended)
+    const gx = ctrl.goal[0], gz = ctrl.goal[1], pg = this._goal || (this._goal = [gx, gz]);
+    const change = Math.hypot(gx - pg[0], gz - pg[1]) > 0.6 || Math.abs(ctrl.turn) > 0.5;
+    if (change) { pg[0] = gx; pg[1] = gz; }
+    const settled = !change && this.dwell < 0.45;
+    if ((this.searchT <= 0 && !settled) || ctrl.force || ending) {
       this.searchT = 0.1;
       const q = this.buildQuery(ctrl);
       // standing still (nothing asked, hardly moving): the standing and the turning-on-the-spot takes only — the ends
@@ -208,14 +216,14 @@ export class MotionPlayer {
       const r = db.search(q, tags);
       // switch only if clearly better, and not to (nearly) the same moment of the same clip
       const same = db.clipOf[r.frame] === db.clipOf[this.frame] && !db.raw.clips[db.clipOf[r.frame]].loop;
-      if (r.frame >= 0 && r.cost < cur * 0.9 - 0.02 && !(same && r.frame - this.frame < 20 && r.frame - this.frame > -20)) {
-        this.frame = r.frame; this.ft = 0; jumped = true;
+      if (r.frame >= 0 && r.cost < cur * (change ? 0.9 : 0.8) - 0.02 && !(same && r.frame - this.frame < 20 && r.frame - this.frame > -20)) {
+        this.frame = r.frame; this.ft = 0; jumped = true; this.dwell = 0;
       }
     }
     // play on (at a rate that keeps the stride matched to the body's speed, within reason: a sprint quicker than the
     // fastest capture plays it up to a quarter faster)
     { const fv = this.frame, va = Math.hypot(db.vel[fv * 2], db.vel[fv * 2 + 1]), vs = Math.hypot(ctrl.vel[0], ctrl.vel[1]);
-      const want = va > 0.6 && vs > 0.6 ? Math.min(1.25, Math.max(0.85, vs / va)) : 1;
+      const want = va > 0.6 && vs > 0.6 ? Math.min(1.3, Math.max(0.85, vs > va ? Math.pow(vs / va, 0.55) : vs / va)) : 1; // (faster than the capture: part quicker steps, part longer ones — afterMove's stride warping)
       this.rate += (want - this.rate) * Math.min(1, dt * 6); }
     this.ft += dt * db.fps * this.rate;
     while (this.ft >= 1) { this.ft -= 1; this.frame = db.step(this.frame, 1); }

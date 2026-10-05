@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { STYLE } from './style.js';
 import { clamp, lerp, damp, dampAngle, wrapAngle, smoothstep, polyNearest, polySample, TAU } from './util.js';
-import { springCharacter, springAngle } from './springs.js';
+import { springCharacter, springAngle, springDamper } from './springs.js';
 import { PERK, setPerk, applyFitness } from './perks.js';
 
 const WALK = 1.7, JOG = 3.6, SPRINT = 6.4, CROUCH = 1.15;
@@ -109,6 +109,7 @@ export class Player {
     } else { this.turnRate = 0; this.stamina = Math.min(1, this.stamina + dt * 0.3 * PERK.regen); }
     let ns;
     const hero = !!this.char.isHero, mm = hero ? this.heroSprings(dt, target, moveYaw, mag > 0.05, strafe, camYaw) : null;
+    if (hero) this.leanUpdate(dt, strafe);
     if (hero) ns = Math.hypot(this.vel.x, this.vel.z);
     else {
       const hs = Math.hypot(this.vel.x, this.vel.z);
@@ -142,8 +143,20 @@ export class Player {
       if (this.pos.y <= gy) { this.pos.y = gy; this.grounded = true; if (this.vel.y < -3) g.audio.sfx('land'); this.vel.y = 0; }
     } else if (gy < this.pos.y - 0.4) { this.grounded = false; this.vel.y = 0; } // stepped off an edge
     else this.pos.y = gy;
-    // footsteps
-    if (this.grounded && ns > 1) {
+    // footsteps: the hero's on the very frame each foot lands (the capture says when), a little puff of dust kicked up
+    // by a sprinting foot — so what is heard and seen keeps the stride's own beat; others' by distance
+    const mpl = hero && this.char.mp;
+    if (mpl) {
+      const fs = this._fs || (this._fs = { L: mpl.contactL, R: mpl.contactR });
+      for (const sd of ['L', 'R']) {
+        const c = sd === 'L' ? mpl.contactL : mpl.contactR;
+        if (c && !fs[sd] && this.grounded && ns > 0.8) {
+          g.audio.sfx('footstep', { vol: this.crouch ? 0.08 : ns > 5 ? 0.6 : ns > 2.5 ? 0.42 : 0.3 });
+          if (ns > 4.4 && !g.interior) this.footDust(sd, ns);
+        }
+        fs[sd] = c;
+      }
+    } else if (this.grounded && ns > 1) {
       this.stepAcc = (this.stepAcc || 0) + ns * dt;
       const stride = ns > 5 ? 1.5 : ns > 3 ? 1.1 : 0.75;
       if (this.stepAcc > stride) { this.stepAcc = 0; g.audio.sfx('footstep', { vol: this.crouch ? 0.08 : ns > 5 ? 0.6 : 0.35 }); }
@@ -191,6 +204,36 @@ export class Player {
     return m;
   }
 
+  // a sprinting foot kicks up a little dust where it lands (in the claymation, a pinch of cotton wool)
+  footDust(sd, ns) {
+    const g = this.game, B = this.char.bones, toe = B && B['toe' + sd];
+    if (!toe || !g.effects || !g.effects.smoke) return;
+    const w = toe.getWorldPosition(this._dw || (this._dw = new THREE.Vector3())), k = Math.min(1, (ns - 4.4) / 2);
+    for (let i = 0; i < 3; i++) {
+      g.effects.smoke.emit(w.x + (Math.random() - 0.5) * 0.12, 0.06, w.z + (Math.random() - 0.5) * 0.12,
+        (Math.random() - 0.5) * 0.7 - this.vel.x * 0.06, 0.25 + Math.random() * 0.25, (Math.random() - 0.5) * 0.7 - this.vel.z * 0.06,
+        0.45 + Math.random() * 0.25, 0.12, 0.42 + 0.2 * k, 0.78, 0.72, 0.62, 0.3 + 0.15 * k);
+    }
+  }
+
+  // The hero leans into what it does, as a runner does (and as the best-animated game characters are made to: a body
+  // that runs round a corner bolt upright reads as weightless): into a turn by the pull of the turn, forwards as it
+  // speeds up and in a sprint, back as it brakes. Worked out from the same springs that move it, softened by springs
+  // of its own so it never snaps; the whole body tilts at the feet (syncChar), the head keeps level (hero.steadyHead).
+  leanUpdate(dt, strafe) {
+    const L = this.lean || (this.lean = { p: { x: 0, v: 0 }, r: { x: 0, v: 0 } }), s = this.spr;
+    let pt = 0, rt = 0;
+    if (s && this.mode === 'foot' && this.grounded && !this.knock) {
+      const h = this.heading, sp = Math.hypot(this.vel.x, this.vel.z);
+      const af = s.a[0] * Math.sin(h) + s.a[1] * Math.cos(h); // (speeding up along the way it faces)
+      // (braking: back while there is speed to shed, upright again as it dies away)
+      pt = clamp((0.5 * af * (af < 0 ? smoothstep(0.4, 3, sp) : 1)) / 9.81 + 0.08 * smoothstep(3.6, 6.4, sp), -0.09, 0.2);
+      rt = clamp(-0.5 * Math.atan((sp * (s.yaw.v || 0)) / 9.81), -0.22, 0.22); // (a turn's pull: speed × turn rate)
+      if (strafe || this.crouch || this.carry) { pt *= 0.3; rt *= 0.3; }
+    }
+    springDamper(L.p, pt, 0.12, dt); springDamper(L.r, rt, 0.1, dt);
+  }
+
   // walking a street, the way you go settles on the street's own direction (a diagonal or a curving one too), unless
   // you clearly mean another way: within ~40° of it you follow it, the nearer the more; crossing it stays yours
   alongStreet(want) {
@@ -220,7 +263,10 @@ export class Player {
     // a ragdoll places the body itself: the player is wherever its hips are
     if (ch.rag) { ch.ragPos(this.pos); this.pos.y = ch.rag.floorY; return; }
     o.position.copy(this.pos);
-    o.rotation.set(0, this.heading, 0);
+    // (the hero's lean, at the feet: turned first to its heading, then tilted about its own right and forward axes)
+    const L = ch.isHero && this.mode === 'foot' && this.lean ? this.lean : null;
+    if (L) { o.rotation.order = 'YXZ'; o.rotation.set(L.p.x, this.heading, L.r.x); ch.leanP = L.p.x; ch.leanR = L.r.x; }
+    else { o.rotation.set(0, this.heading, 0); if (ch.isHero) ch.leanP = ch.leanR = 0; }
     // swimming: the body in the water up to the shoulders (a little higher when stretched out in the crawl)
     if (this.mode === 'swim' && this.swim) o.position.y = this.swim.pool.y - (1.36 - 0.22 * smoothstep(0.12, 0.8, this.swim.sp)) * ((ch.isHero ? 1 : ch.scale) || 1);
     if (ch.afterMove) ch.afterMove(); // (the hero's feet locked to the ground, now that the body is where it goes)
@@ -726,12 +772,17 @@ export class CameraRig {
       dist = L * 0.95 + 3.2 + Math.min(2.5, v.vel * 0.05);
       tx = v.x; ty = v.spec.H * 0.75 + 0.9; tz = v.z;
       fovT = 62 + clamp((v.vel - 12) * 0.22, 0, 6); // (a little wider at speed: more distorts what is ahead)
+      this.tgtS = null;
       if (STYLE.plastilina) { dist += 1.6; fovT -= 8; } // (claymation: the set from a little further and higher)
     } else {
       const aim = g.weapons && g.weapons.aiming && !p.knock;
       const sk = aim ? 0.65 : 1; // finer mouse while aiming
-      this.yaw -= ldx * s * sk;
-      this.pitch = clamp(this.pitch - ldy * s * sk, -1.1, 0.55);
+      // the turn the mouse (or the stick) asks for, as a rate eased in and out over a few hundredths of a second: the
+      // camera starts and stops turning smoothly instead of in steps (the same angle in the end)
+      const lv = this.lookV || (this.lookV = { y: { x: 0, v: 0 }, p: { x: 0, v: 0 } }), idt = 1 / Math.max(dt, 1e-3);
+      springDamper(lv.y, -ldx * s * sk * idt, aim ? 0.02 : 0.035, dt); springDamper(lv.p, -ldy * s * sk * idt, aim ? 0.02 : 0.035, dt);
+      this.yaw += lv.y.x * dt;
+      this.pitch = clamp(this.pitch + lv.p.x * dt, -1.1, 0.55);
       // (the anime look frames its courier as the reference does: lower and closer, over the shoulder of a child)
       const ks = (p.char && p.char.scale) || 1, an = STYLE.anime;
       if (p.knock) { tx = p.pos.x; ty = 0.9; tz = p.pos.z; }
@@ -747,8 +798,33 @@ export class CameraRig {
       const rx = -Math.cos(this.yaw + Math.PI), rz = Math.sin(this.yaw + Math.PI);
       const so = aim ? 0.6 : 0.35;
       tx += rx * so; tz += rz * so;
-      // gentle auto-follow when running and not looking
-      if (!aim && Math.abs(ldx) < 0.5 && Math.hypot(p.vel.x, p.vel.z) > 3) this.yaw = dampAngle(this.yaw, p.heading + Math.PI, 0.6, dt);
+      // gentle auto-follow when running and not looking: it eases in with the speed and a moment after the mouse lets
+      // go, and never swings the camera round when you run towards it
+      const spd = Math.hypot(p.vel.x, p.vel.z);
+      this.lookT = Math.abs(ldx) + Math.abs(ldy) > 0.5 ? 0 : (this.lookT || 0) + dt;
+      const behind = Math.abs(wrapAngle(p.heading + Math.PI - this.yaw));
+      const wF = aim ? 0 : smoothstep(2.4, 5, spd) * smoothstep(0.6, 1.4, this.lookT) * smoothstep(2.1, 1.4, behind);
+      if (wF > 0.001) this.yaw = dampAngle(this.yaw, p.heading + Math.PI, 1.1 * wF, dt);
+      // a sprint opens the lens a little: the street rushes by
+      if (!aim) fovT += 5 * smoothstep(4.6, 6.2, spd);
+      // (fluid follow) the point looked at chases the player on a critically damped spring, a little ahead along the
+      // way you run: starts, stops and turns cushioned, never a jolt (aiming: tight, no lead)
+      const ts = this.tgtS || (this.tgtS = { x: { x: tx, v: 0 }, y: { x: ty, v: 0 }, z: { x: tz, v: 0 } });
+      if (Math.hypot(ts.x.x - tx, ts.z.x - tz) > 6 || Math.abs(ts.y.x - ty) > 3) { ts.x.x = tx; ts.y.x = ty; ts.z.x = tz; ts.x.v = ts.y.v = ts.z.v = 0; } // (a jump cut: no glide)
+      const lead = aim || p.knock ? 0 : 0.2, hl = aim ? 0.04 : 0.11;
+      // (the shoulder and the lead never put the point inside a wall — running along a façade they would, and every
+      // ray from in there is blocked: the camera would dive onto the back of your head)
+      const outOfWalls = (x, z) => {
+        const t = col.raycast(p.pos.x, p.pos.z, x, z, ty, ty);
+        if (t >= 1) return [x, z];
+        const L = Math.hypot(x - p.pos.x, z - p.pos.z) || 1, k = Math.max(0, t - 0.25 / L);
+        return [p.pos.x + (x - p.pos.x) * k, p.pos.z + (z - p.pos.z) * k];
+      };
+      const [gx, gz] = outOfWalls(tx + clamp(p.vel.x * lead, -1.3, 1.3), tz + clamp(p.vel.z * lead, -1.3, 1.3));
+      springDamper(ts.x, gx, hl, dt);
+      springDamper(ts.z, gz, hl, dt);
+      springDamper(ts.y, ty, aim ? 0.04 : 0.14, dt);
+      [tx, tz] = outOfWalls(ts.x.x, ts.z.x); ty = ts.y.x;
       // (the anime look) standing still a while, hands off the keys: the camera drifts slowly round you, a little back
       // and up, and the HUD fades — a moment to look at the town. Any key or a look brings it all back
       if (an) {
@@ -773,12 +849,32 @@ export class CameraRig {
     const inn = g.interior;
     cy = Math.max((inn && inn.floorY ? inn.floorY(tx, tz, p.pos.y) : 0) + 0.35, cy);
     if (inn && inn.ceilY) cy = Math.min(cy, inn.ceilY(tx, tz, p.pos.y) - 0.18);
-    // collision: pull in if a wall is between target and camera
-    const t = col.raycast(tx, tz, cx, cz, ty, cy);
-    if (t < 1) {
-      const k = Math.max(0.12, t - 0.06);
-      cx = tx + (cx - tx) * k; cz = tz + (cz - tz) * k; cy = ty + (cy - ty) * k;
+    // collision. Whether the view is blocked is judged by three rays a hand apart (the middle one of them): a lamp post
+    // or a sign across one ray is not a wall, and the camera does not dive in for a frame. Running along a façade, the
+    // camera first slides sideways, off the wall (as a camera operator would step aside), gliding there; only what
+    // that cannot clear pulls it in — at once (never through a wall), and back out softly.
+    const probe = (px, pz, py) => {
+      const ox = pz - tz, oz = -(px - tx), ol = Math.hypot(ox, oz) || 1, w = 0.32 / ol;
+      const t0 = col.raycast(tx, tz, px, pz, ty, py), t1 = col.raycast(tx + ox * w, tz + oz * w, px + ox * w, pz + oz * w, ty, py), t2 = col.raycast(tx - ox * w, tz - oz * w, px - ox * w, pz - oz * w, ty, py);
+      return Math.max(Math.min(t0, t1), Math.min(Math.max(t0, t1), t2)); // (the middle of the three)
+    };
+    const lx = Math.cos(this.yaw), lz = -Math.sin(this.yaw); // (sideways, across the view)
+    let shiftGoal = 0;
+    if (!inV && probe(cx, cz, cy) < 0.98) {
+      const pref = this.lastShift || 1;
+      for (const k of [0.7, 1.4, 2.1]) {
+        if (probe(cx + lx * k * pref, cz + lz * k * pref, cy) >= 0.98) { shiftGoal = k * pref; break; }
+        if (probe(cx - lx * k * pref, cz - lz * k * pref, cy) >= 0.98) { shiftGoal = -k * pref; break; }
+      }
+      if (shiftGoal) this.lastShift = Math.sign(shiftGoal);
     }
+    const ss = this.shiftS || (this.shiftS = { x: 0, v: 0 });
+    springDamper(ss, shiftGoal, shiftGoal ? 0.16 : 0.45, dt);
+    if (Math.abs(ss.x) > 1e-3) { cx += lx * ss.x; cz += lz * ss.x; }
+    const t = probe(cx, cz, cy);
+    const kT = t < 1 ? Math.max(0.12, t - 0.06) : 1, ks = this.pullS || (this.pullS = { x: 1, v: 0 });
+    if (kT < ks.x) { ks.x = kT; ks.v = 0; } else springDamper(ks, kT, 0.32, dt);
+    if (ks.x < 0.999) { const k = ks.x; cx = tx + (cx - tx) * k; cz = tz + (cz - tz) * k; cy = ty + (cy - ty) * k; }
     this.target.set(tx, ty, tz);
     this.pos.set(cx, cy, cz);
     // shake

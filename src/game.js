@@ -705,14 +705,16 @@ export class Game {
     pf.avg = pf.avg * 0.97 + dtReal * 0.03;
     pf.t += dtReal;
     pf.lock -= dtReal;
-    if (pf.t < 2) return;
+    if (pf.t < 1) return;
     pf.t = 0;
-    pf.slow = pf.avg > 1 / 38 ? pf.slow + 1 : 0;   // under ~38 fps
-    pf.fast = pf.avg < 1 / 50 ? pf.fast + 1 : 0;   // over ~50 fps
+    // (fluid first: under ~50 fps for two seconds running, a little less resolution; back up once the frames are
+    // coming at ~60 again for three)
+    pf.slow = pf.avg > 1 / 50 ? pf.slow + 1 : 0;   // under ~50 fps
+    pf.fast = pf.avg < 1 / 57 ? pf.fast + 1 : 0;   // at ~60 fps
     const floor = Math.max(0.75, pf.base * 0.6);
     let pr = pf.pr;
-    if (pf.slow >= 3 && pr > floor) { pr = Math.max(floor, pr - 0.1); pf.lock = 6; pf.slow = 0; }       // 6 s in a row
-    else if (pf.fast >= 2 && pr < pf.base && pf.lock <= 0) { pr = Math.min(pf.base, pr + 0.1); pf.fast = 0; }
+    if (pf.slow >= 2 && pr > floor) { pr = Math.max(floor, pr - 0.1); pf.lock = 4; pf.slow = 0; }       // 2 s in a row
+    else if (pf.fast >= 3 && pr < pf.base && pf.lock <= 0) { pr = Math.min(pf.base, pr + 0.05); pf.fast = 0; }
     if (Math.abs(pr - pf.pr) < 0.01) return;
     pf.pr = pr;
     r.setPixelRatio(pr);
@@ -800,7 +802,9 @@ export class Game {
     // (drawn where it was at the last frame between them), a new grain on every frame
     let camLive = null;
     if (STYLE.plastilina) {
-      if (this.player && this.player.char) SM.setSmooth(this.player.char.object, !this.cine); // («Película»: you too, on twos)
+      // (you are posed every frame and drawn where you are, as fluid as the camera that follows you; «Película»: you
+      // too on twos, like everybody)
+      if (this.player && this.player.char) { SM.setFree(this.player.char.object, !this.cine); SM.setSmooth(this.player.char.object, false); }
       const now = performance.now(), h = this._camHold || (this._camHold = { p: new THREE.Vector3(), q: new THREE.Quaternion(), fov: 60, ok: false, t: 0 });
       const filmTick = now - h.t >= 1000 / 24 - 2;
       if (this.grade && SM.tick) this.grade.uniforms.uGain.value = SM.on ? 1 + (Math.random() - 0.5) * PLASTILINA.flicker : 1;

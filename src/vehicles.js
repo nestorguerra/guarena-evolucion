@@ -745,6 +745,7 @@ export class VehicleRenderer {
     this.setColor(v, v.color);
     this.setWear(v);
     this.setLights(v, 0, 0, 0);
+    this.changed = true; // (slots given out or taken back: see fleet's flush)
     return true;
   }
   setWear(v) {
@@ -789,6 +790,7 @@ export class VehicleRenderer {
     ws.tyre.count = ws.rim.count = ws.slots.length * 4;
     ws.tyre.instanceMatrix.needsUpdate = true; ws.rim.instanceMatrix.needsUpdate = true;
     v.wheelSlot = -1;
+    this.changed = true;
   }
   setColor(v, color) {
     const m = this.models[v.model];
@@ -829,6 +831,7 @@ export class VehicleRenderer {
   flush() {
     for (const k in this.models) for (const p in this.models[k].meshes) { const a = this.models[k].meshes[p].instanceMatrix; a.clearUpdateRanges(); a.needsUpdate = true; }
     for (const st in this.wheelSets) for (const w of [this.wheelSets[st].tyre, this.wheelSets[st].rim]) { w.instanceMatrix.clearUpdateRanges(); w.instanceMatrix.needsUpdate = true; }
+    this.changed = false;
   }
   // only one car's matrices to the GPU (the others keep their last pose: claymation)
   flushOnly(v) {
