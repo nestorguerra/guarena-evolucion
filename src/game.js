@@ -12,6 +12,8 @@ import { Chant } from './chant.js';
 import { MapData } from './mapdata.js';
 import { World } from './world.js';
 import { SkySystem } from './sky.js';
+import { Weather } from './weather.js';
+import { Rain } from './rain.js';
 import { shared } from './materials.js';
 import { CharacterFactory, PLAYER_PRESETS, pedShapes } from './characters.js';
 import { installHero, loadHero } from './hero.js';
@@ -119,6 +121,9 @@ export class Game {
     this.world.skySource = this.sky.uniforms; // the reservoir reflects this sky
     this.sky.hour = this.save.hour ?? 18.4;
     this.world.landmarks.hour = this.sky.hour;
+    // the weather of the real Guareña (asked for now, while the town loads) and its rain
+    this.weather = new Weather(this);
+    this.rain = new Rain(this);
     this.input = new Input(this.canvas, this.ui.touch);
     progress('Aparcando coches en doble fila…', 0.84);
     await tick();
@@ -667,7 +672,10 @@ export class Game {
       this.saveT = (this.saveT || 0) + dtReal;
       if (this.saveT > 10) { this.saveT = 0; if (!this.interior && !this.map.buildingAt(p.pos.x, p.pos.z)) this.save.pos = { x: p.pos.x, z: p.pos.z }; this.persist(); }
     }
+    if (this.weather) this.weather.update(dtReal, this);
     const night = this.sky.update(dt, this.camera.position);
+    if (this.rain) this.rain.update(dt, this.sky.wx, this.camera, !!this.interior);
+    if (this.grade) this.grade.uniforms.uSat.value = PLASTILINA.grade.sat * (1 - 0.14 * this.sky.wx.over); // (a grey day: the clay a little less bright)
     // cutscenes are lit like a film at night: a little more exposure and sky fill so you can see what it shows
     if (this.cam.cinematic && night > 0.05) { this.renderer.toneMappingExposure *= 1 + 0.4 * night; this.sky.hemi.intensity += 0.55 * night; }
     if (this.interior) this.interiors.dimSky();
@@ -735,7 +743,9 @@ export class Game {
       if (this.playerSiren) { a.sirenStop('player'); this.playerSiren = false; }
       a.horn(false);
     }
-    a.setAmbient({ hour: this.sky.hour, town: this.map.inTown(p.pos.x, p.pos.z) ? 1 : 0.25, indoor: this.interior ? (this.interior.church ? 1 : 0.65) : 0 });
+    const wx = this.sky.wx, wet = Math.max(wx.rain, wx.snow * 0.3, wx.storm * 0.5);
+    a.setAmbient({ hour: this.sky.hour, town: this.map.inTown(p.pos.x, p.pos.z) ? 1 : 0.25, indoor: this.interior ? (this.interior.church ? 1 : 0.65) : 0, wet });
+    if (a.setRain) a.setRain(Math.max(wx.rain, wx.snow * 0.15) * (this.interior ? 0.55 : 1), !!this.interior); // (the rain, heard muffled from indoors)
     const fu = this.world.landmarks.poi.fuente; // the fountain's water, all the time (not heard from inside anywhere)
     if (fu && a.ready) a.loopAt('fuente', { x: fu.x, z: fu.z, kind: 'fuente', vol: 0.55, ref: 5, max: 60, on: !this.interior });
     this.storkT = (this.storkT || 20) - dt;

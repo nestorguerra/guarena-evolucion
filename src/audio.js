@@ -670,6 +670,26 @@ function bedWind(A, t) {
   } };
 }
 
+// Rain: the broad hiss of the drops (pink noise, its highs for the patter on the street), a low wash when it pours;
+// muffled from indoors (the roof and the shutters keep the highs out)
+function bedRain(A, t) {
+  const k = new Kit(A.ctx), out = k.gain(0);
+  const src = k.buf(A.bank.get('pink'), t, undefined, 1, true, Math.random() * 3);
+  const hp = k.filter('highpass', 500, 0.5), lp = k.filter('lowpass', 7000, 0.4), body = k.gain(0.9);
+  const wash = k.buf(A.bank.get('brown'), t, undefined, 1, true, Math.random() * 3), wl = k.filter('lowpass', 380, 0.7), wg = k.gain(0);
+  const pat = k.buf(A.bank.get('white'), t, undefined, 1, true, Math.random() * 2), pb = k.filter('bandpass', 4200, 1.2), pg = k.gain(0.12);
+  src.connect(hp); hp.connect(lp); lp.connect(body); body.connect(out);
+  wash.connect(wl); wl.connect(wg); wg.connect(out);
+  pat.connect(pb); pb.connect(pg); pg.connect(lp);
+  out.connect(A.world);
+  return { k, apply(v, t) {
+    const m = A._rainMuffle;
+    glide(out.gain, Math.pow(v, 0.8) * 0.42 * (m ? 0.7 : 1), t, 0.6);
+    glide(lp.frequency, m ? 900 : 4500 + 3500 * v, t, 0.4, 1);
+    glide(wg.gain, v * v * 0.8, t, 0.6);
+  } };
+}
+
 // Two-tone car horn: slightly detuned squares, saturated and band-passed.
 function makeHorn(A, t) {
   const k = new Kit(A.ctx), out = k.gain(0), mix = k.gain(0.4);
@@ -733,7 +753,7 @@ export class GameAudio {
     this._speed = 0;
     this._prevTh = 0;
     this._horn = null; this._hornOn = false; this._hornIdle = 0;
-    this._pending = { skid: 0, off: 0, wind: 0 };
+    this._pending = { skid: 0, off: 0, wind: 0, rain: 0 };
     this._beds = null;
     this._paused = false;
     this._amb = { hour: 12, town: 0.5, indoor: 0 };
@@ -800,7 +820,7 @@ export class GameAudio {
     const lp = bq('lowpass', 6500, 0.6, 0, this.radioGain), pk = bq('peaking', 1800, 0.8, 2.5, lp), hp = bq('highpass', 55, 0.7, 0, pk);
     const sat = c.createWaveShaper(); sat.curve = satCurve(1.4); sat.oversample = '2x'; sat.connect(hp);
     this.radioIn = g(0.45, sat); // keeps the mix inside the soft part of the saturation curve
-    this._beds = { skid: new Bed(this, bedSkid), off: new Bed(this, bedOffroad), wind: new Bed(this, bedWind) };
+    this._beds = { skid: new Bed(this, bedSkid), off: new Bed(this, bedOffroad), wind: new Bed(this, bedWind), rain: new Bed(this, bedRain) };
     for (const key of Object.keys(this._pending)) this._beds[key].set(this._pending[key]);
     this._ambient = new Ambient(this);
     this._radio = new Radio(this);
@@ -947,6 +967,7 @@ export class GameAudio {
   setSkid(v) { this._setBed('skid', v); }
   setOffroad(v) { this._setBed('off', v); }
   setWind(v) { this._setBed('wind', v); }
+  setRain(v, muffled = false) { this._rainMuffle = !!muffled; this._setBed('rain', v); }
   _setBed(key, v) { this._pending[key] = clamp(num(v), 0, 1); if (this._beds) this._beds[key].set(this._pending[key]); }
 
   horn(on) {
@@ -1066,6 +1087,7 @@ export class GameAudio {
     if (o.hour !== undefined) this._amb.hour = num(o.hour, this._amb.hour);
     if (o.town !== undefined) this._amb.town = clamp(num(o.town, this._amb.town), 0, 1);
     if (o.indoor !== undefined) this._amb.indoor = clamp(num(o.indoor, 0), 0, 1);
+    if (o.wet !== undefined) this._amb.wet = clamp(num(o.wet, 0), 0, 1); // (in the rain the crickets, cicadas and birds go quiet)
   }
   setChurchPos(x, z) { this._church = { x: num(x), z: num(z) }; }
 
@@ -1347,6 +1369,16 @@ const SFX = {
     chain(nz(A, v, t, 0.02), v.k.filter('bandpass', 3600 * p, 5), eg(v, t, 0.55, 0.0005, 0.012), v.out);
     chain(tone(v, 'sine', 1900 * p, t, 0.02), eg(v, t, 0.12, 0.0005, 0.01), v.out);
   },
+  thunder(A, v, t, p) { // a peal of thunder: close (p > 1.1) a crack first; then the long rumble that rolls away
+    const near = p > 1.1, dur = 4.5 + Math.random() * 3;
+    if (near) chain(nz(A, v, t, 0.5, 'white'), v.k.filter('bandpass', 1800, 0.7), eg(v, t, 0.9, 0.004, 0.35), v.out);
+    const lp = v.k.filter('lowpass', near ? 520 : 260, 0.6), g = v.k.gain(0), G = g.gain;
+    let tt = t + (near ? 0.05 : 0.25);
+    G.setValueAtTime(0, t); G.linearRampToValueAtTime(near ? 1 : 0.7, tt);
+    for (let i = 0; i < 5; i++) { tt += (dur / 6) * (0.6 + Math.random() * 0.8); G.linearRampToValueAtTime((0.35 + Math.random() * 0.55) * (1 - i / 6), tt); } // (it rolls: louder and softer as it comes from farther along the bolt)
+    G.linearRampToValueAtTime(0, tt + 1.2);
+    chain(nz(A, v, t, tt - t + 1.4, 'brown'), lp, g, v.out);
+  },
   wind(A, v, t, p) { // a gust against the shutters
     const f = v.k.filter('lowpass', 380 * p, 0.7);
     f.frequency.setValueAtTime(260 * p, t); f.frequency.linearRampToValueAtTime(720 * p, t + 1.2); f.frequency.linearRampToValueAtTime(240 * p, t + 3);
@@ -1609,7 +1641,7 @@ const SFX_META = {
   reload: { ref: 3, max: 30, vol: 0.7 }, empty: { ref: 3, max: 25, vol: 0.7 }, bat_swing: { ref: 4, max: 50, vol: 0.7 }, bat_hit: { ref: 6, max: 90 },
   bullet_flesh: { ref: 5, max: 60, vol: 0.8 }, bullet_metal: { ref: 6, max: 120, rev: 0.05, vol: 0.8 }, ricochet: { ref: 6, max: 120, rev: 0.1, vol: 0.7 },
   heartbeat: { vol: 0.9 }, door_slam: { ref: 6, max: 90, rev: 0.35 }, church_door: { ref: 6, max: 70, rev: 0.4, vol: 0.8 }, church_shut: { ref: 8, max: 110, rev: 0.6 }, cancel_flap: { ref: 4, max: 40, rev: 0.5, vol: 0.7 }, knock: { ref: 5, max: 60, rev: 0.25 }, flashlight: { vol: 0.6 },
-  creak: { ref: 4, max: 40, rev: 0.45 }, clock: { ref: 2, max: 16, vol: 0.55, rev: 0.25 }, wind: { vol: 0.45, rev: 0.3 }, whisper: { ref: 2, max: 14, rev: 0.4 }, thud: { ref: 6, max: 60, rev: 0.4 },
+  thunder: { vol: 1.15, rev: 0.5 }, creak: { ref: 4, max: 40, rev: 0.45 }, clock: { ref: 2, max: 16, vol: 0.55, rev: 0.25 }, wind: { vol: 0.45, rev: 0.3 }, whisper: { ref: 2, max: 14, rev: 0.4 }, thud: { ref: 6, max: 60, rev: 0.4 },
   radio: { vol: 0.45 }, lid: { ref: 5, max: 60, vol: 0.8 }, bark: { ref: 5, max: 70, vol: 0.8, rev: 0.1 }, piano: { rev: 0.25, vol: 0.9 }, guitar: { rev: 0.2, vol: 0.8 },
   pickup: { vol: 0.8 }, money: { vol: 0.8 }, checkpoint: { vol: 0.9 }, phone_ring: { vol: 0.7 }, text_msg: { vol: 0.7 },
 };
@@ -1636,15 +1668,15 @@ class Ambient {
     const day = smooth(6, 7.5, h) * (1 - smooth(20.5, 22, h)), night = 1 - day;
     const act = clamp(0.12 + 0.55 * day + 0.45 * bump(h, 20, 1.6) + 0.2 * bump(h, 12, 2.5), 0, 1); // evening paseo peak
     // indoors the street is muffled (in a house) or gone (in the church: only its own silence)
-    const ind = num(A._amb.indoor, 0), out = 1 - ind;
+    const ind = num(A._amb.indoor, 0), out = 1 - ind, dry = 1 - 0.85 * num(A._amb.wet, 0);
     glide(this.murmur.gain, town * act * 0.55 * out, t, 0.8);
     glide(this.traffic.gain, (0.25 + 0.45 * town) * act * 0.5 * out, t, 0.8);
-    glide(this.crickets.gain, night * (0.35 + 0.65 * (1 - town)) * 0.7 * out, t, 1.5);
-    glide(this.cicadas.gain, day * bump(h, 15.5, 2.3) * (1 - 0.85 * town) * 0.35 * out, t, 1.5);
+    glide(this.crickets.gain, night * (0.35 + 0.65 * (1 - town)) * 0.7 * out * dry, t, 1.5);
+    glide(this.cicadas.gain, day * bump(h, 15.5, 2.3) * (1 - 0.85 * town) * 0.35 * out * dry, t, 1.5);
     if (A._paused || ind > 0.5) return; // (no birds, swifts, dogs or owls inside)
     const ev = this.timers;
-    const birds = day * (0.5 + 0.5 * (1 - town)) * (1 + 1.5 * bump(h, 7.8, 1)); // dawn chorus
-    const swifts = smooth(17.5, 18.5, h) * (1 - smooth(20.8, 21.6, h)) * (0.4 + 0.6 * town);
+    const birds = day * (0.5 + 0.5 * (1 - town)) * (1 + 1.5 * bump(h, 7.8, 1)) * dry; // dawn chorus
+    const swifts = smooth(17.5, 18.5, h) * (1 - smooth(20.8, 21.6, h)) * (0.4 + 0.6 * town) * dry;
     if ((ev.bird -= dt * birds) < 0) { ev.bird = rnd(1.5, 5); this.bird(); }
     if ((ev.swift -= dt * swifts) < 0) { ev.swift = rnd(4, 12); this.swifts(); }
     if ((ev.owl -= dt * night * (1 - 0.6 * town)) < 0) { ev.owl = rnd(20, 45); this.owl(); }

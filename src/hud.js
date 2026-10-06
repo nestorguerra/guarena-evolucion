@@ -264,6 +264,14 @@ export class Hud {
     ui.money.textContent = fmtMoney(Math.round(this.moneyShown));
     const wd = (((g.sky.day || 0) + 5) % 7);
     ui.clock.textContent = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][wd] + ' ' + g.sky.timeString;
+    // the real weather of the town, under the clock (weather.js): what it is, and from when and where the reading is
+    this.wxT = (this.wxT || 0) - Math.max(dt, 0.016);
+    if (ui.wx && this.wxT <= 0) {
+      this.wxT = 0.5;
+      const info = g.weather ? g.weather.info() : null;
+      const html = info ? `<span>${info.icon ? `<span class="wxI">${info.icon}</span>` : ''}${info.text}</span>${info.sub ? `<small>${info.sub}</small>` : ''}` : '';
+      if (ui.wx._last !== html) { ui.wx.innerHTML = html; ui.wx._last = html; ui.wx.hidden = !info; ui.wx.className = info ? 'wx-' + info.cls : ''; }
+    }
     // wanted
     const w = g.police.wanted, fl = g.police.flashing && Math.floor(performance.now() / 300) % 2;
     let stars = '';

@@ -42,6 +42,7 @@ CARPETAS
                    player.js, vehicles.js, fleet.js, traffic.js, police.js, peds.js
                    census.js (el padrón: los 6.665 vecinos), charla.js (conversaciones),
                    npcmind.js (planes y charlas de la gente)
+                   weather.js (el tiempo real de Guareña, Open-Meteo), rain.js (lluvia y nieve)
                    weapons.js, gunmodels.js, gunrig.js, viewmodel.js
                    missions.js, activities.js, interiors.js (casas, casa de Annie),
                    horror.js, zombies.js, hud.js, audio.js, input.js...
@@ -50,7 +51,8 @@ CARPETAS
   data/          Datos del mapa: OpenStreetMap, Catastro (INSPIRE) y map.json.
   tools/         Empaquetado, servidor local, generación del mapa y herramientas de
                  prueba (playtest.js, charlab.js, snap.js, guntest.js, sheet.py,
-                 townlab.js: la gente, el civismo, el tráfico y las charlas del pueblo).
+                 townlab.js: la gente, el civismo, el tráfico y las charlas del pueblo;
+                 weatherlab.js: el tiempo real, cada cielo forzado y fotografiado, la red caída).
   dist/          Juego empaquetado listo para jugar.
   .snaps/        Capturas de las pruebas de desarrollo (se pueden borrar).
   debug.html     Visor libre del mapa (src/debug.js).
@@ -61,5 +63,6 @@ CRÉDITOS
 --------
 Callejero © colaboradores de OpenStreetMap (ODbL). Edificios: Dirección General del
 Catastro (INSPIRE). Texturas: Poly Haven (CC0). Sonidos: OpenGameArt (CC0).
+Tiempo en directo: Weather data by Open-Meteo.com (CC BY 4.0).
 Personajes, vehículos, historias y misiones son ficticios; los vecinos del padrón
 también (del INE solo vienen el número de habitantes y la pirámide de edades).

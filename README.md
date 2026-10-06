@@ -98,6 +98,19 @@ sin y con el esculpido de muñeco.
 
 `tools/townlab.js` lo mide en siete escenas del pueblo: la gente, el civismo, el tráfico y las conversaciones.
 
+**El tiempo de Guareña, en directo** (en [docs/tiempo.md](docs/tiempo.md)):
+- Fuente: las condiciones actuales del pueblo según [Open-Meteo](https://open-meteo.com), gratis y sin clave.
+- Cuándo: al empezar la partida y cada 10 minutos.
+- Qué cambia: si allí está despejado, nuboso, cubierto, llueve, hay niebla, tormenta (con relámpagos y truenos) o
+  nieve, el juego lo refleja poco a poco, en las dos estéticas.
+- Dónde se ve: una línea discreta bajo el reloj dice qué tiempo hace y de qué hora es el dato (por cuartos de hora: es
+  una estimación de un modelo meteorológico, no una estación).
+- Si falla la red: se queda el último dato, marcado como antiguo.
+- El reloj del juego, el día y la noche y las rutinas no cambian. En *Ajustes › Tiempo de Guareña* se puede volver al
+  tiempo del juego.
+- No funciona en la página publicada en claude.ai, que no deja consultar otras webs; sí en GitHub Pages y en la
+  versión del ordenador.
+
 ![Guareña desde el aire: la Iglesia de Santa María y la Plaza de España con el Ayuntamiento](docs/portada.jpg)
 
 ## Jugar
@@ -186,5 +199,7 @@ pueden jugar online (navegadores sin WebRTC) enlazan con él desde la pantalla *
   `tools/mocaplab.js` la adapta al esqueleto del juego en `assets/hero/moves.bin.gz`.
 - Personajes, vehículos, historias y misiones son ficticios. Los bares y comercios llevan nombres inventados:
   ningún negocio real aparece por su nombre.
+- El tiempo en directo: *Weather data by [Open-Meteo.com](https://open-meteo.com/)*, con licencia
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (uso no comercial gratuito).
 - Los vecinos del padrón también son inventados (nombres, familias y oficios al azar). Del INE solo vienen el número de
   habitantes (6.665 a 1 de enero de 2025) y la forma de la pirámide de edades (censo de 2021).

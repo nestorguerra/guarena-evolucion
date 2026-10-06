@@ -1,4 +1,5 @@
-// Sky, sun & moon, time of day (real solar geometry for Guareña in late September), clouds, fog, lights, IBL.
+// Sky, sun & moon, time of day (real solar geometry for Guareña in late September), clouds, fog, lights, IBL — and the
+// weather of the real town (weather.js: `wx`), cloud, overcast, rain, fog and lightning, over both looks.
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { clamp, lerp, smoothstep } from './util.js';
@@ -68,7 +69,7 @@ function makeSkyMaterial(uniforms) {
     uniforms,
     vertexShader: `varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w; }`,
     fragmentShader: `
-      uniform vec3 uSun, uZen, uHor, uWarm, uGnd, uSunCol; uniform float uTime, uNight, uCloud;
+      uniform vec3 uSun, uZen, uHor, uWarm, uGnd, uSunCol; uniform float uTime, uNight, uCloud, uOver, uRain, uFlash;
       varying vec3 vDir;
       float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
       float n2(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h2(i),h2(i+vec2(1,0)),f.x), mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x), f.y); }
@@ -99,7 +100,10 @@ function makeSkyMaterial(uniforms) {
         if (h > 0.0) {
           vec2 uv = d.xz / (h + 0.12) * 1.6 + vec2(uTime * 0.004, uTime * 0.0016);
           float c = fbm(uv), c2 = fbm(uv * 3.1 + 5.3);
-          cov = smoothstep(1.0 - uCloud * 0.62, 1.05 - uCloud * 0.35, c * 0.85 + c2 * 0.15) * smoothstep(0.0, 0.12, h);
+          // (how much of the sky they take: the game's usual few at 0.42, as always; a clear sky next to none; a cloudy
+          // one, most of it)
+          float lo = uCloud <= 0.42 ? 0.8 - uCloud * 0.143 : 0.74 - (uCloud - 0.42) * 0.72;
+          cov = smoothstep(lo, lo + 0.163, c * 0.85 + c2 * 0.15) * smoothstep(0.0, 0.12, h);
           vec3 lit = mix(vec3(1.0, 0.98, 0.95), uSunCol * 1.2 + vec3(0.2), 0.35 * (1.0 - smoothstep(0.0, 0.4, uSun.y)));
           cc = mix(hor * 0.9, lit, 0.45 + 0.55 * pow(sd, 3.0));
           cc *= 0.78 + 0.22 * smoothstep(0.35, 0.8, c2); // thicker parts in shade
@@ -107,7 +111,26 @@ function makeSkyMaterial(uniforms) {
         }
         float nightK = smoothstep(-0.03, -0.15, uSun.y); // 0: the physical sky shows, 1: our night sky
         vec3 full = mix(col, cc, cov * 0.85);
-        gl_FragColor = vec4(mix(cc, full, nightK), mix(cov * 0.85, 1.0, nightK));
+        vec3 rgb = mix(cc, full, nightK); float alpha = mix(cov * 0.85, 1.0, nightK);
+        // overcast: a grey deck over the whole sky down to the horizon (darker where it rains, the town's lights on its
+        // belly at night), which hides the sun; lit up for an instant by the lightning
+        if (uOver > 0.001 || uFlash > 0.001) {
+          float dayK = smoothstep(-0.12, 0.25, uSun.y);
+          vec2 ouv = d.xz / (max(h, 0.0) + 0.1) * 0.8 + vec2(uTime * 0.006, uTime * 0.002);
+          // (the deck has its clouds: rolls and masses with darker bellies, paler gaps between them; heavier and darker
+          // the harder it rains)
+          float m1 = fbm(ouv * 0.9), m2 = fbm(ouv * 2.6 + 3.1);
+          float mass = smoothstep(0.3, 0.78, m1 * 0.7 + m2 * 0.3);
+          vec3 ovLit = mix(vec3(0.78, 0.8, 0.84), vec3(0.52, 0.54, 0.58), uRain), ovDark = mix(vec3(0.48, 0.5, 0.55), vec3(0.19, 0.2, 0.24), uRain);
+          vec3 ov = mix(ovLit, ovDark, mass * (0.6 + 0.4 * uRain)) * (0.94 + 0.12 * fbm(ouv * 7.0 + 1.3));
+          ov = mix(ov, ov * (uWarm * 0.7 + 0.45), 0.4 * (1.0 - smoothstep(0.02, 0.3, uSun.y)) * dayK);
+          ov *= mix(0.07, 1.0, dayK);
+          ov += vec3(0.06, 0.04, 0.025) * (1.0 - dayK) * exp(-max(h, 0.0) * 5.0);
+          ov += vec3(0.72, 0.76, 0.9) * uFlash * (0.55 + 0.45 * fbm(ouv * 2.0 + 3.0));
+          float ovA = min(1.0, max(uOver * 1.15, uFlash * 0.8)) * smoothstep(-0.1, 0.04, h); // (closed before it is quite whole: not a glint of the sun through it)
+          rgb = mix(rgb, ov, ovA); alpha = max(alpha, ovA);
+        }
+        gl_FragColor = vec4(rgb, alpha);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -122,7 +145,7 @@ function makeClaySkyMaterial(uniforms) {
     uniforms,
     vertexShader: `varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w; }`,
     fragmentShader: `
-      uniform vec3 uSun, uZen, uHor, uWarm, uGnd, uSunCol; uniform float uTime, uNight, uCloud;
+      uniform vec3 uSun, uZen, uHor, uWarm, uGnd, uSunCol; uniform float uTime, uNight, uCloud, uOver, uRain, uFlash;
       varying vec3 vDir;
       float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
       float n2(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h2(i),h2(i+vec2(1,0)),f.x), mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x), f.y); }
@@ -140,6 +163,15 @@ function makeClaySkyMaterial(uniforms) {
         vec3 hor = mix(uHor, uWarm, toward * 0.35);
         vec3 col = mix(hor, uZen, smoothstep(0.0, 0.6, pow(max(h, 0.0), 0.8)));
         col = mix(col, uGnd, smoothstep(0.0, -0.1, h));
+        // overcast: the backdrop repainted the grey of a rainy day (a painter's grey, a little lilac, darker in the rain;
+        // soft darker swathes), under the same brush
+        if (uOver > 0.001) {
+          float dayK = smoothstep(-0.12, 0.25, uSun.y);
+          vec3 ov = mix(vec3(0.56, 0.57, 0.63), vec3(0.34, 0.35, 0.41), uRain) * (0.9 + 0.18 * fbm(vec2(atan(d.x, d.z) * 2.0, h * 5.0) + uTime * 0.002));
+          ov = mix(ov, ov * (uWarm * 0.6 + 0.55), 0.35 * (1.0 - smoothstep(0.02, 0.3, uSun.y)) * dayK);
+          ov *= mix(0.13, 1.0, dayK);
+          col = mix(col, ov, uOver * smoothstep(-0.08, 0.04, h));
+        }
         // the painter's brush: long soft strokes in the backdrop's colour, over a plaster wall dabbed with a sponge (its
         // little bumps lit from above)
         vec2 bp = vec2(atan(d.x, d.z) * 3.0, h * 9.0);
@@ -149,25 +181,30 @@ function makeClaySkyMaterial(uniforms) {
         col *= 0.94 + 0.1 * st0 + 0.16 * (st1 - st0);
         vec2 bs = vec2(atan(d.x, d.z) * 9.0, h * 30.0); // (and the broad strokes of the brush that painted it)
         col *= 0.95 + 0.1 * fbm(vec2(bs.x * 1.3 + fbm(bs * 0.5) * 2.0, bs.y * 0.4));
-        float sd = max(dot(d, uSun), 0.0), up = step(-0.03, uSun.y);
+        float sd = max(dot(d, uSun), 0.0), up = step(-0.03, uSun.y) * (1.0 - uOver); // (behind the clouds: no sun)
         col += uSunCol * (pow(sd, 8.0) * 0.12 + pow(sd, 64.0) * 0.22) * up;
         col = mix(col, uSunCol * 1.4 + 0.45, smoothstep(0.9993, 0.9996, sd) * up); // (a painted disc)
         col += vec3(0.16, 0.11, 0.08) * exp(-max(h, 0.0) * 12.0) * uNight * 0.3;
-        if (h > -0.02 && uCloud > -0.5) { // (uCloud −1: the cotton clouds hang in front instead)
+        // (uCloud −1: the cotton clouds hang in front instead — unless the sky clouds over: then the backdrop fills with
+        // cotton overhead too, grey and heavy in the rain)
+        float cc = uCloud > -0.5 ? uCloud : uOver * 1.7 - 0.25;
+        if (h > -0.02 && cc > -0.1) {
           vec2 uv = d.xz / (h + 0.16) * 0.9 + vec2(uTime * 0.002, uTime * 0.0007);
           float big = fbm(uv * 0.35 + 5.0);                                  // where the cotton gathers
           vec2 pf = puffs(uv * 1.6);
           float fib = fbm(uv * 14.0 + 3.0) * 0.6 + fbm(uv * 40.0 + 1.0) * 0.4; // its fibres
           float edge = pf.x + (fib - 0.5) * 0.55;
-          float th = 1.0 - (big - 0.42 + uCloud * 0.25) * 1.6;                // (fewer puffs where the sky is clear)
-          float m = (1.0 - smoothstep(th - 0.08, th + 0.04, edge)) * smoothstep(-0.01, 0.12, h) * (1.0 - smoothstep(0.5, 0.95, h) * 0.6);
+          float th = 1.0 - (big - 0.42 + cc * 0.25) * 1.6;                    // (fewer puffs where the sky is clear)
+          float m = (1.0 - smoothstep(th - 0.08, th + 0.04, edge)) * smoothstep(-0.01, 0.12, h) * mix(1.0 - smoothstep(0.5, 0.95, h) * 0.6, 1.0, uOver);
           // lit from above and from the sun's side; a lilac grey underneath and in its folds
           float shade = clamp(0.55 + 0.45 * (1.0 - pf.x) + 0.25 * (fib - 0.5) + 0.2 * dot(normalize(vec3(uSun.x, 0.6, uSun.z)), vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
           vec3 lit = mix(vec3(0.82, 0.8, 0.88), vec3(1.0, 0.99, 0.97), shade);
           lit = mix(lit, lit * (uSunCol * 0.5 + 0.55), 0.35 * (1.0 - smoothstep(0.0, 0.4, uSun.y)));
+          lit = mix(lit, mix(vec3(0.64, 0.64, 0.7), vec3(0.3, 0.3, 0.36), uRain) * (0.75 + 0.35 * shade), uOver); // (rain clouds: grey cotton, darker than the sky behind it in the rain)
           lit = mix(lit, uZen * 0.5 + vec3(0.04, 0.045, 0.07), uNight * 0.85);
           col = mix(col, lit, m * (0.97 - 0.35 * uNight));
         }
+        col += vec3(0.8, 0.82, 0.95) * uFlash * 0.75 * smoothstep(-0.05, 0.3, h); // (a lightning flash lights the whole backdrop)
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -181,7 +218,9 @@ function makeClaySkyMaterial(uniforms) {
 function buildCottonClouds() {
   let sd = 77031; const rnd = () => { sd = (sd * 16807) % 2147483647; return (sd - 1) / 2147483646; };
   const balls = [];
+  const clumpOf = []; // (each ball's tuft's threshold: the order the tufts are hung in as the sky clouds over)
   for (let c = 0; c < 72; c++) {
+    const rank = ((c * 37) % 72) / 72 * 0.9 + 0.05, n0 = balls.length;
     const th = (c / 72) * Math.PI * 2 + (rnd() - 0.5) * 0.2, R = 1300 + rnd() * 400, el = (rnd() < 0.75 ? 4 + rnd() * 12 : 16 + rnd() * 16) * Math.PI / 180; // (most low, just above the roofs)
     const cx = Math.sin(th) * R, cz = Math.cos(th) * R, cy = Math.tan(el) * R + 30;
     const S = 58 + rnd() * 52, tx = Math.cos(th), tz = -Math.sin(th); // (a round tuft of cotton across the view)
@@ -192,6 +231,7 @@ function buildCottonClouds() {
       for (let k = 1; k <= m; k++) { const r = S * (0.42 - k * 0.09 + rnd() * 0.06); put(sd * S * (0.5 + 0.38 * (k - 1) + rnd() * 0.08), r * 0.15, r); }
     }
     if (rnd() < 0.7) put((rnd() - 0.5) * S * 0.5, S * 0.55, S * (0.32 + rnd() * 0.08)); // a puff on top
+    for (let i = n0; i < balls.length; i++) clumpOf.push(rank);
   }
   const geo = new THREE.SphereGeometry(1, 22, 16);
   const mat = new THREE.MeshStandardMaterial({ color: 0xfbf6ec, roughness: 1, metalness: 0, fog: false, emissive: 0x5a5048 });
@@ -199,7 +239,22 @@ function buildCottonClouds() {
   const m = new THREE.InstancedMesh(geo, mat, balls.length), M = new THREE.Matrix4(), q = new THREE.Quaternion();
   balls.forEach(([x, y, z, r], i) => m.setMatrixAt(i, M.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(r, r * 0.86, r * 0.8))));
   m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; m.renderOrder = -90; m.name = 'cotton';
+  m.userData.balls = balls; m.userData.clump = clumpOf; m.userData.cover = -1;
   return m;
+}
+// how much of the cotton is hung: the game's usual sky (cover 0.42) has every tuft; a clear sky none; a cloudier one
+// bigger tufts. A tuft grows in or shrinks away (never pops), each at its own threshold
+function hangCotton(m, cover) {
+  const U = m.userData;
+  if (Math.abs(cover - U.cover) < 0.004) return;
+  U.cover = cover;
+  const show = clamp((cover - 0.04) / 0.33, 0, 1.2), big = 1 + Math.max(0, cover - 0.42) * 0.9; // (at 0.42: every tuft, whole)
+  const M = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3();
+  U.balls.forEach(([x, y, z, r], i) => {
+    const k = clamp((show - U.clump[i]) * 7, 0, 1) * big;
+    m.setMatrixAt(i, M.compose(v.set(x, y, z), q, sc.set(r * k + 1e-4, r * 0.86 * k + 1e-4, r * 0.8 * k + 1e-4)));
+  });
+  m.instanceMatrix.needsUpdate = true;
 }
 
 export class SkySystem {
@@ -211,8 +266,11 @@ export class SkySystem {
     this.uniforms = {
       uSun: { value: new THREE.Vector3(0, 1, 0) }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() },
       uWarm: { value: new THREE.Color() }, uGnd: { value: new THREE.Color() }, uSunCol: { value: new THREE.Color() },
-      uTime: { value: 0 }, uNight: { value: 0 }, uCloud: { value: 0.42 },
+      uTime: { value: 0 }, uNight: { value: 0 }, uCloud: { value: 0.42 }, uOver: { value: 0 }, uRain: { value: 0 }, uFlash: { value: 0 },
     };
+    // the weather (weather.js eases it towards the real town's): cloud cover, overcast, rain, snow, fog (and how far one
+    // sees in it, m), storm, wind (0–1 and m/s), a lightning flash. These values are the game's usual sky
+    this.wx = { cover: 0.42, over: 0, rain: 0, snow: 0, fog: 0, fogFar: 3000, storm: 0, wind: 0, windX: 0, windZ: 0, flash: 0 };
     const skyMaterial = () => (STYLE.plastilina ? makeClaySkyMaterial(this.uniforms) : makeSkyMaterial(this.uniforms));
     this.mat = skyMaterial();
     if (!STYLE.plastilina) { // physical daytime sky (Rayleigh + Mie scattering): real blues, a white haze at the horizon, orange sunsets
@@ -343,25 +401,35 @@ export class SkySystem {
     paletteAt(alt, 'gnd', U.uGnd.value);
     paletteAt(alt, 'sun', U.uSunCol.value);
     U.uTime.value += dt;
+    const W = this.wx, ov = W.over;
+    this.cloud = W.cover;
     U.uCloud.value = this.cotton ? -1 : this.cloud;
+    U.uOver.value = ov; U.uRain.value = Math.max(W.rain, W.storm * 0.8, W.snow * 0.5); U.uFlash.value = W.flash;
     const day = smoothstep(-0.08, 0.12, alt);
     const golden = 1 - smoothstep(0.05, 0.35, alt);
     this.night = 1 - smoothstep(-0.12, 0.03, alt);
     U.uNight.value = this.night;
     this.dome.position.copy(focus);
-    if (this.cotton) this.cotton.position.set(focus.x, 0, focus.z);
+    if (this.cotton) {
+      this.cotton.position.set(focus.x, 0, focus.z);
+      // (the cotton hung as the sky clouds over; grey cotton under a rainy sky, lit for an instant by the lightning)
+      hangCotton(this.cotton, W.cover);
+      const cm = this.cotton.material;
+      cm.color.setHex(0xfbf6ec).lerp(_c.setRGB(0.4, 0.4, 0.45), ov * 0.85);
+      cm.emissive.setHex(0x5a5048).multiplyScalar(1 - ov * 0.75).lerp(_c.setRGB(0.9, 0.92, 1), W.flash * 0.6);
+    }
     if (this.phys) {
       this.phys.position.copy(focus);
       this.phys.material.uniforms.sunPosition.value.copy(d);
-      this.phys.material.uniforms.turbidity.value = 2.8 + this.cloud * 2.4; // hazier with more cloud
+      this.phys.material.uniforms.turbidity.value = Math.min(20, 2.8 + this.cloud * 2.4 + ov * 7); // hazier with more cloud
       this.phys.visible = alt > -0.2;
     }
     this.stars.position.copy(focus);
-    this.stars.material.uniforms.uOpacity.value = this.night * (1 - (this.cloud || 0) * 0.5);
+    this.stars.material.uniforms.uOpacity.value = this.night * (1 - (this.cloud || 0) * 0.5) * (1 - ov); // (no stars through a cloud deck)
     // moon opposite-ish to the sun, high at night
     const md = (this.moonDir || (this.moonDir = new THREE.Vector3())).set(-d.x * 0.6 + 0.2, Math.max(0.15, -d.y * 0.9 + 0.25), -d.z * 0.6 - 0.3).normalize();
     this.moon.position.copy(focus).addScaledVector(md, 3500);
-    this.moon.material.opacity = this.night;
+    this.moon.material.opacity = this.night * (1 - ov * 0.95);
     // sun light
     const sunCol = paletteAt(Math.max(alt, 0.0), 'sun', _sunCol);
     if (alt > -0.02) {
@@ -387,6 +455,7 @@ export class SkySystem {
       this.sun.position.copy(focus).addScaledVector(md, 250);
       this.lightDir = (this.lightDir || new THREE.Vector3()).copy(md);
     }
+    this.sun.intensity *= 1 - 0.82 * ov; // (behind the clouds: hardly any direct sun, and its shadows fade with it)
     const texel = (this.shadowSize * 2) / this.sun.shadow.mapSize.x;
     this.sun.target.position.set(Math.round(focus.x / texel) * texel, 0, Math.round(focus.z / texel) * texel);
     this.sun.position.sub(focus).add(this.sun.target.position);
@@ -409,6 +478,16 @@ export class SkySystem {
       b.position.set(-d.x, 0, -d.z).normalize().setY(0.35).normalize().multiplyScalar(100).add(focus);
       b.target.updateMatrixWorld();
     }
+    // overcast: the light comes from the whole sky, greyer and even (a little more of it while the sun is gone, less in
+    // the rain); a lightning flash, for an instant, white
+    if (ov > 0.001 || W.flash > 0.001 || W.rain > 0.001) {
+      const wet = Math.max(W.rain, W.storm * 0.8, W.snow * 0.5);
+      this.hemi.color.lerp(_c.setRGB(0.8, 0.82, 0.86), (STYLE.plastilina ? 0.45 : 0.55) * ov * day);
+      this.hemi.intensity *= (STYLE.plastilina ? 1 - 0.16 * ov * day : 1 + 0.14 * ov * day) * (1 - (STYLE.plastilina ? 0.28 : 0.18) * wet); // (claymation: the studio's lamps turned down for a grey day)
+      if (this.bounce) this.bounce.intensity *= 1 - 0.9 * ov;
+      this.hemi.color.lerp(_c.setRGB(0.88, 0.92, 1), Math.min(1, W.flash));
+      this.hemi.intensity += W.flash * 2.4;
+    }
     // fog matches the horizon
     if (!STYLE.plastilina) {
       this.fog.color.copy(U.uHor.value).lerp(U.uZen.value, 0.15);
@@ -419,6 +498,16 @@ export class SkySystem {
       this.fog.near = lerp(120, 520, day); this.fog.far = lerp(1200, 4200, day);
       this.renderer.toneMappingExposure = 0.9 + golden * day * 0.05;
     }
+    // rain and fog close the distance in, and the air goes the grey of the clouds
+    const wetK = Math.max(W.rain * 0.55, W.snow * 0.7, W.fog);
+    if (wetK > 0.001 || ov > 0.001) {
+      const far0 = this.fog.far, far = Math.min(W.fog > 0.01 ? lerp(far0, Math.min(far0, W.fogFar), W.fog) : far0, far0 * (1 - 0.55 * Math.max(W.rain, W.snow)));
+      this.fog.far = far;
+      this.fog.near = Math.min(this.fog.near, lerp(this.fog.near, W.fog > 0.5 ? 0 : far * 0.05 + 4, Math.max(W.fog, W.rain * 0.5))); // (in a real fog it starts at your feet)
+      this.fog.color.lerp(_c.setRGB(0.62, 0.64, 0.68).multiplyScalar(0.15 + 0.85 * day), Math.min(1, Math.max(ov * 0.7, W.fog)));
+      this.renderer.toneMappingExposure += (STYLE.plastilina ? 0.0 : 0.1) * ov * day;
+    }
+    this.renderer.toneMappingExposure += W.flash * 0.3;
     // environment map (IBL), refreshed occasionally
     this.envTimer -= dt;
     if (forceEnv || this.envTimer <= 0) {
@@ -427,12 +516,12 @@ export class SkySystem {
       if (!STYLE.plastilina) {
         this.envGround.material.color.copy(U.uGnd.value);
         this.envBand.material.color.copy(U.uHor.value).multiplyScalar(0.35).lerp(_c.copy(REAL.walls).multiply(U.uSunCol.value), sunK * 0.85);
-        this.envHaze.material.color.copy(U.uHor.value).lerp(REAL.haze, 0.6).multiplyScalar(0.25 + 0.75 * day);
-        this.envHaze.material.opacity = 0.38 * day;
+        this.envHaze.material.color.copy(U.uHor.value).lerp(REAL.haze, 0.6).multiplyScalar(0.25 + 0.75 * day).lerp(_c.setRGB(0.6, 0.62, 0.66).multiplyScalar(0.2 + 0.8 * day), ov);
+        this.envHaze.material.opacity = 0.38 * day + 0.3 * ov * day;
       } else { // (claymation: the studio round the set reflects warm — its walls, its lamps — never the painted blue)
         this.envGround.material.color.setRGB(0.6, 0.5, 0.42);
         this.envBand.material.color.copy(U.uHor.value).multiplyScalar(0.3).lerp(_c.copy(CLAY.walls).multiply(U.uSunCol.value), sunK * 0.95);
-        this.envHaze.material.color.setRGB(0.93, 0.83, 0.7).multiplyScalar(0.3 + 0.7 * day);
+        this.envHaze.material.color.setRGB(0.93, 0.83, 0.7).multiplyScalar(0.3 + 0.7 * day).lerp(_c.setRGB(0.72, 0.72, 0.76).multiplyScalar(0.25 + 0.75 * day), ov * 0.8);
         this.envHaze.material.opacity = 0.62 * day;
       }
       const rt = this.pmrem.fromScene(this.envScene, 0, 0.1, 400);

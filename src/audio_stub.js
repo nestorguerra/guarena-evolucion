@@ -4,7 +4,7 @@ export class GameAudio {
   async unlock() {}
   get ready() { return false; }
   get stationName() { return 'Radio Apagada'; }
-  setVolumes() {} setListener() {} update() {} setEngine() {} setSkid() {} setOffroad() {} setWind() {} horn() {}
+  setVolumes() {} setListener() {} update() {} setEngine() {} setSkid() {} setOffroad() {} setWind() {} setRain() {} horn() {}
   sfx() {} sirenStart() {} sirenPos() {} sirenStop() {} sirenStopAll() {}
   radioOn() {} radioNext() { return 'Radio Apagada'; } radioPrev() { return 'Radio Apagada'; }
   setAmbient() {} setChurchPos() {} bells() {} storks() {} pauseAll() {} loopAt() {}

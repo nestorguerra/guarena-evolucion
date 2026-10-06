@@ -17,7 +17,7 @@ import { STYLE, setStyle, LOOKS } from './style.js';
 const $ = (id) => document.getElementById(id);
 const ui = {
   canvas: $('game'), radar: $('radar'), bigmap: $('bigmap'), mapScreen: $('mapScreen'), touch: $('touch'),
-  money: $('money'), clock: $('clock'), stars: $('stars'), wState: $('wState'), hp: $('hp'), veh: $('veh'), speed: $('speed'), vehName: $('vehName'), vehHp: $('vehHp'),
+  money: $('money'), clock: $('clock'), wx: $('wx'), stars: $('stars'), wState: $('wState'), hp: $('hp'), veh: $('veh'), speed: $('speed'), vehName: $('vehName'), vehHp: $('vehHp'),
   street: $('street'), district: $('district'), streetBox: $('streetBox'), objective: $('objective'), subs: $('subs'), help: $('help'),
   notes: $('notes'), banner: $('banner'), radio: $('radio'), timer: $('timer'), damage: $('damage'), letterbox: $('letterbox'), speech: $('speech'),
   ar: $('ar'), weapon: $('weapon'), wName: $('wName'), wAmmo: $('wAmmo'), crosshair: $('crosshair'), prompt: $('prompt'), tAttack: $('tAttack'),
@@ -537,6 +537,7 @@ function settingsHtml() {
     <div class="setting"><span>Calidad gráfica <small style="opacity:.6">(se aplica al recargar)</small></span><span class="seg" id="sQ">${Object.entries(QUALITY).map(([k, v]) => `<button data-q="${k}" class="${k === q ? 'on' : ''}">${v.name}</button>`).join('')}</span></div>
     <div class="setting"><span>Estética <small style="opacity:.6">(se aplica al recargar)</small></span><span class="seg" id="sLook">${LOOKS.map(([id, n]) => `<button data-look="${id}" class="${STYLE.name === id ? 'on' : ''}">${n}</button>`).join('')}</span></div>
     <div class="setting"><span>Resolución <small style="opacity:.6">(automática: baja un poco solo si el juego va a tirones)</small></span><span class="seg" id="sR"><button data-r="auto" class="${game.save.dynRes !== false ? 'on' : ''}">Automática</button><button data-r="fija" class="${game.save.dynRes === false ? 'on' : ''}">Fija</button></span></div>
+    <div class="setting"><span>Tiempo de Guareña <small style="opacity:.6">(en directo: el tiempo reciente del pueblo, una estimación por cuartos de hora de <a href="https://open-meteo.com/" target="_blank" rel="noopener" style="color:inherit">Open-Meteo.com</a>, CC BY 4.0; se consulta cada 10 min)</small></span><span class="seg" id="sWx"><button data-wx="1" class="${game.save.weatherLive !== false ? 'on' : ''}">En directo</button><button data-wx="0" class="${game.save.weatherLive === false ? 'on' : ''}">Del juego</button></span></div>
     <div class="setting"><span>Hora del día</span><span class="seg" id="sT">${times.map(([n, h]) => `<button data-h="${h}">${n}</button>`).join('')}</span></div>
     <div class="setting"><span>Música (radio)</span><input id="sMus" type="range" min="0" max="1" step="0.05" value="${game.save.music ?? 0.55}"></div>
     <div class="setting"><span>Efectos</span><input id="sSfx" type="range" min="0" max="1" step="0.05" value="${game.save.sfx ?? 0.9}"></div>
@@ -566,6 +567,11 @@ function bindSettings() {
     offerReload('sLook', b.dataset.look !== STYLE.name);
   }));
   document.querySelectorAll('#sR button').forEach((b) => (b.onclick = () => { game.save.dynRes = b.dataset.r === 'auto'; game.persist(); pickIn('sR', b); }));
+  document.querySelectorAll('#sWx button').forEach((b) => (b.onclick = () => {
+    const on = b.dataset.wx === '1';
+    if (game.weather) game.weather.setOn(on); else { game.save.weatherLive = on; game.persist(); }
+    pickIn('sWx', b);
+  }));
   document.querySelectorAll('#sT button').forEach((b) => (b.onclick = () => { game.sky.hour = parseFloat(b.dataset.h); game.sky.update(0, game.camera.position, true); game.render(); }));
   const mus = $('sMus'), sfx = $('sSfx'), sens = $('sSens');
   if (mus) mus.oninput = () => { game.save.music = +mus.value; audio.setVolumes({ music: +mus.value }); game.persist(); };
