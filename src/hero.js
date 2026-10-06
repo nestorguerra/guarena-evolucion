@@ -42,7 +42,6 @@ export function loadHero() {
   })();
   return HDP;
 }
-export const heroReady = () => !!HD;
 // the skeleton the motion database is played on (the body's bones: order, parents, rest offsets)
 function bodyRig(body) {
   const order = [], parent = {}, rest = {};
@@ -55,8 +54,6 @@ function bodyRig(body) {
 const HEADKIDS = [['jaw', [0, 0.05, -0.005]], ['eyeL', [0.032, 0.075, 0.075]], ['eyeR', [-0.032, 0.075, 0.075]], ['lidL', [0.032, 0.075, 0.075]], ['lidR', [-0.032, 0.075, 0.075]],
   ['browL', [0.03, 0.097, 0.085]], ['browR', [-0.03, 0.097, 0.085]], ['mouthL', [0.0245, 0.0068, 0.095]], ['mouthR', [-0.0245, 0.0068, 0.095]]];
 // the bones the capture moves, by body part (for layering)
-const LEGS = ['thighL', 'thighR', 'shinL', 'shinR', 'footL', 'footR', 'toeL', 'toeR'];
-const TORSO = ['spine', 'spine2', 'chest'];
 const ARMS = ['clavL', 'clavR', 'armL', 'armR', 'foreL', 'foreR', 'handL', 'handR'];
 const HEADB = ['neck', 'head'];
 // actions done with the arms only (the legs go on with the capture)
@@ -88,7 +85,7 @@ export class Hero extends Character {
   get isHero() { return true; }
   // the head-only build the worker makes (the MakeHuman head for the hero's own build and face), at the body's scale
   makeSpec(desc, factory) {
-    // (real proportions: the body's own height and head; the haircut the hero wears; no anime fringe cuts)
+    // (real proportions: the body's own height and head; the haircut the hero wears, not the preset's stylized fringe)
     this.desc = desc = { ...desc, height: 1, headScale: 1, hairStyle: desc.heroHair || desc.hairStyle, fringe: undefined, hem: undefined };
     const s = factory.spec(desc);
     const B = HD.body, m = s.mh;
@@ -537,13 +534,6 @@ export class Hero extends Character {
     c.vel[0] = c.goal[0]; c.vel[1] = c.goal[1];
     c.turn = opts.turn || 0;
     return c;
-  }
-  // the skeleton the motion database is played on: bone order, parents, rest offsets
-  dbRig() {
-    const B = this.bones, order = [], parent = {}, rest = {};
-    const visit = (o) => { if (o.isBone) { order.push(o.name); parent[o.name] = o.parent && o.parent.isBone ? o.parent.name : null; rest[o.name] = this.rest[o.name].clone(); } for (const c of o.children) visit(c); };
-    visit(B.root);
-    return { order, parent, rest };
   }
   fingers() {
     const B = this.bones;

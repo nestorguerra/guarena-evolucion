@@ -6,10 +6,7 @@
 import * as THREE from 'three';
 import { randomDesc } from './characters.js';
 import { polySample, polyNearest, clamp, lerp, dampAngle, wrapAngle, mulberry32, hash1 } from './util.js';
-import { endNode } from './traffic.js';
 import { Dogs } from './dogs.js';
-import { STYLE } from './style.js';
-import { lensMap } from './toon.js';
 import { Places, routeBetween, personaOf, Chat, greetLine, errandLine, PASSING, BUSY, ANNOYED, ANNOYED_SAT, WARY, AFTER_DARK, FOLLOWED, CLOSE, BYE, partOfDay, weekday, massTime, fillLine } from './npcmind.js';
 
 export const FRASES = {
@@ -1422,7 +1419,7 @@ export class Peds {
       v.set(s.ped.x, y + 2.05, s.ped.z).project(cam);
       if (v.z > 1 || dist > 35) { s.el.style.opacity = 0; continue; }
       s.el.style.opacity = Math.min(1, s.t * 2);
-      const [sx, sy] = STYLE.anime ? lensMap(v.x * 0.5 + 0.5, v.y * 0.5 + 0.5) : [v.x * 0.5 + 0.5, v.y * 0.5 + 0.5]; // (through the lens)
+      const sx = v.x * 0.5 + 0.5, sy = v.y * 0.5 + 0.5;
       s.el.style.transform = `translate(${sx * W}px, ${(1 - sy) * H}px) translate(-50%, -100%)`;
     }
     for (const m of this.marks) {
@@ -1431,7 +1428,7 @@ export class Peds {
       v.set(m.ped.x, y + 2.35, m.ped.z).project(cam);
       if (v.z > 1 || dist > 60) { m.el.style.opacity = 0; continue; }
       m.el.style.opacity = 1;
-      const [sx, sy] = STYLE.anime ? lensMap(v.x * 0.5 + 0.5, v.y * 0.5 + 0.5) : [v.x * 0.5 + 0.5, v.y * 0.5 + 0.5];
+      const sx = v.x * 0.5 + 0.5, sy = v.y * 0.5 + 0.5;
       m.el.style.transform = `translate(${sx * W}px, ${(1 - sy) * H}px) translate(-50%, -100%)`;
     }
   }

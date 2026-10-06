@@ -2,8 +2,8 @@
 // Iglesia de Santa María (tower 32 m), Ayuntamiento (Plaza de España), Iglesia de San Gregorio, Ermita de San Isidro,
 // gas station, cooperative tanks, stadium La Noria, Guardia Civil, Centro de Salud, entry signs, plaza furniture.
 import * as THREE from 'three';
-import { stoneCanvas, flagCanvas, signAtlas, textCanvas, radialCanvas } from './textures.js';
-import { orientedRect, ringArea, ringCentroid, pointInRing, polySample, hash1, mulberry32, clamp } from './util.js';
+import { stoneCanvas, flagCanvas, textCanvas } from './textures.js';
+import { orientedRect, ringArea, ringCentroid, pointInRing, mulberry32, clamp } from './util.js';
 import { shared, makeNightGlowMaterial } from './materials.js';
 import { makeFurnitureGeometries } from './props.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -35,6 +35,15 @@ function canvasTex(c, repeat = false, srgb = true) {
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
+}
+// the town hall's plaque: «AYUNTAMIENTO» in two lines on cream
+function aytoPlaque() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = '#e9e1cf'; x.fillRect(0, 0, 128, 128);
+  x.fillStyle = '#3a2a1a'; x.font = 'bold 22px Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText('AYUNTA-', 64, 64 - 12.1); x.fillText('MIENTO', 64, 64 + 12.1);
+  return c;
 }
 
 // Extrude a ring into walls with world-scaled UVs (tile metres) + optional flat roof
@@ -185,8 +194,6 @@ class Landmarks {
     // (claymation: the church's stones swell from their bed — the relief painted with them, textures.js clayStones)
     if (bumps.mamposteria) { this.mat.mamp.bumpMap = bumps.mamposteria; this.mat.mamp.bumpScale = 5; }
     if (bumps.sillar) { this.mat.sillar.bumpMap = bumps.sillar; this.mat.sillar.bumpScale = 4; }
-    this.signs = signAtlas();
-    this.signTex = canvasTex(this.signs.canvas);
     this.build();
   }
 
@@ -255,20 +262,6 @@ class Landmarks {
     for (const c of this.circleColliders || []) map.collider.addCircle(c[0], c[1], c[2], c[3], -11);
     for (const s of this.segColliders || []) map.collider.addSegment(s[0], s[1], s[2], s[3], s[4], -11);
   }
-  signQuad(name, w, h) {
-    const [cx, cy] = this.signs.cells[name];
-    const g = new THREE.PlaneGeometry(w, h);
-    const uv = g.attributes.uv;
-    const C = this.signs.cols, R = this.signs.rows;
-    for (let i = 0; i < uv.count; i++) {
-      uv.setXY(i, (cx + uv.getX(i)) / C, 1 - (cy + 1 - uv.getY(i)) / R);
-    }
-    return g;
-  }
-  get signMat() {
-    if (!this._signMat) this._signMat = new THREE.MeshStandardMaterial({ map: this.signTex, roughness: 0.5, side: THREE.DoubleSide });
-    return this._signMat;
-  }
   circle(x, z, r, h) { (this.circleColliders || (this.circleColliders = [])).push([x, z, r, h]); }
   seg(ax, az, bx, bz, h) { (this.segColliders || (this.segColliders = [])).push([ax, az, bx, bz, h]); }
 
@@ -296,56 +289,6 @@ class Landmarks {
     // traffic signs and the town entry boards now come from signs.js (built with the street furniture)
     this.terraces();
     this.plazaTrees();
-  }
-
-  // ================================================================ traffic signs from OSM (stop / give way) + one-way streets
-  streetSigns() {
-    const map = this.map;
-    const boards = [], posts = [];
-    const tmp = {};
-    const place = (name, x, z, faceAng, h = 2.25, size = 0.72) => {
-      if (map.buildingAt(x, z)) return;
-      const post = new THREE.CylinderGeometry(0.035, 0.035, h, 6);
-      post.translate(x, h / 2, z);
-      posts.push(post);
-      const q = this.signQuad(name, size, size);
-      q.rotateY(faceAng);
-      q.translate(x + Math.sin(faceAng) * 0.05, h - size / 2 + 0.05, z + Math.cos(faceAng) * 0.05);
-      boards.push(q);
-      this.circle(x, z, 0.12, 2.5);
-    };
-    // stop / give way nodes
-    for (const p of map.pois) {
-      if (p.kind !== 'highway:stop' && p.kind !== 'highway:give_way') continue;
-      const q = map.nearestEdge(p.x, p.z, 10, (e) => e.drive);
-      if (!q) continue;
-      const e = q.edge, d = map.sample(e, q.s, tmp);
-      const na = map.nodes[e.a], nb = map.nodes[e.b];
-      const toB = Math.hypot(nb.x - q.x, nb.z - q.z) < Math.hypot(na.x - q.x, na.z - q.z);
-      const fx = toB ? d.dx : -d.dx, fz = toB ? d.dz : -d.dz; // driver direction
-      const rx = -fz, rz = fx;
-      const off = e.w / 2 + 0.6;
-      place(p.kind === 'highway:stop' ? 'stop' : 'ceda', q.x + rx * off, q.z + rz * off, Math.atan2(-fx, -fz));
-    }
-    // one-way streets in town: "sentido obligatorio" at the entry, "dirección prohibida" at the exit
-    for (const e of map.edges) {
-      if (!e.drive || !e.oneway || e.len < 25 || !map.inTown(e.pts[0], e.pts[1])) continue;
-      const fwd = e.oneway === 1;
-      const sEntry = fwd ? 3 : e.len - 3, sExit = fwd ? e.len - 3 : 3;
-      const dirSign = fwd ? 1 : -1;
-      let d = map.sample(e, sEntry, {});
-      let fx = d.dx * dirSign, fz = d.dz * dirSign;
-      const off = e.w / 2 + 0.35;
-      place('sentido', d.x + -fz * off, d.z + fx * off, Math.atan2(-fx, -fz), 2.4, 0.6);
-      d = map.sample(e, sExit, {});
-      fx = d.dx * dirSign; fz = d.dz * dirSign;
-      // facing drivers that would enter against the flow (they travel -f): board faces +f
-      place('prohibido', d.x + fz * off, d.z - fx * off, Math.atan2(fx, fz), 2.4, 0.6);
-    }
-    if (boards.length) {
-      const bm = new THREE.Mesh(mergeGeos(boards), this.signMat); bm.castShadow = true; this.root.add(bm);
-      const pm = new THREE.Mesh(mergeGeos(posts), this.mat.steel); pm.castShadow = true; this.root.add(pm);
-    }
   }
 
   // ================================================================ bar terraces (mesas, sillas y sombrillas)
@@ -741,7 +684,7 @@ class Landmarks {
       this.flags.push({ mesh: flag, base: fg.attributes.position.array.slice(), phase: i });
     });
     // sign
-    const s = new THREE.Mesh(this.signQuad('ayto', 1.4, 1.4), this.signMat); s.position.set(-FW / 2 + 1.5, 3.4, 0.05); f.add(s);
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshStandardMaterial({ map: canvasTex(aytoPlaque()), roughness: 0.5, side: THREE.DoubleSide })); s.position.set(-FW / 2 + 1.5, 3.4, 0.05); f.add(s);
     this.poi.ayto = { x: mx + nx * 4, z: mz + nz * 4, nx, nz };
     // in under the arcade by the middle arch (venues.js: the hall, the stairs, the Salón de Plenos)
     (this.poi.venues || (this.poi.venues = [])).push({ kind: 'ayto', name: 'Ayuntamiento de Guareña', sub: 'Casa Consistorial · Plaza de España', x: mx + nx * 1.3, z: mz + nz * 1.3, fx: mx - nx * 3, fz: mz - nz * 3, seed: 9 });
@@ -1067,48 +1010,6 @@ class Landmarks {
     g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
     this.root.add(g);
     this.circle(px, pz, 0.3, 3);
-  }
-
-  // ================================================================ town entry signs on main roads
-  entrySigns() {
-    const map = this.map;
-    const geo = this.signQuad('entrada', 1.6, 1.6);
-    const done = [];
-    for (const e of map.edges) {
-      if (!e.drive || !['primary', 'tertiary', 'secondary', 'unclassified'].includes(e.cls)) continue;
-      const aIn = map.inTown(e.pts[0], e.pts[1]);
-      const n = e.pts.length / 2;
-      const bIn = map.inTown(e.pts[n * 2 - 2], e.pts[n * 2 - 1]);
-      if (aIn === bIn) continue;
-      // find crossing point along the edge
-      let s0 = 0, s1 = e.len;
-      for (let it = 0; it < 18; it++) {
-        const sm = (s0 + s1) / 2;
-        const p = map.sample(e, sm, {});
-        if (map.inTown(p.x, p.z) === aIn) s0 = sm; else s1 = sm;
-      }
-      const s = aIn ? Math.min(e.len, s0 + 6) : Math.max(0, s0 - 6);
-      const p = map.sample(e, s, {});
-      if (done.some(([x, z]) => Math.hypot(x - p.x, z - p.z) < 120)) continue;
-      done.push([p.x, p.z]);
-      // incoming direction (towards town): right side of incoming driver
-      const dirIn = aIn ? -1 : 1;
-      const fx = p.dx * dirIn, fz = p.dz * dirIn;
-      const rx = -fz, rz = fx; // right of driver = (-fz, fx)
-      const off = e.w / 2 + 1.2;
-      const x = p.x + rx * off, z = p.z + rz * off;
-      const grp = new THREE.Group();
-      for (const s2 of [-0.55, 0.55]) {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.6, 6), this.mat.steel);
-        post.position.set(s2, 1.3, 0); grp.add(post);
-      }
-      const board = new THREE.Mesh(geo, this.signMat); board.position.set(0, 2.3, 0.03); grp.add(board);
-      grp.position.set(x, 0, z);
-      grp.rotation.y = Math.atan2(-fx, -fz); // face the incoming driver
-      grp.traverse((m) => { if (m.isMesh) m.castShadow = true; });
-      this.root.add(grp);
-      this.circle(x, z, 0.4, 3);
-    }
   }
 
   // called after vegetation; statues need the character module (set by game)

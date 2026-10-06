@@ -374,7 +374,6 @@ export class ChurchDoor {
     const [l, r] = this.leaves, R = this.w / 2, c = (q) => Math.cos(clamp(q.cur, 0, 1) * this.maxOpen);
     return [l.cur < 0.04 ? 0 : -R + R * c(l) + 0.05, r.cur < 0.04 ? 0 : R - R * c(r) - 0.05];
   }
-  get passage() { return this.leaves.reduce((a, l) => a + (1 - Math.cos(clamp(l.cur, 0, 1) * this.maxOpen)) * this.w * 0.5, 0); }
   set(k, now = false, one = this.one) {
     this.leaves.forEach((l, i) => {
       l.target = one && i === 0 ? 0 : k;

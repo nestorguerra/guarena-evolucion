@@ -64,7 +64,6 @@ function estofado_(base, gold, dense, seed) {
   }
   return tex(c, true);
 }
-const MATS = {};
 function mats(B) {
   const m = (key, make) => B.mat(key, make);
   return {

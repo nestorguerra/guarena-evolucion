@@ -3,7 +3,7 @@
 // ahead and react to the player. Every car is going somewhere: it plans a route (A*) to a destination across town
 // instead of turning at random. Also shared route helpers.
 import { TRAFFIC_MIX, MODELS } from './vehicles.js';
-import { polySample, polyNearest, clamp, lerp, wrapAngle, hash1 } from './util.js';
+import { polySample, polyNearest, clamp, wrapAngle } from './util.js';
 
 // lane geometry: parked cars take 2.2 m on their side, lanes share what is left
 function laneGeom(e) {
@@ -14,7 +14,6 @@ function laneGeom(e) {
   const off = aiOneway(e) ? 0 : Math.max(0.6, Math.min(avail / 4 + 0.12, avail / 2 - 1.0));
   return (e._lg = { shift, off });
 }
-export function laneOffset(e) { return laneGeom(e).off; }
 // narrow two-way streets behave as one-way for AI traffic (a -> b) to avoid head-on deadlocks
 export function aiOneway(e) { return e.oneway || (e.w < 4.7 ? 1 : 0); }
 export function aiCanDrive(map, e, from) {

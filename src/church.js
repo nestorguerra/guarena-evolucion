@@ -11,8 +11,6 @@ import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { INTERIOR_ORIGIN, HouseBuilder, boxGeo, planeGeo, std, texMat } from './housekit.js';
 import { mulberry32, clamp, lerp } from './util.js';
-import { STYLE } from './style.js';
-import { toonifyCanvas } from './toon.js';
 import { ChurchDoor, cancelLobby, doorwayWall, revealGeo } from './churchdoors.js';
 import { buildRetablo } from './retablo.js';
 import { statue as carve } from './statues.js';
@@ -34,14 +32,12 @@ const CHY = 6.2;              // choir floor
 const P = 0.9;                // presbytery floor (five steps)
 const XP = 13.6;              // the first step
 const WIN = { w: 2.1, y0: 10.9, y1: 15.2 };
-export const CHURCH = { HW, X0, XC, BAY, NB, XA, AR, S, CD, CHY, P, XP };
 
 // ---------------------------------------------------------------- painted textures (canvas): made once, kept (each visit
 // builds the church again; its pictures need not be painted again — nor fill the GPU)
 const MEMO = new Map();
 const memo = (key, fn) => { if (!MEMO.has(key)) MEMO.set(key, fn()); return MEMO.get(key); };
-function canvasTex(c, { repeat = false, toon = true } = {}) {
-  if (STYLE.anime && toon && c.width === c.height) toonifyCanvas(c, { levels: 6, ink: 0.3 });
+function canvasTex(c, { repeat = false } = {}) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
@@ -80,7 +76,7 @@ function goldTexture_(seed = 3) {
   }
   // the years: the gold rubbed thin on the high points, the bole showing through in small patches
   for (let i = 0; i < 90; i++) { x.fillStyle = `rgba(${r() < 0.5 ? '140,66,26' : '100,56,22'},${0.12 + r() * 0.2})`; x.beginPath(); x.ellipse(r() * S2, r() * S2, 1 + r() * 3.5, 1 + r() * 2, r() * 3, 0, 6.283); x.fill(); }
-  return canvasTex(c, { repeat: true, toon: false });
+  return canvasTex(c, { repeat: true });
 }
 export const goldTexture = (seed = 3) => memo('gold' + seed, () => goldTexture_(seed));
 const cofferTexture = () => memo('coffer', cofferTexture_);
@@ -141,7 +137,7 @@ function viaCrucisTexture_(n) {
   // its plaque
   x.fillStyle = '#c8a050'; x.fillRect(0, H2 - 30, W2, 30); x.fillStyle = '#3a2410'; x.font = 'bold 20px serif'; x.textAlign = 'center';
   x.fillText(['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV'][n], W2 / 2, H2 - 9);
-  return canvasTex(c, { toon: false });
+  return canvasTex(c);
 }
 function plaqueTexture_() {
   const c = document.createElement('canvas'); c.width = 256; c.height = 160;
@@ -151,7 +147,7 @@ function plaqueTexture_() {
   x.fillStyle = '#3a2a18'; x.textAlign = 'center';
   x.font = 'bold 17px serif'; x.fillText('IGLESIA PARROQUIAL', 128, 40); x.fillText('DE SANTA MARÍA', 128, 62);
   x.font = '13px serif'; x.fillText('Comenzada en 1557', 128, 92); x.fillText('Rodrigo Gil de Hontañón', 128, 112); x.fillText('Bien de Interés Cultural', 128, 136);
-  return canvasTex(c, { toon: false });
+  return canvasTex(c);
 }
 
 // ---------------------------------------------------------------- geometry helpers

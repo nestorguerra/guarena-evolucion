@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { HouseBuilder, INTERIOR_ORIGIN, boxGeo, planeGeo, std, texMat, glassMat } from './housekit.js';
 import { StaticCollider } from './collision.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { flagCanvas, stoneCanvas, textCanvas } from './textures.js';
+import { flagCanvas, textCanvas } from './textures.js';
 import { mulberry32 } from './util.js';
 
 const TEXC = new Map();

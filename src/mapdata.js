@@ -310,12 +310,6 @@ export class MapData {
     this.bIndex = new PolyIndex(x0 - 400, z0 - 400, x1 + 400, z1 + 400, 16);
     for (const b of this.buildings) this.bIndex.add(b.ring, b);
   }
-  // Collider/geometry heights are decided by the world builder (after landmark overrides); it calls these.
-  addBuildingCollider(b, height) {
-    b.height = height;
-    this.collider.addRing(b.ring, height, b.id);
-    if (b.holes) for (const h of b.holes) this.collider.addRing(h, height, b.id);
-  }
   buildingAt(x, z) { const p = this.bIndex.find(x, z); return p ? p.data : null; }
   // once the town is built, "inside a building" means inside what is drawn of it (its parts), not its whole outline
   useDrawnParts(parts) {
@@ -343,7 +337,6 @@ export class MapData {
     }
     return false;
   }
-  poisOf(prefix) { return this.pois.filter((p) => p.kind.startsWith(prefix)); }
   poiNamed(re) { return this.pois.find((p) => re.test(p.name)); }
 }
 

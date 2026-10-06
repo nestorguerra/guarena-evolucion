@@ -4,7 +4,7 @@ import * as THREE from 'three';
 const G = () => window.game;
 export const SPOT = { x: -346.5, z: 49.4 };
 async function post(name) { const url = G().renderer.domElement.toDataURL('image/jpeg', 0.88); await fetch('/__snap?name=' + name, { method: 'POST', body: url }); }
-function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); if (g.composer) { g.composer.setSize(w, h); if (g.bloom) g.bloom.setSize(w, h); } if (g.toon) g.toon.setSize(w, h); }
+function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); if (g.composer) { g.composer.setSize(w, h); if (g.bloom) g.bloom.setSize(w, h); } }
 async function shot(name, pos, look, fov, w, h) {
   const g = G(); size(w, h);
   const cam = g.camera.clone(); cam.fov = fov; cam.aspect = w / h; cam.near = 0.01; cam.position.set(...pos); cam.lookAt(...look); cam.updateProjectionMatrix();

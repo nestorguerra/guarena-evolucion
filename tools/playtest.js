@@ -1,6 +1,6 @@
 // Dev-only automated play test: drives, walks, fights and gets chased, reporting anomalies.
 // Load in the dev page:  const T = await import('/tools/playtest.js'); await T.run('drive', 120);
-import { followRoute, driveToward, turnSpeed } from '/src/traffic.js';
+import { followRoute, turnSpeed } from '/src/traffic.js';
 
 const g = () => window.game;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

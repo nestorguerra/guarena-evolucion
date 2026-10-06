@@ -1,6 +1,6 @@
 // Builds the whole static world of Guareña: ground, roads, buildings, landmarks, vegetation and street furniture.
 import * as THREE from 'three';
-import { buildFacadeArray, buildGroundArray, markingsCanvas, radialCanvas, signAtlas } from './textures.js';
+import { buildFacadeArray, buildGroundArray, markingsCanvas, radialCanvas } from './textures.js';
 import { arrayTexture, makeBuildingMaterial, makeGroundMaterial, makeNightGlowMaterial, makeTrimMaterial, shared } from './materials.js';
 import { FacadeDetails, CT } from './facades.js';
 import { PLAYER_PRESETS } from './characters.js';
@@ -14,11 +14,11 @@ import { makeFurnitureGeometries, InstanceGroup } from './props.js';
 import { TreeLibrary, TreeField } from './trees.js';
 import { plantTown } from './vegetation.js';
 import { STYLE } from './style.js';
-import { toonifyLayers } from './toon.js';
+import { clayRepaint } from './plastilina.js';
 import { buildLandmarks } from './landmarks.js';
 import { Reservoir } from './pantano.js';
 import { buildTrafficSigns } from './signs.js';
-import { mulberry32, hash1, hash2, pointInRing, ringArea, ringBounds, polySample, polyNearest, clamp } from './util.js';
+import { mulberry32, hash1, pointInRing, ringArea, ringBounds, polySample, polyNearest, clamp } from './util.js';
 
 export class World {
   constructor(scene, map, quality) {
@@ -48,15 +48,12 @@ export class World {
     await step('Encalando fachadas…', 0.08);
     const S = q.texSize;
     const fac = buildFacadeArray(S);
-    // the anime look repaints them: flat colour, a few tones, ink on every real edge
-    if (STYLE.anime) toonifyLayers(fac.data, fac.size, fac.layers, { rColor: 3, rEdge: 1, levels: 6, posterize: 0.75, ink: 0.78, edge0: 15, edge1: 30, grunge: 1 });
-    // claymation: the same paintings as pieces of plasticine — smoothed, a few soft tones, purer colour, no lines
-    else if (STYLE.plastilina) toonifyLayers(fac.data, fac.size, fac.layers, { rColor: 3, rEdge: 1, levels: 5, posterize: 0.5, ink: 0, saturation: 1.1 });
+    // claymation: the same paintings as pieces of plasticine — smoothed, a few soft tones, purer colour
+    if (STYLE.plastilina) clayRepaint(fac.data, fac.size, fac.layers, { blur: 3, levels: 5, posterize: 0.5, saturation: 1.1 });
     this.facadeTex = arrayTexture(fac.data, fac.size, fac.layers, { aniso: q.aniso });
     await step('Empedrando calles…', 0.18);
     const gnd = buildGroundArray(STYLE.plastilina && q.photo >= 1024 ? 1024 : Math.min(512, S)); // (claymation on high: the street sharp close up, as in a film)
-    if (STYLE.anime) toonifyLayers(gnd.data, gnd.size, gnd.layers, { rColor: 4, rEdge: 1, levels: 5, posterize: 0.7, ink: 0.62, edge0: 16, edge1: 36, saturation: 0.82, grunge: 0.35 });
-    else if (STYLE.plastilina) toonifyLayers(gnd.data, gnd.size, gnd.layers, { rColor: 3, rEdge: 1, levels: 5, posterize: 0.45, ink: 0, saturation: 1.08 });
+    if (STYLE.plastilina) clayRepaint(gnd.data, gnd.size, gnd.layers, { blur: 3, levels: 5, posterize: 0.45, saturation: 1.08 });
     this.groundTex = arrayTexture(gnd.data, gnd.size, gnd.layers, { aniso: q.aniso });
 
     // ---------------- landmarks (claim their footprints first)
@@ -71,8 +68,8 @@ export class World {
     await step('Colocando tejas árabes…', 0.34);
     // CC0 photo-scanned materials (Poly Haven) for plaster, brick, granite and clay tiles
     const dS = q.photo || (q.texSize >= 512 ? 512 : 256); // photo scans at 1K on high quality
-    // (the anime look paints its walls flat, the claymation models them: no photographs)
-    const [dA, dN] = STYLE.anime || STYLE.plastilina ? [{ tex: null, mean: null, any: false }, null] : await Promise.all([
+    // (the claymation models its walls: no photographs)
+    const [dA, dN] = STYLE.plastilina ? [{ tex: null, mean: null, any: false }, null] : await Promise.all([
       loadTextureArray(DETAIL_LAYERS, '_d', dS, { aniso: q.aniso }),
       q.shadows > 0 ? loadTextureArray(DETAIL_LAYERS, '_n', Math.min(dS, 512), { srgb: false, aniso: q.aniso, flat: [128, 128, 255, 255] }) : Promise.resolve(null),
     ]);
@@ -154,7 +151,7 @@ void main(){
     this.groundData = G;
     // CC0 photo-scanned ground (asphalt, concrete, dry earth, gravel, grass) + the zone map for the imperfections
     const gS = q.photo || (q.texSize >= 512 ? 512 : 256);
-    const [gA, gN] = STYLE.anime || STYLE.plastilina ? [{ tex: null, mean: null, any: false }, null] : await Promise.all([
+    const [gA, gN] = STYLE.plastilina ? [{ tex: null, mean: null, any: false }, null] : await Promise.all([
       loadTextureArray(GROUND_DETAIL, '_d', gS, { aniso: q.aniso }),
       q.shadows > 0 ? loadTextureArray(GROUND_DETAIL, '_n', Math.min(gS, 512), { srgb: false, aniso: q.aniso, flat: [128, 128, 255, 255] }) : Promise.resolve(null),
     ]);

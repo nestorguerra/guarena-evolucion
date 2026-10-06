@@ -181,7 +181,7 @@ export function decorModel(id, seed = 1) {
 }
 
 // ---------------------------------------------------------------- decorating your house
-const _ray = new THREE.Raycaster(), _v = new THREE.Vector3(), _n = new THREE.Vector3(), _c = new THREE.Vector2(0, 0);
+const _ray = new THREE.Raycaster(), _n = new THREE.Vector3(), _c = new THREE.Vector2(0, 0);
 
 export class Decorator {
   constructor(game) {

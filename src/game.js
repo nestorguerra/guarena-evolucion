@@ -6,11 +6,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { DIORAMA, DioramaGrade } from './diorama.js';
-import { PLASTILINA, SM, ClayLens } from './plastilina.js';
+import { PLASTILINA, SM, ClayLens, ClayGrade, STUDIO_AO } from './plastilina.js';
 import { STYLE } from './style.js';
-import { ToonPipeline } from './toon.js';
-import { LoFi } from './lofi.js';
 import { Chant } from './chant.js';
 import { MapData } from './mapdata.js';
 import { World } from './world.js';
@@ -88,14 +85,14 @@ export class Game {
   async init(progress) {
     const q = this.q;
     const r = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: !q.bloom, powerPreference: 'high-performance', stencil: false });
-    // (the anime look's ink lines and the claymation's thumbprints want the screen's own resolution on high quality —
-    // a film is sharp; dynamic resolution backs off if needed)
-    r.setPixelRatio(Math.min(devicePixelRatio || 1, (STYLE.anime || STYLE.plastilina) && this.qKey === 'alta' ? 2 : q.pr));
+    // (the claymation's thumbprints want the screen's own resolution on high quality — a film is sharp; dynamic
+    // resolution backs off if needed)
+    r.setPixelRatio(Math.min(devicePixelRatio || 1, STYLE.plastilina && this.qKey === 'alta' ? 2 : q.pr));
     r.setSize(innerWidth, innerHeight, false);
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.shadowMap.enabled = q.shadows > 0;
-    r.shadowMap.type = STYLE.diorama ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap; // (the diorama: a short, soft penumbra — sky.js radius)
+    r.shadowMap.type = STYLE.plastilina ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap; // (claymation: the studio lamps' short, soft penumbra — sky.js radius)
     this.renderer = r;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.25, 4200);
@@ -103,8 +100,7 @@ export class Game {
     // characters are sculpted in background workers while the town is being built
     this.chars = new CharacterFactory(this.qKey === 'baja' ? { q: 1.3, lodNear: 7 } : this.qKey === 'media' ? { lodNear: 10 } : STYLE.plastilina ? { q: 0.8 } : {}); // (claymation: the puppets modelled finer, smoother clay)
     installHero(this.chars); this.heroLoad = loadHero(); // (the protagonist's body and motion capture, unzipped meanwhile)
-    // (the anime look has one protagonist, Álex the courier; the photographic one keeps the saved character)
-    const firstDesc = STYLE.anime ? PLAYER_PRESETS[0] : this.save.custom || PLAYER_PRESETS[0];
+    const firstDesc = this.save.custom || PLAYER_PRESETS[0];
     this.chars.prebuild([firstDesc], 10);
     this.chars.prebuild(PLAYER_PRESETS, 8);
     this.chars.prebuild(pedShapes(), 6);
@@ -183,13 +179,9 @@ export class Game {
     this.buildLabels();
     const lm = this.world.landmarks.poi;
     if (lm.churchTower) this.audio.setChurchPos(lm.churchTower.x, lm.churchTower.z);
-    // post-processing: the anime look draws its ink lines and grade in one last pass (no bloom); the real one blooms
-    if (STYLE.anime) {
-      this.toon = new ToonPipeline(r, { msaa: this.qKey === 'baja' ? 0 : 4 });
-      this.toon.setLook(this.save.look || 'manga'); // (the look: Ajustes › Estética)
-      r.toneMapping = THREE.CustomToneMapping; // (what is drawn straight to the screen gets the pipeline's curve)
-    } else if (STYLE.diorama) {
-      // the diorama: the scene, its contact shadows (ambient occlusion where things meet), a warm grade, a little bloom
+    // post-processing. The claymation: the scene, its contact shadows (ambient occlusion where things meet), the film's
+    // grade, a soft lens, a little bloom; the photographic town: the scene and its bloom
+    if (STYLE.plastilina) {
       const rt = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: this.qKey === 'baja' ? 0 : 4, depthTexture: new THREE.DepthTexture(innerWidth, innerHeight) });
       this.composer = new EffectComposer(r, rt);
       // (the scene pass draws into whichever of the composer's two buffers is free; its depth is kept for the AO and, in
@@ -199,7 +191,7 @@ export class Game {
       rp.render = (renderer, wb, rb, dt, mask) => {
         rb.resolveDepthBuffer = true; this.sceneDepth = rb.depthTexture;
         rpRender(renderer, wb, rb, dt, mask);
-        if (STYLE.plastilina) rb.resolveDepthBuffer = wb.resolveDepthBuffer = false;
+        rb.resolveDepthBuffer = wb.resolveDepthBuffer = false;
       };
       this.composer.addPass(rp);
       if (this.qKey !== 'baja') {
@@ -207,8 +199,8 @@ export class Game {
         // town for a normal buffer (twice the draw calls), and no sprites without normals (they came out as black squares)
         this.gtao = new GTAOPass(this.scene, this.camera, innerWidth, innerHeight);
         this.gtao.setGBuffer(rt.depthTexture); // (after construction: r170's constructor trips over a given depth texture)
-        this.gtao.updateGtaoMaterial(DIORAMA.ao); this.gtao.updatePdMaterial(DIORAMA.aoDenoise);
-        this.gtao.blendIntensity = DIORAMA.aoBlend;
+        this.gtao.updateGtaoMaterial(STUDIO_AO.ao); this.gtao.updatePdMaterial(STUDIO_AO.denoise);
+        this.gtao.blendIntensity = STUDIO_AO.blend;
         const gtaoRender = this.gtao.render.bind(this.gtao);
         this.gtao.render = (renderer, wb, rb, dt, mask) => { // (the composer's two buffers take turns: the one just drawn)
           this.gtao.gtaoMaterial.uniforms.tDepth.value = this.sceneDepth; this.gtao.pdMaterial.uniforms.tDepth.value = this.sceneDepth;
@@ -216,13 +208,12 @@ export class Game {
         };
         this.composer.addPass(this.gtao);
       }
-      this.grade = new ShaderPass(DioramaGrade);
+      this.grade = new ShaderPass(ClayGrade);
       this.grade.material.depthTest = this.grade.material.depthWrite = false; // (full-screen passes never touch depth)
       this.composer.addPass(this.grade);
-      if (STYLE.plastilina) { // (claymation: pure clay colours, the studio's fill in the shadows, a touch of lens)
+      { // (pure clay colours, the studio's fill in the shadows, a touch of lens)
         const G = PLASTILINA.grade, U = this.grade.uniforms;
-        U.uSat.value = G.sat; U.uWarm.value = G.warm; U.uContrast.value = G.contrast; U.uLift.value = G.lift; U.uVignette.value = G.vignette; if (G.tint && U.uTint) U.uTint.value = new THREE.Vector3(...G.tint);
-        this.setStopMotion(this.save.stopMotion);
+        U.uSat.value = G.sat; U.uWarm.value = G.warm; U.uContrast.value = G.contrast; U.uLift.value = G.lift; U.uVignette.value = G.vignette; U.uTint.value = new THREE.Vector3(...G.tint);
         if (this.qKey !== 'baja') this.lens = [0, 1].map((k) => { // (the far background a little soft, as through a real lens)
           const pass = new ShaderPass(ClayLens), pr = pass.render.bind(pass);
           pass.material.depthTest = pass.material.depthWrite = false;
@@ -290,8 +281,7 @@ export class Game {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    if (this.composer) { this.composer.setSize(w, h); if (this.bloom) this.bloom.setSize(w, h); } // (the diorama's composer may have no bloom)
-    if (this.toon) this.toon.setSize(w, h);
+    if (this.composer) { this.composer.setSize(w, h); if (this.bloom) this.bloom.setSize(w, h); } // (the claymation's composer may have no bloom)
     const radar = this.ui.radar;
     const size = Math.round(w < 520 ? Math.min(128, w * 0.34) : h <= 500 ? Math.min(112, h * 0.3) : Math.min(230, Math.max(150, Math.min(w, h) * 0.24)));
     const dpr = Math.min(2, devicePixelRatio || 1);
@@ -614,13 +604,6 @@ export class Game {
       this.shaderT = (this.shaderT || 0) + dt;
       shared.uTime.value = STYLE.plastilina ? SM.time(this.shaderT) : this.shaderT; // (claymation: the wind and the water pose by pose too)
       const p = this.player;
-      // (the anime look) a quiet lo-fi bed while you walk the town: not in a car or with the radio on, not in church
-      if (STYLE.anime) {
-        if (!this.lofi) this.lofi = new LoFi(this.audio);
-        this.lofi.enabled = this.save.lofi !== false;
-        const radio = this.audio._radioOn || (this.fm && this.fm.where);
-        this.lofi.update(dt, (p.mode === 'foot' || p.mode === 'sit') && !radio && !(this.interior && (this.interior.church || this.interior.chapel)));
-      }
       // inside Santa María, Gregorian chant far off in the stone (softer while mass is said)
       if (!this.chant) this.chant = new Chant(this.audio);
       this.chant.update(dt, !!(this.interior && (this.interior.church || this.interior.chapel)), this.interior && this.interior.chapel ? 0.6 : this.interiors.church && this.interiors.church.mass ? 0.45 : 1);
@@ -664,7 +647,7 @@ export class Game {
       if (this.fm) this.fm.update(dt);
       if (this.mode === 'normal' && !this.interior) { this.merendero.update(dt); this.mercadillo.update(dt); }
       if (this.zombieSys.active) this.zombieSys.update(dt);
-      if (STYLE.plastilina && SM.on) { this.fxAcc = (this.fxAcc || 0) + dt; if (SM.tick) { this.effects.update(this.fxAcc); this.fxAcc = 0; } } // (smoke and sparks pose by pose)
+      if (STYLE.plastilina) { this.fxAcc = (this.fxAcc || 0) + dt; if (SM.tick) { this.effects.update(this.fxAcc); this.fxAcc = 0; } } // (smoke and sparks pose by pose)
       else this.effects.update(dt);
       this.weapons.tracers.update(dt);
       this.cam.update(dt, input);
@@ -757,22 +740,12 @@ export class Game {
   }
 
   // the scene through whichever pipeline is on (also used by the photo tools with their own cameras)
-  renderView(cam, overlay = null) {
-    if (this.toon) this.toon.render(this.scene, cam, { night: this.sky ? this.sky.night : 0, exposure: this.renderer.toneMappingExposure, overlay });
-    else if (this.composer) {
+  renderView(cam) {
+    if (this.composer) {
       if (this.lens) this.focusLens(cam);
       const rp = this.composer.passes[0], keep = rp.camera; rp.camera = cam; if (this.gtao) this.gtao.camera = cam; this.composer.render(); rp.camera = keep; if (this.gtao) this.gtao.camera = keep;
     }
     else this.renderer.render(this.scene, cam);
-  }
-  // claymation's stop motion: true (the puppets pose 12 times a second), 'cine' (the camera too, with the film's grain and
-  // its black bars: a stop-motion film), false (everything smooth)
-  setStopMotion(mode) {
-    SM.on = mode !== false;
-    this.cine = STYLE.plastilina && mode === 'cine';
-    if (this._camHold) this._camHold.ok = false;
-    if (typeof document !== 'undefined') document.body.classList.toggle('cine', !!this.cine);
-    if (this.grade && this.grade.uniforms.uGrain && !this.cine) this.grade.uniforms.uGrain.value = 0;
   }
   // claymation: the lens focuses on the action — the player (or what they drive) at its distance; in first person, on
   // whatever is in the middle of the view
@@ -796,32 +769,17 @@ export class Game {
       this.bloom.radius = lerp(0.3, 0.6, night);
       if (STYLE.plastilina) { this.bloom.strength = lerp(0.14, 0.6, night); this.bloom.threshold = lerp(0.95, 0.85, night); this.bloom.radius = lerp(0.75, 0.6, night); } // (claymation: the soft halation of a photographed set)
     }
-    // claymation: the puppets not due a new pose are drawn as they were at the last one (the player keeps its place);
-    // at each pose the lamps flicker a hair
-    // «Película»: a stop-motion feature — the puppets (you too) on twos, the camera on the film's own 24 frames a second
-    // (drawn where it was at the last frame between them), a new grain on every frame
-    let camLive = null;
+    // claymation: the puppets not due a new pose are drawn as they were at the last one; at each pose the lamps flicker
+    // a hair
     if (STYLE.plastilina) {
-      // (you are posed every frame and drawn where you are, as fluid as the camera that follows you; «Película»: you
-      // too on twos, like everybody)
-      if (this.player && this.player.char) { SM.setFree(this.player.char.object, !this.cine); SM.setSmooth(this.player.char.object, false); }
-      const now = performance.now(), h = this._camHold || (this._camHold = { p: new THREE.Vector3(), q: new THREE.Quaternion(), fov: 60, ok: false, t: 0 });
-      const filmTick = now - h.t >= 1000 / 24 - 2;
-      if (this.grade && SM.tick) this.grade.uniforms.uGain.value = SM.on ? 1 + (Math.random() - 0.5) * PLASTILINA.flicker : 1;
-      if (this.grade && filmTick) { const U = this.grade.uniforms; U.uGrain.value = this.cine && SM.on ? PLASTILINA.grain : 0; U.uSeed.value = Math.random() * 100; }
+      if (this.grade && SM.tick) this.grade.uniforms.uGain.value = 1 + (Math.random() - 0.5) * PLASTILINA.flicker;
       SM.hold();
-      if (this.cine && SM.on) {
-        const c = this.camera;
-        if (filmTick || !h.ok || c.position.distanceToSquared(h.p) > 25) { h.p.copy(c.position); h.q.copy(c.quaternion); h.fov = c.fov; h.ok = true; h.t = now; } // (a cut: no held frame)
-        else { camLive = [c.position.clone(), c.quaternion.clone(), c.fov]; c.position.copy(h.p); c.quaternion.copy(h.q); if (c.fov !== h.fov) { c.fov = h.fov; c.updateProjectionMatrix(); } c.updateMatrixWorld(); }
-      }
     }
     const wv = this.interior && this.windowView && this.windowView.render(); // the street, drawn for the windows
     this.renderView(this.camera);
     if (wv) this.windowView.after();
-    if (camLive) { const c = this.camera; c.position.copy(camLive[0]); c.quaternion.copy(camLive[1]); if (c.fov !== camLive[2]) { c.fov = camLive[2]; c.updateProjectionMatrix(); } c.updateMatrixWorld(); }
     if (STYLE.plastilina) SM.release();
-    // first-person gun on top (in the anime look, through the same tone curve: CustomToneMapping)
+    // first-person gun on top
     if (this.viewModel && this.state === 'play') this.viewModel.render(this.renderer);
   }
 

@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { GroundBuilder } from './ground.js';
 import { GROUND } from './textures.js';
-import { mulberry32, hash1, polySample, polyNearest, clamp, pointInRing } from './util.js';
+import { mulberry32, polySample, clamp } from './util.js';
 
 // ------------------------------------------------------------------ zone map
 function ageOf(y) {

@@ -9,7 +9,7 @@
 <title>Guareña Evolución</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&family=Dela+Gothic+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&display=swap">
 <style>
 :root {
   color-scheme: dark;
@@ -358,10 +358,6 @@ body.hiding::after { content: ''; position: fixed; inset: 0; z-index: 11; pointe
 #damage { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(170,10,10,0.55) 100%); opacity: 0; }
 #damage.hit { animation: dmg 0.6s ease; }
 @keyframes dmg { 0% { opacity: 1; } 100% { opacity: 0; } }
-/* «Película» (Plastilina › Stop motion): a stop-motion film's black bars, 2.39:1, under the HUD */
-#cine::before, #cine::after { content: ''; position: fixed; left: 0; right: 0; height: 0; background: #000; z-index: 12; pointer-events: none; transition: height 0.6s ease; }
-#cine::before { top: 0; } #cine::after { bottom: 0; }
-body.cine #cine::before, body.cine #cine::after { height: clamp(0px, calc((100vh - 100vw / 2.39) / 2), 11vh); } /* (never more than a film's bars on a tall screen) */
 #letterbox::before, #letterbox::after { content: ''; position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height 0.5s ease; z-index: 1; }
 #letterbox::before { top: 0; } #letterbox::after { bottom: 0; }
 #letterbox.on::before, #letterbox.on::after { height: 11vh; }
@@ -596,57 +592,8 @@ input[type=range] { width: 150px; accent-color: var(--trigo); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
-
-/* ---------------- the anime look (after the web game Messenger): teal skies, cream paper, ink outlines, rounded
-   Japanese-style type. Applies when <body data-look="anime"> (the default; Ajustes › Estilo visual). */
-body[data-look="anime"] {
-  --display: 'Dela Gothic One', 'Anton', 'Impact', sans-serif;
-  --cond: 'Zen Maru Gothic', 'Barlow Condensed', 'Arial Narrow', sans-serif;
-  --body: 'Zen Maru Gothic', 'Barlow', system-ui, -apple-system, sans-serif;
-  --ink: #1b2830;
-  --panel: rgba(27, 44, 54, 0.88);
-  --panel-2: rgba(27, 44, 54, 0.62);
-  --teja: #e5794f; --teja-d: #a9492a; --trigo: #ffd36e; --money: #b4f5c4;
-}
-body[data-look="anime"] #loading { background: linear-gradient(180deg, #8bd0ca 0%, #72bfba 58%, #5aa8a7 100%); }
-body[data-look="anime"] .brand .big { color: #fbf7ee; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 7px 7px 0 var(--ink); transform: none; letter-spacing: 0.02em; }
-body[data-look="anime"] .brand .sub { color: var(--ink); }
-body[data-look="anime"] .brand .sub i { background: var(--ink); }
-body[data-look="anime"] #loadBar { background: rgba(251, 250, 245, 0.55); border: 2.5px solid var(--ink); height: 12px; border-radius: 7px; box-shadow: 3px 3px 0 var(--ink); }
-body[data-look="anime"] #loadBar b { background: #f6c64f; }
-body[data-look="anime"] #loadText, body[data-look="anime"] .tip { color: var(--ink); }
-body[data-look="anime"] #menu { background: linear-gradient(90deg, rgba(20, 42, 50, 0.7) 0%, rgba(20, 42, 50, 0.32) 40%, rgba(20, 42, 50, 0) 66%), linear-gradient(0deg, rgba(20, 42, 50, 0.55), rgba(20, 42, 50, 0) 45%); }
-body[data-look="anime"] .menuList button { text-shadow: 3px 3px 0 var(--ink); font-weight: 900; }
-body[data-look="anime"] .menuList button::after { height: 5px; background: var(--trigo); box-shadow: 2px 2px 0 var(--ink); }
-body[data-look="anime"] .btn { border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); border-radius: 12px; }
-body[data-look="anime"] .selName .n, body[data-look="anime"] .edName { -webkit-text-stroke: 2.5px var(--ink); paint-order: stroke fill; text-shadow: 6px 6px 0 var(--ink); }
-/* the HUD: filled letters with an ink outline and a flat offset shadow, like a manga caption */
-body[data-look="anime"] #money { color: var(--money); -webkit-text-stroke: 2px var(--ink); text-shadow: 3px 3px 0 var(--ink); }
-body[data-look="anime"] #clock, body[data-look="anime"] #street, body[data-look="anime"] #district, body[data-look="anime"] #wState { -webkit-text-stroke: 1.2px var(--ink); paint-order: stroke fill; text-shadow: 2px 2px 0 var(--ink); }
-body[data-look="anime"] #banner .bt { -webkit-text-stroke: 3px var(--ink); text-shadow: 6px 6px 0 var(--ink); }
-body[data-look="anime"] #banner .bs { text-shadow: 2px 2px 0 var(--ink); }
-body[data-look="anime"] #stars i.on { background: #fff6d6; filter: drop-shadow(2px 2px 0 var(--ink)); }
-/* speech and subtitles: a white card with an ink border and the speaker's name in blue (the reference's dialogue box) */
-body[data-look="anime"] #subs { background: #fbfaf5; color: var(--ink); border: 2.5px solid var(--ink); border-radius: 6px; box-shadow: 5px 5px 0 rgba(27, 40, 48, 0.9); text-shadow: none; padding: 10px 18px; }
-body[data-look="anime"] #subs b { color: #2b7fae; }
-body[data-look="anime"] #objective { text-shadow: 2px 2px 0 var(--ink), -1px -1px 0 var(--ink), 1px -1px 0 var(--ink), -1px 1px 0 var(--ink); }
-body[data-look="anime"] #help, body[data-look="anime"] .note, body[data-look="anime"] #prompt, body[data-look="anime"] #orderMenu, body[data-look="anime"] .listMenu { border: 2px solid rgba(251, 250, 246, 0.8); box-shadow: 4px 4px 0 var(--ink); }
-body[data-look="anime"] #phone { border-color: var(--ink); box-shadow: 6px 6px 0 var(--ink); }
-
-/* the way in (anime look): the drone's picture while the town is built, fading into the live flight */
-#intro { z-index: 25; background: #a3d9cf; overflow: hidden; transition: opacity 1.1s ease; }
-#intro.out { opacity: 0; pointer-events: none; }
-#introImg { position: absolute; opacity: 0; transform-origin: 50% 50%; will-change: transform; user-select: none; -webkit-user-drag: none; }
-#introImg.on { opacity: 1; }
-body[data-look="anime"] #loading { display: none; }
-body[data-look="anime"] #bChars, body[data-look="anime"] #pChars, body[data-look="anime"] #mpChangeChar { display: none; }
-
-/* standing still a while (anime look): the HUD fades and the camera drifts (player.js CameraRig) */
-#hud .tr, #hud .radarWrap, #hud #streetBox { transition: opacity 1.2s ease; }
-body.contemplar #hud .tr, body.contemplar #hud .radarWrap, body.contemplar #hud #notes, body.contemplar #hud #streetBox { opacity: 0.1; }
 </style>
 <canvas id="game"></canvas>
-<div id="cine"></div>
 
 <div id="hud" hidden>
   <div id="letterbox"></div>
@@ -697,22 +644,6 @@ body.contemplar #hud .tr, body.contemplar #hud .radarWrap, body.contemplar #hud 
   </div>
 </div>
 
-<div id="intro" class="screen" hidden><img id="introImg" src="assets/intro.jpg" alt=""></div>
-<script>(function () {
-  // the look, before anything shows; in the anime one the drone's picture of Guareña covers the screen and starts
-  // drifting closer at once (a CSS transition, smooth while the page loads and builds the town)
-  var look = 'anime';
-  try { var st = JSON.parse(localStorage.getItem('guarena_evo_save') || localStorage.getItem('guarena_save') || '{}').style; look = st === 'real' || st === 'diorama' || st === 'plastilina' ? st : 'anime'; } catch (e) { /* ignore */ }
-  try { var ue = new URLSearchParams(location.search).get('estilo'); if (ue) look = ue === 'real' || ue === 'diorama' || ue === 'plastilina' ? ue : 'anime'; } catch (e) { /* ignore */ }
-  document.body.dataset.look = look;
-  if (look !== 'anime') return;
-  var box = document.getElementById('intro'), img = document.getElementById('introImg');
-  box.hidden = false;
-  function fit() { var vw = innerWidth, vh = innerHeight, k = Math.max(vw / 1920, vh / 1080); img.style.width = 1920 * k + 'px'; img.style.height = 1080 * k + 'px'; img.style.left = (vw - 1920 * k) / 2 + 'px'; img.style.top = (vh - 1080 * k) / 2 + 'px'; }
-  fit(); addEventListener('resize', fit);
-  function go() { img.classList.add('on'); requestAnimationFrame(function () { requestAnimationFrame(function () { img.style.transition = 'transform 26s cubic-bezier(0.25, 0.55, 0.35, 1), opacity 0.8s'; img.style.transform = 'scale(1.34)'; }); }); }
-  if (img.complete && img.naturalWidth) go(); else img.addEventListener('load', go);
-})();</script>
 <div id="loading" class="screen">
   <div class="brand"><span class="big">Guareña</span><span class="sub"><i></i>Evolución · Vegas Altas · Extremadura</span></div>
   <div id="loadBar"><b></b></div>

@@ -32,7 +32,7 @@ export function parseMoves(buf) {
   return { fps, bones, frames: nF, clips, rot, root, contact, rs, ps, vs };
 }
 
-const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 
 // The decoded database: quaternions per frame and bone, the root's motion, and the matching features
 export class MotionDB {

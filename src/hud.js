@@ -1,6 +1,6 @@
 // HUD: radar with the real street map of Guareña, GPS routes, blips, street names, money, clock, wanted stars,
 // speedometer, mission text, subtitles, notifications, big banners and the full-screen map.
-import { clamp, fmtMoney, lerp, ringBounds } from './util.js';
+import { clamp, fmtMoney, lerp } from './util.js';
 
 const PX = 0.66; // radar raster: pixels per metre
 

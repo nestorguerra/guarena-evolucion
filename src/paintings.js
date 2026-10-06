@@ -34,7 +34,6 @@ export function paintingTexture(kind, { w = 288, h = 432, seed = 1, fresco = fal
   return t;
 }
 export const APOSTLE_ORDER = ['pedro', 'pablo', 'andres', 'santiago', 'juan', 'tomas', 'mateo', 'bartolome', 'felipe', 'menor', 'simon', 'tadeo'];
-export const APOSTLE_NAME = { pedro: 'San Pedro', pablo: 'San Pablo', andres: 'San Andrés', santiago: 'Santiago el Mayor', juan: 'San Juan Evangelista', tomas: 'Santo Tomás', mateo: 'San Mateo', bartolome: 'San Bartolomé', felipe: 'San Felipe', menor: 'Santiago el Menor', simon: 'San Simón', tadeo: 'San Judas Tadeo' };
 
 // the apostles as tradition paints them: their colours, hair and beard, what they hold
 const APOSTLES = {
@@ -75,7 +74,7 @@ function hex(c) { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (
 function rgb(a, k = 1, add = 0) { return `rgb(${clamp(a[0] * k + add, 0, 255) | 0},${clamp(a[1] * k + add, 0, 255) | 0},${clamp(a[2] * k + add, 0, 255) | 0})`; }
 function rgba(a, al, k = 1, add = 0) { return `rgba(${clamp(a[0] * k + add, 0, 255) | 0},${clamp(a[1] * k + add, 0, 255) | 0},${clamp(a[2] * k + add, 0, 255) | 0},${al})`; }
 function mix(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
-const SKIN = [226, 182, 146], SKIN_DARK = [150, 98, 68], GOLD = [222, 176, 84], WARM_LIGHT = [255, 236, 196];
+const SKIN = [226, 182, 146], SKIN_DARK = [150, 98, 68];
 
 class Painter {
   constructor(x, w, h, r) { this.x = x; this.W = w; this.H = h; this.r = r; this.light = [-0.75, -0.65]; }

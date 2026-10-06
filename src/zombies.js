@@ -13,7 +13,6 @@ const GROANS = ['z1', 'z2', 'z3', 'z4', 'z5', 'z6'];
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const ease = (t) => t * t * (3 - 2 * t);
 const HALF_PI = Math.PI / 2;
-const ALIVE = new Set(['walk', 'lunge', 'crawl', 'rise']);
 
 function zombieDesc(rnd) {
   const d = randomDesc(rnd);

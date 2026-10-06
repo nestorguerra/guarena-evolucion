@@ -278,7 +278,7 @@ const LEAF_RECIPES = {
   cinta: (c, a, r) => blades(c, a, r, 34, [hex('#6a9a4a'), hex('#8ab86a'), hex('#e8f0d0')], 0.45, 0.95, 5), // spider plant: long pale-striped leaves
   hierba: (c, a, r) => blades(c, a, r, 90, [hex('#5f8a3a'), hex('#6f9a42'), hex('#4f7d33'), hex('#86a04a')], 0.35, 0.9, 2.2),
   hierba_seca: (c, a, r) => blades(c, a, r, 80, [hex('#c8b27a'), hex('#b89e62'), hex('#d8c48c'), hex('#a08a58')], 0.3, 0.85, 2),
-  // the skin of the anime crowns' clumps: almost flat, a few scalloped marks of leaves a shade darker or lighter
+  // the skin of the claymation crowns' balls: almost flat, a few scalloped marks of leaves a shade darker or lighter
   copa: (c, a, r) => { // leaf clusters drawn in: little dark scallops and flecks, a few pale ones
     c.fillStyle = a ? '#fff' : '#e8e8e8'; c.fillRect(0, 0, LT, LT); if (a) return;
     for (let i = 0; i < 46; i++) { const x = r() * LT, y = r() * LT; c.fillStyle = 'rgba(96,104,98,0.5)'; for (let k = 0; k < 3; k++) { c.beginPath(); c.ellipse(x + (r() - 0.5) * 12, y + (r() - 0.5) * 7, 3 + r() * 3.5, 1.6 + r() * 1.6, r() * 3, 0, Math.PI * 2); c.fill(); } }
@@ -357,34 +357,6 @@ const LEAF_RECIPES = {
   },
   flores: (c, a, r) => { blades(c, a, r, 50, [hex('#6f9a42'), hex('#86a04a')], 0.3, 0.8, 2); balls(c, a, r, 7, hex('#d8302a'), 7); balls(c, a, r, 6, hex('#e8d23a'), 5); },
 };
-// the anime look: every painted leaf and petal in a few flat tones, with a dark rim just inside its edge
-function animeFlatten(dc, da, W, H) {
-  const lv = 5;
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const i = (y * W + x) * 4;
-    let r = dc[i], g = dc[i + 1], b = dc[i + 2];
-    const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    if (L > 1) { const t = (L / 255) * lv, q = ((Math.floor(t) + (t % 1 > 0.5 ? 1 : 0) * 0.85 + 0.075) / lv) * 255, m = 1 + (q / L - 1) * 0.8; r *= m; g *= m; b *= m; }
-    const a = da[i];
-    if (a > 110) { // (an edge: a transparent neighbour two pixels away)
-      const xm = Math.max(0, x - 2), xp = Math.min(W - 1, x + 2), ym = Math.max(0, y - 2), yp = Math.min(H - 1, y + 2);
-      if (da[(y * W + xm) * 4] < 110 || da[(y * W + xp) * 4] < 110 || da[(ym * W + x) * 4] < 110 || da[(yp * W + x) * 4] < 110) { r *= 0.5; g *= 0.52; b *= 0.58; }
-    }
-    dc[i] = Math.min(255, r); dc[i + 1] = Math.min(255, g); dc[i + 2] = Math.min(255, b);
-  }
-}
-// the diorama look: the leaves towards the visual spec's olive and dark greens (dusty, a little warm); flowers keep theirs
-function dioramaGreens(dc, W, H) {
-  for (let i = 0; i < W * H * 4; i += 4) {
-    const r = dc[i], g = dc[i + 1], b = dc[i + 2];
-    const gr = Math.min(1, (g - Math.max(r, b)) / 30); // how green the pixel is
-    if (gr <= 0) continue;
-    const L = 0.299 * r + 0.587 * g + 0.114 * b, k = 0.7;
-    dc[i] = r + ((L + (r - L) * k) * 1.06 - r) * gr;
-    dc[i + 1] = g + ((L + (g - L) * k) * 0.97 - g) * gr;
-    dc[i + 2] = b + ((L + (b - L) * k) * 0.8 - b) * gr;
-  }
-}
 // claymation: the leaves and petals as pieces of plasticine — purer, a little lighter, never dusty
 function clayColours(dc, W, H) {
   for (let i = 0; i < W * H * 4; i += 4) {
@@ -411,9 +383,7 @@ export function makeLeafAtlas() {
     f(xa, true, mulberry32(77 + i * 131)); xa.restore();
   });
   const dc = xc.getImageData(0, 0, W, H).data, da = xa.getImageData(0, 0, W, H).data;
-  if (STYLE.anime) animeFlatten(dc, da, W, H);
-  else if (STYLE.plastilina) clayColours(dc, W, H);
-  else if (STYLE.diorama) dioramaGreens(dc, W, H);
+  if (STYLE.plastilina) clayColours(dc, W, H);
   const out = new Uint8Array(W * H * 4);
   // rows flipped: the DataTexture's first row is the bottom (v = 0)
   for (let y = 0; y < H; y++) {
@@ -594,7 +564,6 @@ for (const k of SPECIES_KEYS) SPECIES[k].name = k;
 function specOf(name) { const s = SPECIES[name]; return s.base ? { ...SPECIES[s.base], ...s } : s; }
 
 // ------------------------------------------------------------ small vector helpers (plain arrays)
-const v3 = (x = 0, y = 0, z = 0) => [x, y, z];
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const scl = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
@@ -768,15 +737,13 @@ function leafCards(B, sp, sk, rnd, lod) {
     }
   }
 }
-// ------------------------------------------------------------ the anime look: crowns of rounded clumps (the way a
-// background painter draws a tree), shaded as one volume, each clump outlined by the ink pass, fruit and flowers as
-// little balls of colour
-const ANIME_LEAF = { olivo: '#93a17c', encina: '#587a4c', platano: '#7aa55c', naranjo: '#4a7a45', limonero: '#52844a', morera: '#72a35a', pino: '#577a55', eucalipto: '#8ca68e', chopo: '#8fb266', higuera: '#6f9c56', frutal: '#7ba45e', adelfa: '#5a8552', cipres: '#446448', seto: '#548453', vid: '#7aa45a' };
-const ANIME_DOTS = { naranjo: [['#f28c1c', 16, 0.075]], limonero: [['#eed63c', 14, 0.07]], adelfa: [['#ef7aa6', 26, 0.09], ['#f6f0ea', 6, 0.09]], frutal: [['#f4b0c0', 10, 0.06]] };
+// ------------------------------------------------------------ claymation: crowns of balls of clay (a broccoli, as in the
+// user's pictures), shaded as one volume; fruit and flowers as little balls of colour
+const CLAY_LEAF = { olivo: '#93a17c', encina: '#587a4c', platano: '#7aa55c', naranjo: '#4a7a45', limonero: '#52844a', morera: '#72a35a', pino: '#577a55', eucalipto: '#8ca68e', chopo: '#8fb266', higuera: '#6f9c56', frutal: '#7ba45e', adelfa: '#5a8552', cipres: '#446448', seto: '#548453', vid: '#7aa45a' };
+const CLAY_DOTS = { naranjo: [['#f28c1c', 16, 0.075]], limonero: [['#eed63c', 14, 0.07]], adelfa: [['#ef7aa6', 26, 0.09], ['#f6f0ea', 6, 0.09]], frutal: [['#f4b0c0', 10, 0.06]] };
 const lin = (h) => hex(h).map((v) => Math.pow(v / 255, 2.2));
-// (claymation: the same greens as plasticine — more saturated; the anime look keeps its own)
-// (claymation: the deep olive greens of modelling clay, as in the user's pictures — darker, a touch warm)
-const clayGreen = (c) => { if (!STYLE.plastilina) return c; const L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; return c.map((v, i) => Math.max(0, (L + (v - L) * 1.0) * 0.47 * [1.0, 1.12, 1.0][i])); }; // (a fresh green, as the pictures' broccoli trees — olive read as dry)
+// (the greens of modelling clay, darker than the paint)
+const clayGreen = (c) => { const L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; return c.map((v, i) => Math.max(0, (L + (v - L) * 1.0) * 0.47 * [1.0, 1.12, 1.0][i])); }; // (a fresh green, as the pictures' broccoli trees — olive read as dry)
 const ICO = [];
 function icoMesh(detail) { // a unit icosphere with shared vertices (smooth normals, lumps that stay closed)
   if (ICO[detail]) return ICO[detail];
@@ -800,7 +767,7 @@ function blob(B, c, r, sq, col, sk, rnd, detail, tile, flexK, lump = 0.34, box =
       const e = box.n, q = Math.pow(Math.pow(Math.abs(d[0]), e) + Math.pow(Math.abs(d[1]), e) + Math.pow(Math.abs(d[2]), e), -1 / e);
       P = [c[0] + d[0] * q * box.h[0] * kk, c[1] + d[1] * q * box.h[1] * kk, c[2] + d[2] * q * box.h[2] * kk];
     }
-    const own = STYLE.plastilina && detail <= 2 && sk.C ? 0.7 : 0.5; // (claymation: each ball shaded as a ball — they read one by one)
+    const own = detail <= 2 && sk.C ? 0.7 : 0.5; // (each ball shaded as a ball — they read one by one)
     const n = nrm(add(scl(d, own), scl(nrm(sub(P, cc)), 1 - own)));
     const dd = sk.C ? ellD(P, sk.C, sk.Rr) : 1;
     const ao = (0.62 + 0.38 * sstep(0.2, 1.0, dd)) * (0.86 + 0.14 * (0.5 + 0.5 * d[1]));
@@ -811,7 +778,7 @@ function blob(B, c, r, sq, col, sk, rnd, detail, tile, flexK, lump = 0.34, box =
 }
 function clumps(B, sp, sk, rnd, lod) {
   const Lf = sp.leaves, name = sp.name;
-  const col = clayGreen(lin(ANIME_LEAF[name] || '#6e9c4a'));
+  const col = clayGreen(lin(CLAY_LEAF[name] || '#6e9c4a'));
   const pts = [];
   for (const tw of sk.twigs) {
     const from = tw.tipOnly ? 0.7 : (Lf.from ?? 0.25);
@@ -820,7 +787,7 @@ function clumps(B, sp, sk, rnd, lod) {
   }
   for (let i = pts.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pts[i], pts[j]] = [pts[j], pts[i]]; }
   const crownR = Math.cbrt(sk.Rr[0] * sk.Rr[1] * sk.Rr[2]);
-  if (STYLE.plastilina && !lod) { // (claymation: the balls laid over the crown's whole envelope, evenly, like a broccoli)
+  if (!lod) { // (the balls laid over the crown's whole envelope, evenly, like a broccoli)
     pts.length = 0;
     const rb = Math.min(crownR * 0.3, 0.36), N = Math.round(clamp(4 * crownR * crownR / (rb * rb) * 0.5, 24, 84)), ga = Math.PI * (3 - Math.sqrt(5)); // (florets of a hand's size: the pictures' broccoli)
     for (let k = 0; k < N; k++) {
@@ -828,26 +795,25 @@ function clumps(B, sp, sk, rnd, lod) {
       pts.push([sk.C[0] + Math.cos(a) * r * sk.Rr[0] * 1.06, sk.C[1] + y * sk.Rr[1] * 1.06, sk.C[2] + Math.sin(a) * r * sk.Rr[2] * 1.06]);
     }
   }
-  // (claymation: the crown made of many small balls of clay, as in the user's pictures)
-  // (claymation: every tree a broccoli of small balls of clay, ~25 cm whatever its size — the user's pictures)
-  const rc = STYLE.plastilina && !lod ? Math.min(crownR * 0.3, 0.36) : crownR * (lod ? 0.5 : 0.42) * (sp.clump || 1), sq = clamp(sk.Rr[1] / Math.max(sk.Rr[0], 0.1), 0.55, 1.2);
+  // (every tree a broccoli of small balls of clay, ~25 cm whatever its size; far off, a few big lumps)
+  const rc = !lod ? Math.min(crownR * 0.3, 0.36) : crownR * 0.5, sq = clamp(sk.Rr[1] / Math.max(sk.Rr[0], 0.1), 0.55, 1.2);
   const cs = [];
   for (const p0 of pts) {
     const p = add(sk.C, scl(sub(p0, sk.C), 0.84)); // (a little inside the envelope: the lumps reach out to it)
-    if (cs.some((c) => Math.hypot(c[0] - p[0], (c[1] - p[1]) / sq, c[2] - p[2]) < rc * (STYLE.plastilina && !lod ? 0.9 : 1.05))) continue;
+    if (cs.some((c) => Math.hypot(c[0] - p[0], (c[1] - p[1]) / sq, c[2] - p[2]) < rc * (!lod ? 0.9 : 1.05))) continue;
     cs.push(p);
-    if (cs.length >= (lod ? 9 : STYLE.plastilina ? 84 : 13)) break; // (the far ones stay light: thousands of them)
+    if (cs.length >= (lod ? 9 : 84)) break; // (the far ones stay light: thousands of them)
   }
   // a core, so no sky shows through the middle of the crown
   blob(B, sk.C, crownR * 0.62, sq, col.map((v) => v * 0.82), sk, rnd, lod ? 1 : 2, TILE.copa, 0.25, 0.2);
   cs.forEach((c, i) => {
     const vk = 0.9 + rnd() * 0.2 + (c[1] > sk.C[1] ? 0.06 : -0.04);
-    // (claymation: each ball round, as rolled between the palms — squashed with a wide crown they read as pillows)
-    const sb = STYLE.plastilina && !lod ? Math.max(sq, 0.92) : sq;
-    blob(B, c, rc * (0.9 + rnd() * 0.4), sb * (0.85 + rnd() * 0.2), col.map((v) => v * vk), sk, rnd, lod ? 1 : STYLE.plastilina ? 2 : 3, i % 3 ? TILE.copa : TILE.copa_b, 0.45, STYLE.plastilina ? 0.2 : 0.26);
+    // (each ball round, as rolled between the palms — squashed with a wide crown they read as pillows)
+    const sb = !lod ? Math.max(sq, 0.92) : sq;
+    blob(B, c, rc * (0.9 + rnd() * 0.4), sb * (0.85 + rnd() * 0.2), col.map((v) => v * vk), sk, rnd, lod ? 1 : 2, i % 3 ? TILE.copa : TILE.copa_b, 0.45, 0.2);
   });
   // fruit, flowers: little balls sitting on the clumps
-  if (!lod && ANIME_DOTS[name]) for (const [h, n, r] of ANIME_DOTS[name]) {
+  if (!lod && CLAY_DOTS[name]) for (const [h, n, r] of CLAY_DOTS[name]) {
     const dc = lin(h);
     for (let k = 0; k < n; k++) {
       const c = cs[Math.floor(rnd() * cs.length)] || sk.C;
@@ -865,7 +831,7 @@ function buildBranching(sp, rnd, lod) {
     const radial = b.depth === 0 ? (lod ? 6 : 9) : b.depth === 1 ? (lod ? 4 : 6) : 3;
     tube(bark, b, radial, tile, tint, sk, (i * 0.61803) % 1);
   });
-  if (STYLE.anime || STYLE.plastilina) clumps(leaves, sp, sk, rnd, lod); else leafCards(leaves, sp, sk, rnd, lod); // (claymation: balls of modelled clay)
+  if (STYLE.plastilina) clumps(leaves, sp, sk, rnd, lod); else leafCards(leaves, sp, sk, rnd, lod); // (claymation: balls of modelled clay)
   return { bark, leaves, H: sk.H, R: Math.max(sk.Rr[0], sk.Rr[2]) };
 }
 // cypress: a slim spindle of foliage round a hidden stem
@@ -873,8 +839,8 @@ function buildColumn(sp, rnd, lod) {
   const H = R(rnd, sp.H), Rm = R(rnd, sp.r), bark = new Buf(), leaves = new Buf();
   const sk = { H, C: [0, H * 0.5, 0], Rr: [Rm, H * 0.5, Rm] };
   tube(bark, { pts: [[0, 0, 0], [0.02, 0.8, 0], [0, H * 0.85, 0.02]], rad: [0.16, 0.12, 0.03], depth: 0, flare: 1.3 }, lod ? 5 : 7, BARK[sp.bark], [1, 1, 1], sk, 0.3);
-  if (STYLE.anime || STYLE.plastilina) { // a column of lumps, tapering to a point
-    const col = clayGreen(lin(ANIME_LEAF.cipres)), n = lod ? 5 : 9;
+  if (STYLE.plastilina) { // claymation: a column of lumps, tapering to a point
+    const col = clayGreen(lin(CLAY_LEAF.cipres)), n = lod ? 5 : 9;
     for (let k = 0; k < n; k++) {
       const t = (k + 0.5) / n, y = 0.9 + t * (H - 1.4), prof = Math.pow(Math.sin(Math.PI * clamp(t * 0.92 + 0.06, 0, 1)), 0.7) * (1 - 0.45 * t * t);
       const r = Math.max(0.25, Rm * prof * 1.05), vk = 0.88 + 0.2 * t + rnd() * 0.08;
@@ -903,8 +869,8 @@ function buildColumn(sp, rnd, lod) {
 // clipped hedge: cards all over a box, turned outwards
 function buildBox(sp, rnd, lod) {
   const [L, W, Hh] = sp.size, bark = new Buf(), leaves = new Buf(), tile = TILE[sp.tiles[0]];
-  if (STYLE.anime || STYLE.plastilina) { // a clipped hedge as a row of rounded lumps
-    const col = clayGreen(lin(ANIME_LEAF.seto)), sk = { H: Hh, C: [0, Hh * 0.55, 0], Rr: [L / 2, Hh / 2, W / 2] };
+  if (STYLE.plastilina) { // claymation: a clipped hedge as one rounded lump
+    const col = clayGreen(lin(CLAY_LEAF.seto)), sk = { H: Hh, C: [0, Hh * 0.55, 0], Rr: [L / 2, Hh / 2, W / 2] };
     blob(leaves, [0, Hh * 0.5, 0], 1, 1, col.map((v) => v * (0.94 + rnd() * 0.1)), sk, rnd, lod ? 1 : 2, TILE.copa_b, 0.15, 0.05, { n: 5, h: [L * 0.53, Hh * 0.5, W * 0.5] });
     return { bark, leaves, H: Hh, R: L / 2 };
   }
@@ -992,8 +958,8 @@ function buildVine(sp, rnd, lod) {
   const bark = new Buf(), leaves = new Buf(), sk = { H: 1.8, C: [0, 1.25, 0], Rr: [0.9, 0.55, 0.35] };
   tube(bark, { pts: [[0, 0, 0], [0.05, 0.4, 0.02], [-0.03, 0.8, 0]], rad: [0.05, 0.04, 0.035], depth: 0, flare: 1.2 }, 5, BARK.comun, [0.9, 0.8, 0.7], sk, 0.1);
   for (const s of [-1, 1]) tube(bark, { pts: [[-0.03, 0.8, 0], [s * 0.5, 0.86, 0], [s * 1.0, 0.84, 0]], rad: [0.03, 0.025, 0.015], depth: 1 }, 4, BARK.comun, [0.9, 0.8, 0.7], sk, 0.2);
-  if (STYLE.anime || STYLE.plastilina) { // the row's leaves as a few soft lumps over the wires
-    const col = clayGreen(lin(ANIME_LEAF.vid));
+  if (STYLE.plastilina) { // claymation: the row's leaves as a few soft lumps over the wires
+    const col = clayGreen(lin(CLAY_LEAF.vid));
     for (let k = 0; k < (lod ? 2 : 4); k++) blob(leaves, [(k / ((lod ? 2 : 4) - 1) - 0.5) * 1.5, 1.3, 0], 0.55, 0.7, col.map((v) => v * (0.92 + rnd() * 0.12)), sk, rnd, lod ? 0 : 1, TILE.copa, 0.5, 0.3);
     return { bark, leaves, H: 1.8, R: 1.1 };
   }
@@ -1065,8 +1031,8 @@ export function makeLeafMaterial(atlas, { a2c = true } = {}) {
     if (crown) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9), 0.75);
   }` : ''}`)
       // the diffuse light wraps round the crown and some comes through the leaves from behind (the specular keeps the
-      // plain term: a lit back face would blow up the GGX lobe). The anime look keeps its two clean tones instead.
-      .replace('#include <lights_physical_pars_fragment>', STYLE.anime ? '#include <lights_physical_pars_fragment>' : THREE.ShaderChunk.lights_physical_pars_fragment.replace(
+      // plain term: a lit back face would blow up the GGX lobe)
+      .replace('#include <lights_physical_pars_fragment>', THREE.ShaderChunk.lights_physical_pars_fragment.replace(
         'reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );',
         '{ float nlL = dot( geometryNormal, directLight.direction ); reflectedLight.directDiffuse += ( saturate( ( nlL + 0.4 ) / 1.4 ) + saturate( -nlL ) * 0.3 ) * directLight.color * BRDF_Lambert( material.diffuseColor ); }'));
   };
@@ -1162,7 +1128,6 @@ export class TreeLibrary {
 export function makeImpostorMaterial(alb, nrmTex, { a2c = true } = {}) {
   const m = new THREE.MeshStandardMaterial({ map: alb, normalMap: nrmTex, roughness: 0.85, metalness: 0, alphaTest: 0.5, side: THREE.DoubleSide });
   m.alphaToCoverage = a2c;
-  m.defines = { TOON_KEEP_NORMALS: '' }; // (a billboard's volume is all in its baked normals)
   m.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>

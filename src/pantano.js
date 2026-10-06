@@ -5,7 +5,6 @@
 // and level gauge, and a wooden jetty with a moored rowboat. You can't walk on the water (the jetty you can).
 // Everything reads the shore distance from one signed-distance texture (negative inside the water).
 import * as THREE from 'three';
-import { STYLE } from './style.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { shared } from './materials.js';
 import { loadTexture } from './assets.js';
@@ -200,20 +199,7 @@ export class Reservoir {
           float d = sdfAt(vW.xz) + (fbm(vW.xz * 0.25) - 0.5) * 1.4;
           if (d > 0.0) discard;
           float depth = -d;
-${STYLE.anime ? `          // the anime lake: flat bands of teal taking the sky's colour, white dashes where the waves catch the light,
-          // a clean line of foam along the shore
-          float far = length(cameraPosition.xz - vW.xz);
-          float dk = 1.0 - exp(-depth / 6.0);
-          vec3 base = mix(vec3(0.3, 0.6, 0.6), vec3(0.13, 0.34, 0.43), smoothstep(0.25, 0.75, dk));
-          base = mix(base, mix(uHor, uZen, 0.55), 0.35);
-          float lightK = clamp(uSun.y * 1.6 + 0.35, 0.08, 1.0) * (1.0 - uNight * 0.8);
-          vec3 col = base * lightK;
-          vec2 g = waves(vW.xz, uTime);
-          float dash = fbm(vW.xz * vec2(0.3, 1.1) + vec2(uTime * 0.18, uTime * 0.05)) + length(g) * 0.35;
-          col = mix(col, vec3(0.94, 0.98, 1.0) * lightK, step(0.66, dash) * 0.8 * (1.0 - smoothstep(40.0, 280.0, far)) * (1.0 - uNight * 0.7));
-          col = mix(col, uSunCol * 1.2 + 0.2, step(0.9994, max(dot(reflect(-normalize(cameraPosition - vW), normalize(vec3(-g.x * 0.3, 1.0, -g.y * 0.3))), uSun), 0.0)) * (1.0 - uNight));
-          col = mix(col, vec3(0.92, 0.95, 0.92) * lightK, 1.0 - smoothstep(0.3, 0.42, depth));
-` : `          vec3 V = normalize(cameraPosition - vW);
+          vec3 V = normalize(cameraPosition - vW);
           float calm = mix(0.3, 1.0, smoothstep(0.0, 14.0, depth));
           vec2 g = waves(vW.xz, uTime) * calm;
           float far = clamp(length(cameraPosition.xz - vW.xz) / 400.0, 0.0, 1.0);
@@ -240,7 +226,7 @@ ${STYLE.anime ? `          // the anime lake: flat bands of teal taking the sky'
           col = mix(col, vec3(0.82, 0.8, 0.74) * lightK, foam * 0.6);
           // wet dark rim right at the waterline
           col *= mix(0.75, 1.0, smoothstep(0.0, 0.5, depth));
-`}          gl_FragColor = vec4(col, 1.0);
+          gl_FragColor = vec4(col, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
           #include <fog_fragment>

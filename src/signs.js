@@ -25,7 +25,6 @@ function roundRect(w, h, r, n = 4) {
 const CIRCLE = Array.from({ length: 40 }, (_, i) => { const a = (i / 40) * Math.PI * 2; return [Math.cos(a) * 0.5, Math.sin(a) * 0.5]; });
 const SQUARE = roundRect(1, 1, 0.06);
 const RECT3 = roundRect(1, 1 / 3, 0.02);   // 3:1 boards (in a 2x1-cell slot, normalised to its width)
-const RECT2 = roundRect(1, 0.5, 0.03);
 
 // ---------------------------------------------------------------- faces
 function path(ctx, pts, s, ox, oy) { ctx.beginPath(); pts.forEach(([x, y], i) => { const X = ox + (x + 0.5) * s, Y = oy + (0.5 - y) * s; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.closePath(); }

@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { StaticCollider } from './collision.js';
 import { mulberry32, hash1 } from './util.js';
-import { INTERIOR_ORIGIN, WALL_H, T, boxGeo, planeGeo, cylGeo, pictureTexture, rugTexture, HouseBuilder, std, texMat, ringSegs } from './housekit.js';
+import { INTERIOR_ORIGIN, WALL_H, boxGeo, planeGeo, cylGeo, pictureTexture, rugTexture, HouseBuilder, std, texMat, ringSegs } from './housekit.js';
 
 // ---------------------------------------------------------------- who lives here
 export const PROFILES = {

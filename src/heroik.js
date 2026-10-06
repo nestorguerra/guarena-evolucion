@@ -1,12 +1,8 @@
-// Feet on the ground: foot locking and leg IK for an animated body (the hero's motion capture). While the capture says
-// a foot is on the ground, that foot stays where it landed in the world (no skating, whatever small mismatch there is
-// between the animation's speed and the body's), sits on the ground under it (kerbs, steps, slopes), and the leg is
-// re-solved to reach it, the knee kept in the plane it was animated in. When the foot lifts it eases back into the
-// animation. The hips come down if a leg cannot reach.
+// Leg IK for the hero's feet: hero.js (afterMove) keeps a planted foot where it landed and on the ground under it, and
+// re-solves the leg with this to reach it, the knee kept in the plane it was animated in.
 import * as THREE from 'three';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3();
-const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4();
 
 // Two-bone IK in world space: hip joint H, knee K, ankle A (current, animated), goal T. Returns the rotations to apply
 // (world-space deltas) to the upper and lower bones so the ankle reaches T, the knee staying on the side it was on.
@@ -29,7 +25,3 @@ export function solveTwoBone(H, K, A, T, outUpper, outLower) {
   return d;
 }
 
-// per-foot lock state
-export class FootLock {
-  constructor() { this.on = false; this.w = 0; this.pos = new THREE.Vector3(); this.blendOut = 0; this.from = new THREE.Vector3(); }
-}

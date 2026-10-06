@@ -987,7 +987,6 @@ export class GameAudio {
       try { this._samples.set(n, await this.ctx.decodeAudioData(data)); } catch (e) { /* codec not supported: keep the synth fallback */ }
     }));
   }
-  hasSample(n) { return !!(this._samples && this._samples.get(n)); }
   sample(name, o = {}) {
     const b = this._samples && this._samples.get(name);
     if (!b || !this.ready) return null;
@@ -1019,7 +1018,6 @@ export class GameAudio {
     cur.v.k.stop(t + fade + 0.1);
     this._loops.delete(id);
   }
-  loopStopAll() { if (this._loops) for (const id of [...this._loops.keys()]) this.loopStop(id); }
 
   // ── Sirens ──
   sirenStart(id, kind) {

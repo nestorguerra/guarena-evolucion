@@ -8,8 +8,6 @@ import { randomDesc } from './characters.js';
 import { mulberry32 } from './util.js';
 
 const BBQ_OSM = { x: 2054, z: 1130 }; // amenity=bbq (OSM way 179784519)
-const WEEKDAYS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
-export const weekdayName = (i) => WEEKDAYS[((i % 7) + 7) % 7];
 
 function flameTexture() {
   const c = document.createElement('canvas'); c.width = 64; c.height = 128;

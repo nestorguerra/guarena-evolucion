@@ -97,18 +97,18 @@ export const STYLE_DEF = {
   piedra: { wall: 'stone', zocalo: 'stone', zocH: 0.4, wood: '#4e3421', frame: '#4e3421', reja: true, persiana: '#d0c8b8', door: 'wood', doorCol: '#4a2e1a', garage: '#4a2e1a' },
 };
 
-// the diorama's façades (Ajustes › Estética › Diorama; src/diorama.js): the visual spec's palette over the same kinds of
-// house — ivory and cream whitewash, toasted-ochre plinths, deep green or dark wood doors and shutters; brick, stone,
-// sheds and the modern blocks keep what they are. Applied once, before the town is painted (main.js boot), so the 3D
-// details of the fronts (facades.js) take the same colours
-const DIORAMA_DEF = {
+// the claymation's façades: a warm palette over the same kinds of house — ivory and cream whitewash, toasted-ochre
+// plinths, deep green or dark wood doors and shutters; brick, stone, sheds and the modern blocks keep what they are.
+// Applied once, before the town is painted (main.js boot), so the 3D details of the fronts (facades.js) take the same
+// colours
+const CLAY_FACADES = {
   trad_verde: { wall: '#f0e5cd', zocalo: '#bb7d44', wood: '#354d3d', frame: '#354d3d', persiana: '#e6dcc4', doorCol: '#354d3d', garage: '#e6dcc6' },
   trad_ocre: { wall: '#f2e8d4', zocalo: '#bb7d44', wood: '#5a3a24', frame: '#4a3020', persiana: '#dcd0b8', doorCol: '#4e3220', garage: '#5a3a24' },
   renovada: { wall: '#ece2cc', wood: '#d8d2c4', frame: '#e6dfd0', persiana: '#ece4d4', doorCol: '#6e5034', garage: '#e8e0d0' },
   color: { zocalo: '#bf9258', persiana: '#e8dcc6', doorCol: '#5a3a24' },
   moderna: { wall: '#e6ded0', zocalo: '#6a6560', persiana: '#8a8580' },
 };
-export function applyDioramaPalette() { for (const [k, v] of Object.entries(DIORAMA_DEF)) Object.assign(STYLE_DEF[k], v); }
+export function applyClayPalette() { for (const [k, v] of Object.entries(CLAY_FACADES)) Object.assign(STYLE_DEF[k], v); }
 
 function facadePainter(S) {
   const kx = S / BAY_W, ky = S / FLOOR_H;
@@ -476,15 +476,6 @@ function paintShop(P, st, rnd, addGlass) {
   }
 }
 
-// Build alpha mask: wall = 255 where pixel is close to base wall colour; glass = 128 for dark-blue glass pixels; else 0
-function finalizeFacade(P, st, isWallFn) {
-  const { ctx, S } = P;
-  const img = ctx.getImageData(0, 0, S, S);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) d[i + 3] = isWallFn(d[i], d[i + 1], d[i + 2], (i / 4) % S, Math.floor(i / 4 / S));
-  return img;
-}
-
 function drawFacadeLayer(style, layer, S, seed) {
   const st = STYLE_DEF[style];
   const rnd = mulberry32(seed);
@@ -692,10 +683,9 @@ function drawGroundLayer(name, S, seed) {
   switch (name) {
     case 'asphalt':
     case 'asphalt2': {
-      // (the diorama's asphalt: a warm grey, darker, its grain finer)
-      const D = STYLE.diorama, PL = STYLE.plastilina; // (claymation: a warm, faintly pink grey clay, as in the user's pictures)
-      base(name === 'asphalt' ? (PL ? '#7b716c' : D ? '#6c675f' : '#7c7a76') : (PL ? '#746a65' : D ? '#655f58' : '#696866'));
-      speckle(ctx, S, rnd, S * S * (PL ? 0.1 : 0.22), PL ? ['#5d5450', '#665c57', '#4f4744'] : D ? ['#58544d', '#7a746b', '#857e74', '#504c46', '#766d62'] : ['#5f5d59', '#8e8b85', '#9c9892', '#55534f', '#857d74'], 0.6, 1.6, 0.6); // (claymation: no light specks — the clay is one grey)
+      const PL = STYLE.plastilina; // (claymation: a warm, faintly pink grey clay, as in the user's pictures — no light specks)
+      base(name === 'asphalt' ? (PL ? '#7b716c' : '#7c7a76') : (PL ? '#746a65' : '#696866'));
+      speckle(ctx, S, rnd, S * S * (PL ? 0.1 : 0.22), PL ? ['#5d5450', '#665c57', '#4f4744'] : ['#5f5d59', '#8e8b85', '#9c9892', '#55534f', '#857d74'], 0.6, 1.6, 0.6);
       grain(ctx, S, seed, 0.12, 5, 3);
       if (name === 'asphalt') {
         // patches & cracks
@@ -716,12 +706,12 @@ function drawGroundLayer(name, S, seed) {
     }
     case 'acera': {
       // Spanish pavement tiles: 30 cm squares with 4-pastilla relief (2.4 m -> 8 tiles)
-      const D = STYLE.diorama; // (the diorama's pavements: sand-coloured)
-      base(D ? '#a8916a' : '#a79c8a');
+      const PL = STYLE.plastilina; // (claymation: sand-coloured pavements)
+      base(PL ? '#a8916a' : '#a79c8a');
       const n = 8, w = S / n;
       for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
         const v = 0.9 + rnd() * 0.14;
-        ctx.fillStyle = D ? `rgb(${Math.floor(220 * v)},${Math.floor(200 * v)},${Math.floor(162 * v)})` : `rgb(${Math.floor(206 * v)},${Math.floor(194 * v)},${Math.floor(172 * v)})`;
+        ctx.fillStyle = PL ? `rgb(${Math.floor(220 * v)},${Math.floor(200 * v)},${Math.floor(162 * v)})` : `rgb(${Math.floor(206 * v)},${Math.floor(194 * v)},${Math.floor(172 * v)})`;
         ctx.fillRect(i * w + 1.5, j * w + 1.5, w - 3, w - 3);
         const q = w / 2;
         for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) {
@@ -739,8 +729,8 @@ function drawGroundLayer(name, S, seed) {
     }
     case 'plaza': {
       // granite slabs in running bond
-      const D = STYLE.diorama;
-      base(D ? '#988462' : '#8e877a');
+      const PL = STYLE.plastilina; // (claymation: warm sandstone)
+      base(PL ? '#988462' : '#8e877a');
       const rows = 6, rh = S / rows;
       for (let j = 0; j < rows; j++) {
         let x = (j % 2) * rh * 0.7;
@@ -748,7 +738,7 @@ function drawGroundLayer(name, S, seed) {
         while (x < S) {
           const w = rh * (1.1 + rnd() * 0.8);
           const v = 0.85 + rnd() * 0.2;
-          ctx.fillStyle = D ? `rgb(${Math.floor(214 * v)},${Math.floor(194 * v)},${Math.floor(156 * v)})` : `rgb(${Math.floor(190 * v)},${Math.floor(182 * v)},${Math.floor(166 * v)})`;
+          ctx.fillStyle = PL ? `rgb(${Math.floor(214 * v)},${Math.floor(194 * v)},${Math.floor(156 * v)})` : `rgb(${Math.floor(190 * v)},${Math.floor(182 * v)},${Math.floor(166 * v)})`;
           ctx.fillRect(x + 1.5, j * rh + 1.5, w - 3, rh - 3);
           x += w;
         }
@@ -1007,106 +997,6 @@ function star(ctx, x, y, r) {
   }
   ctx.closePath();
   ctx.fill();
-}
-
-// Sign atlas: 8x4 cells of 128px. Returns {canvas, cells: {name: [col,row]}}
-export function signAtlas() {
-  const N = 128, C = 8, Rw = 4;
-  const c = canvas(N * C, N * Rw);
-  const ctx = c.getContext('2d');
-  const cells = {};
-  let idx = 0;
-  const cell = (name, fn) => {
-    const cx = (idx % C) * N, cy = Math.floor(idx / C) * N;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.beginPath(); ctx.rect(0, 0, N, N); ctx.clip();
-    fn(ctx, N);
-    ctx.restore();
-    cells[name] = [idx % C, Math.floor(idx / C)];
-    idx++;
-  };
-  const circle = (ctx, fill, stroke, w) => { ctx.beginPath(); ctx.arc(64, 64, 58, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); if (stroke) { ctx.lineWidth = w; ctx.strokeStyle = stroke; ctx.stroke(); } };
-  cell('stop', (ctx) => {
-    ctx.fillStyle = '#fff';
-    oct(ctx, 64, 64, 62); ctx.fill();
-    ctx.fillStyle = '#c8102e'; oct(ctx, 64, 64, 56); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 40px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('STOP', 64, 66);
-  });
-  cell('ceda', (ctx) => {
-    ctx.fillStyle = '#c8102e';
-    ctx.beginPath(); ctx.moveTo(4, 10); ctx.lineTo(124, 10); ctx.lineTo(64, 118); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.moveTo(24, 22); ctx.lineTo(104, 22); ctx.lineTo(64, 94); ctx.closePath(); ctx.fill();
-  });
-  cell('prohibido', (ctx) => { circle(ctx, '#c8102e'); ctx.fillStyle = '#fff'; ctx.fillRect(22, 54, 84, 20); });
-  cell('v30', (ctx) => {
-    circle(ctx, '#fff', '#c8102e', 14);
-    ctx.fillStyle = '#111'; ctx.font = 'bold 52px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('30', 64, 68);
-  });
-  cell('sentido', (ctx) => {
-    circle(ctx, '#1a4fa0');
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(64, 18); ctx.lineTo(98, 58); ctx.lineTo(76, 58); ctx.lineTo(76, 108); ctx.lineTo(52, 108); ctx.lineTo(52, 58); ctx.lineTo(30, 58); ctx.closePath(); ctx.fill();
-  });
-  cell('paso', (ctx) => {
-    ctx.fillStyle = '#1a4fa0'; ctx.fillRect(4, 4, 120, 120);
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(64, 14); ctx.lineTo(114, 110); ctx.lineTo(14, 110); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#111'; ctx.fillRect(34, 92, 60, 6); ctx.beginPath(); ctx.arc(64, 48, 8, 0, 7); ctx.fill(); ctx.fillRect(60, 56, 8, 26);
-  });
-  cell('farmacia', (ctx) => {
-    ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, 128, 128);
-    ctx.fillStyle = '#19d45a'; ctx.fillRect(44, 12, 40, 104); ctx.fillRect(12, 44, 104, 40);
-  });
-  cell('parada', (ctx) => {
-    ctx.fillStyle = '#1a4fa0'; ctx.fillRect(0, 0, 128, 128);
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 30px Arial'; ctx.textAlign = 'center'; ctx.fillText('BUS', 64, 52);
-    ctx.fillRect(28, 66, 72, 34); ctx.fillStyle = '#1a4fa0'; ctx.fillRect(34, 72, 60, 14);
-  });
-  const text = (name, bg, fg, txt, size = 30, font = 'bold') => cell(name, (ctx) => {
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, 128, 128);
-    ctx.fillStyle = fg; ctx.font = `${font} ${size}px Arial, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const lines = txt.split('\n');
-    lines.forEach((l, i) => ctx.fillText(l, 64, 64 + (i - (lines.length - 1) / 2) * size * 1.1));
-  });
-  text('bar', '#7a1f1f', '#ffe9b0', 'BAR', 44);
-  text('cafe', '#3b2a1c', '#f3d7a5', 'CAFÉ', 40);
-  text('panaderia', '#d9b36a', '#4a2a12', 'PANA-\nDERÍA', 28);
-  text('estanco', '#6b2323', '#f5d24a', 'T\nESTANCO', 26);
-  text('banco', '#0d5c46', '#ffffff', 'BANCO', 36);
-  text('super', '#e31e24', '#ffffff', 'SUPER', 38);
-  text('ropa', '#222222', '#e8e8e8', 'MODA', 40);
-  text('peluqueria', '#6b3a78', '#ffffff', 'PELU', 40);
-  text('tienda', '#2d5a8c', '#ffffff', 'TIENDA', 30);
-  text('taller', '#333333', '#f2c500', 'TALLER', 32);
-  text('farmacia_txt', '#ffffff', '#11903f', 'FARMACIA', 22);
-  text('ayto', '#e9e1cf', '#3a2a1a', 'AYUNTA-\nMIENTO', 22);
-  text('correos', '#ffcc00', '#003a8c', 'Correos', 30);
-  text('loteria', '#ffffff', '#c8102e', 'LOTERÍA', 28);
-  text('guarena', '#ffffff', '#111111', 'GUAREÑA', 26);
-  text('hotel', '#1c2c4a', '#ffffff', 'HOTEL', 36);
-  text('pizza', '#b3261e', '#fff3cf', 'PIZZA', 38);
-  text('kebab', '#e57722', '#ffffff', 'KEBAB', 36);
-  text('muebles', '#5b4636', '#f0e2cc', 'MUEBLES', 26);
-  text('zapateria', '#1e1e1e', '#f6c26b', 'CALZADOS', 22);
-  text('joyeria', '#18181c', '#e6c77a', 'JOYERÍA', 26);
-  text('optica', '#ffffff', '#0b5aa6', 'ÓPTICA', 30);
-  text('chapa', '#1f2e3b', '#f5d000', 'CHAPA Y\nPINTURA', 20);
-  text('cooperativa', '#2f5d2a', '#f4e8c0', 'COOPE-\nRATIVA', 22);
-  // town entry sign (white with red border)
-  cell('entrada', (ctx) => {
-    ctx.fillStyle = '#c8102e'; ctx.fillRect(0, 20, 128, 88);
-    ctx.fillStyle = '#fff'; ctx.fillRect(6, 26, 116, 76);
-    ctx.fillStyle = '#111'; ctx.font = 'bold 26px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('GUAREÑA', 64, 64);
-  });
-  return { canvas: c, cells, cols: C, rows: Rw };
-}
-function oct(ctx, x, y, r) {
-  ctx.beginPath();
-  for (let i = 0; i < 8; i++) {
-    const a = Math.PI / 8 + (i * Math.PI) / 4;
-    ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
-  }
-  ctx.closePath();
 }
 
 // Text label canvas for building names on landmark plaques, big letters etc.

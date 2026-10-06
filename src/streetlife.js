@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { paint, InstanceGroup } from './props.js';
-import { mulberry32, hash1, polySample, polyNearest, clamp, pointInRing, ringBounds, ringArea } from './util.js';
+import { mulberry32, hash1, polySample, pointInRing, ringBounds, ringArea } from './util.js';
 import { makeNightGlowMaterial } from './materials.js';
 import { groundPot } from './facades.js';
 import { STYLE } from './style.js';

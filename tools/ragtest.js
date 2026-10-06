@@ -5,7 +5,7 @@ import { PLAYER_PRESETS } from '/src/characters.js';
 import { build, SPOT } from '/tools/faces.js';
 const G = () => window.game;
 async function post(name, url) { await fetch('/__snap?name=' + name, { method: 'POST', body: url }); }
-function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); if (g.composer) { g.composer.setSize(w, h); if (g.bloom) g.bloom.setSize(w, h); } if (g.toon) g.toon.setSize(w, h); }
+function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); if (g.composer) { g.composer.setSize(w, h); if (g.bloom) g.bloom.setSize(w, h); } }
 function render(cam) {
   const g = G(), keep = g.camera;
   if (g.renderView) { g.camera = cam; try { g.renderView(cam); } finally { g.camera = keep; } return; }

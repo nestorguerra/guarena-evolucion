@@ -190,24 +190,11 @@ export class InstanceGroup {
     m.setMatrixAt(h.idx, new THREE.Matrix4().makeScale(0, 0, 0));
     m.instanceMatrix.needsUpdate = true;
   }
-  addMatrix(m, key = '0:0') {
-    let a = this.items.get('M' + key);
-    if (!a) this.items.set('M' + key, (a = []));
-    a.push(m);
-  }
   build(parent) {
     const meshes = [];
     this.byKey = new Map();
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     for (const [key, a] of this.items) {
-      if (key[0] === 'M') {
-        const im = new THREE.InstancedMesh(this.geometry, this.material, a.length);
-        a.forEach((mm, i) => im.setMatrixAt(i, mm));
-        im.castShadow = this.castShadow; im.receiveShadow = this.receiveShadow;
-        im.computeBoundingSphere();
-        parent.add(im); meshes.push(im);
-        continue;
-      }
       const n = a.length / 9;
       const im = new THREE.InstancedMesh(this.geometry, this.material, n);
       let hasColor = false;

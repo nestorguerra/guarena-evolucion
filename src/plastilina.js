@@ -1,12 +1,13 @@
-// «Plastilina» — Guareña as a claymation film (Ajustes › Estética › Plastilina; the plan in docs/plastilina.md).
-// Built on the diorama (its palette, sky, light and contact shadows: STYLE.diorama is on too), it turns every lit thing
-// into modelling clay and the people, cars and animals into puppets animated pose by pose:
+// «Plastilina» — Guareña as a claymation film (Ajustes › Estética › Plastilina, the default look; the plan and its
+// passes in docs/plastilina.md). A studio set — the façades' warm palette (textures.js applyClayPalette), a painted sky
+// with cotton clouds and studio lamps (sky.js), contact shadows (STUDIO_AO) and the film's grade (ClayGrade) — where
+// every lit thing is modelling clay and the people, cars and animals are puppets animated pose by pose:
 //  - the clay (installClayChunks): through three.js's own shader chunks, so every standard material takes it — lumps
 //    from the hands that shaped it, thumbprints with their ridges, spatula cuts, a speck of lint here and there, the
 //    colour never quite even, a soft waxy sheen, light that wraps a little into the shadow (warm, as clay is); the sets
 //    keep their marks, the puppets are retouched at every pose (the «boil»)
-//  - stop motion (StopMotion): 12 poses a second for the puppets — their bones and, but for the player, their place —
-//    while the camera and the game itself run on as always (as in Kirby and the Rainbow Curse or Spider-Verse: the
+//  - stop motion (StopMotion), always on: 12 poses a second for the puppets — their bones and their place — while the
+//    camera, the player and the game itself run on as always (as in Kirby and the Rainbow Curse or Spider-Verse: the
 //    figures «on twos», the camera «on ones»), and no motion blur
 // What every film and game studied taught (Aardman, The LEGO Movie, Kirby, The Neverhood…) is in the plan.
 import * as THREE from 'three';
@@ -20,12 +21,89 @@ export const PLASTILINA = {
   // subject it starts and is at its softest (× the subject's distance). Only a little: the user asked for it gentler
   lens: { blur: 0.0034, from: 2.2, to: 10 }, // (the user's reference pictures: a macro lens on a miniature, the far end of a street soft)
   boilMM: 0.002, // how far a puppet's surface boils from one pose to the next (metres)
-  grain: 0.045, // «Película»: the film's grain
-  // the animator's hand: a puppet put back each pose is never exactly where it was (metres, radians; the player less)
-  jitter: { pos: 0.003, yaw: 0.006, player: 0.35 },
+  // the animator's hand: a puppet put back each pose is never exactly where it was (metres, radians)
+  jitter: { pos: 0.003, yaw: 0.006 },
   // the clay of the sets (metres): lumps, prints, cuts, lint; the puppets take theirs at their own scale (CLAY_SCALE)
   boil: null, // the shared uniform (installClayChunks): moved at every pose, for the puppets only
 };
+
+// contact shadows: ambient occlusion where things meet — the foot of a wall, under eaves and balconies, round pots and
+// people (three.js GTAOPass on the scene's own depth: game.js)
+export const STUDIO_AO = {
+  ao: { radius: 2.0, distanceExponent: 1.0, thickness: 2.5, scale: 1.7, samples: 16, distanceFallOff: 1.0, screenSpaceRadius: false },
+  denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 },
+  blend: 1.0,
+};
+
+// the film's last grade, in linear light before the tone curve (its values: PLASTILINA.grade): the studio lamps (uGain,
+// a hair brighter or dimmer at each pose) and their gels (uTint), purer colour, a warm white balance, a touch of
+// contrast round the middle greys, the studio's fill in the shadows, the lens's darker corners
+export const ClayGrade = {
+  uniforms: { tDiffuse: { value: null }, uSat: { value: 1 }, uWarm: { value: 0 }, uContrast: { value: 1 }, uLift: { value: 0 }, uVignette: { value: 0 }, uGain: { value: 1 }, uTint: { value: { x: 1, y: 1, z: 1 } } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uSat, uWarm, uContrast, uLift, uVignette, uGain; uniform vec3 uTint; varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      vec3 col = max(c.rgb, 0.0) * uGain * uTint;
+      float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      col = mix(vec3(l), col, uSat);
+      col *= vec3(1.0 + uWarm, 1.0 + uWarm * 0.3, 1.0 - uWarm * 0.7);
+      float k = pow(max(l, 1e-4) / 0.18, uContrast - 1.0);
+      col *= clamp(k, 0.6, 1.6);
+      col += uLift * vec3(0.2, 0.17, 0.13) * (1.0 - smoothstep(0.0, 0.3, l));
+      col *= 1.0 - uVignette * smoothstep(0.4, 1.0, length((vUv - 0.5) * vec2(1.25, 1.0)));
+      gl_FragColor = vec4(col, c.a);
+    }`,
+};
+
+// ---------------------------------------------------------------- textures repainted as pieces of plasticine
+// Each layer of an RGBA texture array (sRGB bytes; a single picture is one layer): smoothed — the grain of plaster,
+// asphalt or stone goes, clay has none — its light pulled softly onto a few tones and its colour made a little purer:
+// the painted façades, the ground and the interiors' wood, tiles and plaster as flat pieces of coloured clay (world.js,
+// assets.js). Alpha is kept. blur: in texels of a 512 tile.
+function boxBlur(src, dst, tmp, S, r) { // (wraps round: the textures tile)
+  const inv = 1 / (2 * r + 1);
+  for (let y = 0; y < S; y++) {
+    const row = y * S;
+    let acc = 0;
+    for (let k = -r; k <= r; k++) acc += src[row + ((k + S) % S)];
+    for (let x = 0; x < S; x++) {
+      tmp[row + x] = acc * inv;
+      acc += src[row + ((x + r + 1) % S)] - src[row + ((x - r + S) % S)];
+    }
+  }
+  for (let x = 0; x < S; x++) {
+    let acc = 0;
+    for (let k = -r; k <= r; k++) acc += tmp[((k + S) % S) * S + x];
+    for (let y = 0; y < S; y++) {
+      dst[y * S + x] = acc * inv;
+      acc += tmp[((y + r + 1) % S) * S + x] - tmp[((y - r + S) % S) * S + x];
+    }
+  }
+}
+export function clayRepaint(data, S, layers, { blur = 3, levels = 5, posterize = 0.5, saturation = 1.1 } = {}) {
+  const r0 = Math.max(1, Math.round(blur * S / 512)), N = S * S;
+  const C = [0, 1, 2].map(() => new Float32Array(N)), Cb = [0, 1, 2].map(() => new Float32Array(N)), tmp = new Float32Array(N);
+  const byte = (v) => Math.max(0, Math.min(255, v));
+  for (let l = 0; l < layers; l++) {
+    const off = l * N * 4;
+    for (let i = 0, j = off; i < N; i++, j += 4) { C[0][i] = data[j]; C[1][i] = data[j + 1]; C[2][i] = data[j + 2]; }
+    for (let c = 0; c < 3; c++) boxBlur(C[c], Cb[c], tmp, S, r0);
+    for (let i = 0, j = off; i < N; i++, j += 4) {
+      let r = Cb[0][i], g = Cb[1][i], b = Cb[2][i];
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      if (lum > 1) { // (soft steps from tone to tone: no hard banding)
+        const t = (lum / 255) * levels, f = t - Math.floor(t), s = f < 0.3 ? 0 : f > 0.7 ? 1 : (f - 0.3) / 0.4;
+        const m = 1 + ((((Math.floor(t) + s * s * (3 - 2 * s)) / levels) * 255) / lum - 1) * posterize;
+        r *= m; g *= m; b *= m;
+      }
+      const lm = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      data[j] = byte(lm + (r - lm) * saturation); data[j + 1] = byte(lm + (g - lm) * saturation); data[j + 2] = byte((lm + (b - lm) * saturation) * 1.02);
+    }
+  }
+  return data;
+}
 
 // ---------------------------------------------------------------- the clay's surface, modelled once
 // A tile of modelled clay (1024², wraps on every side), made when the game starts: four kinds of surface, one per
@@ -377,25 +455,20 @@ export const ClayLens = {
 // (one for the whole game: the characters, the dogs and the cars register with it as they are made)
 // The puppets keep each pose for 1/12 s: every frame the game moves them as always (so nothing it computes changes);
 // before the picture is drawn, those that are not due a new pose are put back as they were at the last one, and
-// after it they get their live state again. A puppet is a node tree (a character's group with its bones, a dog…);
-// `smooth` keeps its place live and holds only its pose (the player: the camera follows it smoothly).
+// after it they get their live state again. A puppet is a node tree (a character's group with its bones, a dog…).
 export class StopMotion {
   constructor(fps = PLASTILINA.fps) {
     this.dt = 1 / fps;
     this.acc = 0;
     this.tick = true;
-    this.on = true;
-    this.items = new Map(); // root -> { nodes, held, live, smooth }
+    this.items = new Map(); // root -> { nodes, held, live, jit, n }
     this.ticks = 0;
   }
-  add(root, { smooth = false } = {}) { this.items.set(root, { nodes: null, held: null, live: null, smooth, free: false, n: -1 }); }
+  add(root) { this.items.set(root, { nodes: null, held: null, live: null, jit: null, n: -1 }); }
+  // (the protagonist is taken off: it is posed every frame and drawn where it is, as fluid as the camera that follows it)
   remove(root) { this.items.delete(root); }
-  setSmooth(root, smooth) { const it = this.items.get(root); if (it) it.smooth = smooth; }
-  // free: not held at all — moved and posed every frame (the protagonist, so it runs as fluidly as the camera follows it)
-  setFree(root, free) { const it = this.items.get(root); if (it) it.free = free; }
   // once a frame, with the frame's real time: is this frame a new pose?
   advance(dt) {
-    if (!this.on) { this.tick = true; return true; }
     this.acc += dt;
     this.tick = this.acc >= this.dt;
     if (this.tick) {
@@ -406,7 +479,7 @@ export class StopMotion {
     return this.tick;
   }
   // the time the shaders see (trees in the wind, water, clouds): it too moves pose by pose
-  time(t) { return this.on ? Math.floor(t / this.dt) * this.dt : t; }
+  time(t) { return Math.floor(t / this.dt) * this.dt; }
   nodesOf(root) {
     const list = [];
     root.traverse((o) => { if (o.matrixAutoUpdate !== false) list.push(o); });
@@ -422,8 +495,8 @@ export class StopMotion {
     }
     return a;
   }
-  static apply(nodes, a, skipRoot) {
-    for (let i = skipRoot ? 1 : 0; i < nodes.length; i++) {
+  static apply(nodes, a) {
+    for (let i = 0; i < nodes.length; i++) {
       const o = nodes[i], k = i * 10;
       o.position.set(a[k], a[k + 1], a[k + 2]);
       o.quaternion.set(a[k + 3], a[k + 4], a[k + 5], a[k + 6]);
@@ -434,21 +507,19 @@ export class StopMotion {
   // animator's hand put it this pose: a few millimetres and a fraction of a degree off (PLASTILINA.jitter)
   hold() {
     this.swapped = false;
-    if (!this.on) return;
     const J = PLASTILINA.jitter;
     for (const [root, it] of this.items) {
-      if (!root.parent || !root.visible || it.free) { it.held = null; continue; }
+      if (!root.parent || !root.visible) { it.held = null; continue; }
       // (the node list is gathered again when the tree changes: a hat put on, a level of detail swapped)
       let count = 0; root.traverse(() => count++);
       if (!it.nodes || count !== it.n) { it.nodes = this.nodesOf(root); it.n = count; it.held = null; }
       const newPose = this.tick || !it.held;
       if (newPose) {
         it.held = StopMotion.capture(it.nodes, it.held);
-        const k = it.smooth ? J.player : 1;
-        it.jit = [(Math.random() - 0.5) * 2 * J.pos * k, (Math.random() - 0.5) * 2 * J.pos * k, (Math.random() - 0.5) * 2 * J.yaw * k];
+        it.jit = [(Math.random() - 0.5) * 2 * J.pos, (Math.random() - 0.5) * 2 * J.pos, (Math.random() - 0.5) * 2 * J.yaw];
       }
       it.live = StopMotion.capture(it.nodes, it.live);
-      if (!newPose) StopMotion.apply(it.nodes, it.held, it.smooth);
+      if (!newPose) StopMotion.apply(it.nodes, it.held);
       if (it.jit && it.nodes[0] === root) { root.position.x += it.jit[0]; root.position.z += it.jit[1]; root.rotateY(it.jit[2]); } // (put back after the picture: release)
       it.swapped = true; this.swapped = true;
     }
@@ -456,7 +527,7 @@ export class StopMotion {
   // after drawing: the live state again, for the game to carry on from
   release() {
     if (!this.swapped) return;
-    for (const it of this.items.values()) if (it.swapped) { StopMotion.apply(it.nodes, it.live, false); it.swapped = false; }
+    for (const it of this.items.values()) if (it.swapped) { StopMotion.apply(it.nodes, it.live); it.swapped = false; }
     this.swapped = false;
   }
 }

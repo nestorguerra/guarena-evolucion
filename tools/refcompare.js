@@ -2,7 +2,6 @@
 // houses, a wider street with parked cars, the church square with a palm), reproduced in the game through its own
 // camera behind the player, at the pictures' size → .snaps/ref_<tag>_<n>.jpg (put beside the references outside).
 //   const R = await import('/tools/refcompare.js?' + Date.now()); await R.shoot('a')
-import * as THREE from 'three';
 import { views } from '/tools/lookcompare.js';
 const G = () => window.game;
 const step = (n, dt = 1 / 30) => { const g = G(); for (let i = 0; i < n; i++) { if (g.state !== 'play') g.state = 'play'; g.frame(dt); } };

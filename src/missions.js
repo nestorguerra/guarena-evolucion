@@ -1,8 +1,8 @@
 // Missions set in real places of Guareña, written as small coroutine scripts, plus markers, checkpoints,
 // the "Tesoros de Tarteso" collectibles and the paint & body shop (chapa y pintura) that clears the wanted level.
 import * as THREE from 'three';
-import { clamp, lerp, mulberry32, ringCentroid, pointInRing } from './util.js';
-import { lanePoint, chooseNext, driveToward, followRoute, turnSpeed } from './traffic.js';
+import { clamp, mulberry32, ringCentroid } from './util.js';
+import { driveToward, followRoute, turnSpeed } from './traffic.js';
 import { PERK } from './perks.js';
 
 function glowTexture(color = '255,200,40') {

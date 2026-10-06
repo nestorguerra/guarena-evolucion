@@ -7,7 +7,7 @@ export async function shoot(tag, views, { hour = 11, W = 1600, H = 1000, frames 
   const g = G();
   if (g.interior) g.interiors.leave();
   const keepR = g.render; g.render = () => {};
-  g.renderer.setSize(W, H, false); if (g.toon) g.toon.setSize(W, H);
+  g.renderer.setSize(W, H, false);
   const cam = new THREE.PerspectiveCamera(60, W / H, 0.1, 2500);
   const out = [];
   try {

@@ -5,7 +5,7 @@
 // Each part is a function of the Landmarks builder (L): L.add / L.put / L.circle / L.poi / L.mat / L.map.
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { pointInRing, ringCentroid, orientedRect, mulberry32, clamp, polySample } from './util.js';
+import { pointInRing, ringCentroid, mulberry32, clamp, polySample } from './util.js';
 import { flagCanvas } from './textures.js';
 import { STYLE } from './style.js';
 import { SM } from './plastilina.js';

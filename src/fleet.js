@@ -1,8 +1,7 @@
 // Fleet: owns every vehicle in the world (parked, traffic, police, player), streams parked cars around the player,
 // runs physics sub-steps, static & vehicle-vehicle collisions, damage, lights and rendering updates.
-import * as THREE from 'three';
 import { Vehicle, VehicleRenderer, MODELS, PARKED_MIX, makeTmp, obbContact, resolvePair } from './vehicles.js';
-import { polySample, hash1, hash2, clamp, mulberry32 } from './util.js';
+import { polySample, hash1, clamp, mulberry32 } from './util.js';
 import { parkingBays } from './ground.js';
 import { PERK } from './perks.js';
 import { STYLE } from './style.js';
@@ -245,7 +244,7 @@ export class Fleet {
     // (claymation: the cars go pose by pose — only the one you drive keeps up with the camera between poses. A frame
     // that gave out or took back slots sends them all: a car just come, or moved into a freed slot, would otherwise show
     // what was last sent for its slot until the next pose — wheels without their body, a body somewhere else)
-    if (STYLE.plastilina && SM.on && !SM.tick && !rend.changed) rend.flushOnly(this.game.cine ? null : this.game.player && this.game.player.vehicle); // («Película»: your car on twos too)
+    if (STYLE.plastilina && !SM.tick && !rend.changed) rend.flushOnly(this.game.player && this.game.player.vehicle);
     else rend.flush();
   }
 
@@ -282,14 +281,4 @@ export class Fleet {
     }
     return best;
   }
-}
-
-function pip(x, z, r) {
-  let ins = false;
-  const n = r.length;
-  for (let i = 0, j = n - 2; i < n; j = i, i += 2) {
-    const xi = r[i], zi = r[i + 1], xj = r[j], zj = r[j + 1];
-    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi + 1e-12) + xi) ins = !ins;
-  }
-  return ins;
 }

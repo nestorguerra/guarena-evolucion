@@ -4,7 +4,7 @@
 // neighbours: little conversations on one topic that answer each other, greetings that suit the hour, and when you stop
 // them, they tell you where they are off to.
 import * as THREE from 'three';
-import { clamp, hash1 } from './util.js';
+import { hash1 } from './util.js';
 
 const pick = (a, r = Math.random) => a[Math.floor(r() * a.length)];
 export const weekday = (sky) => ((sky.day || 0) + 5) % 7; // 0 Monday … 6 Sunday

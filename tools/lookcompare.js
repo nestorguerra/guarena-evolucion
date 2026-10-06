@@ -1,16 +1,16 @@
-// Dev-only: the three test views of the visual spec («Guareña — Especificación visual global», the Diorama look),
-// always the same: (1) a street looking up at Santa María, (2) a narrow street of whitewashed houses, (3) a crossroads
-// with a little square. The player stands there at 14:00 and the game's own camera is behind them, as in the
-// reference pictures. Run it in each look (?estilo=anime|real|diorama, and the Acuarela look) and compare the sheets.
-//   const C = await import('/tools/lookcompare.js?' + Date.now()); await C.shoot('manga')
+// Dev-only: three test views of the town, always the same: (1) a street looking up at Santa María, (2) a narrow street
+// of whitewashed houses, (3) a crossroads with a little square. The player stands there at 14:00 and the game's own
+// camera is behind them. Run it in each look (?estilo=plastilina or ?estilo=real) and compare the sheets.
+//   const C = await import('/tools/lookcompare.js?' + Date.now()); await C.shoot('a')
 //   → .snaps/look_<tag>.jpg (three views side by side) and C.views() for the spots
 import * as THREE from 'three';
+import { polySample } from '/src/util.js';
 const G = () => window.game;
 // a picture through the game's own camera (its near plane too: herolab's renderInto uses 1 cm, and at that the town's
 // 24 km base field shows through the streets — not what the game shows)
 function renderInto(ctx, dx, dy, pos, look, fov, w, h) {
   const g = G();
-  g.renderer.setSize(w, h, false); if (g.composer) { g.composer.setSize(w, h); if (g.bloom) g.bloom.setSize(w, h); } if (g.toon) g.toon.setSize(w, h);
+  g.renderer.setSize(w, h, false); if (g.composer) { g.composer.setSize(w, h); if (g.bloom) g.bloom.setSize(w, h); }
   const cam = g.camera.clone(); cam.fov = fov; cam.aspect = w / h; cam.position.set(...pos); cam.lookAt(...look); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
   const keep = g.camera; g.camera = cam; if (g.composer) g.composer.passes[0].camera = cam;
   try { g.renderView(cam); } finally { g.camera = keep; if (g.composer) g.composer.passes[0].camera = keep; }
@@ -19,14 +19,37 @@ function renderInto(ctx, dx, dy, pos, look, fov, w, h) {
 }
 const step = (n) => { const g = G(); for (let i = 0; i < n; i++) { if (g.state !== 'play') g.state = 'play'; g.frame(1 / 30); } };
 
+// a walkable street 50–110 m from Santa María that runs straight at it, nothing in the way
+function churchStreet(g) {
+  const lm = g.world.landmarks.poi, map = g.map, C = lm.churchTower || lm.plaza || { x: 0, z: 0 }, tmp = {};
+  let best = null;
+  for (const e of map.edges) {
+    if (!e.walk || e.blocked || e.dirt || e.len < 20) continue;
+    for (let s = 4; s < e.len - 4; s += 2.5) {
+      polySample(e.pts, e.cum, s, tmp);
+      const dx = C.x - tmp.x, dz = C.z - tmp.z, d = Math.hypot(dx, dz);
+      if (d < 50 || d > 110) continue;
+      const ux = dx / d, uz = dz / d, al = Math.abs(ux * tmp.dx + uz * tmp.dz); // (the street runs towards the church)
+      if (al < 0.92) continue;
+      if (map.buildingAt(tmp.x, tmp.z) || map.buildingAt(tmp.x - ux * 4, tmp.z - uz * 4)) continue;
+      let clear = 0;
+      for (let t = 0.1; t < 0.8; t += 0.05) if (!map.buildingAt(tmp.x + dx * t, tmp.z + dz * t)) clear++;
+      const score = al * 2 + clear * 0.2 - Math.abs(d - 75) * 0.01;
+      if (!best || score > best.score) best = { score, x: tmp.x, z: tmp.z, ux, uz };
+    }
+  }
+  if (!best) best = { x: C.x + 30, z: C.z + 60, ux: -0.45, uz: -0.9 };
+  const l = Math.hypot(best.ux, best.uz);
+  return { x: best.x, z: best.z, dx: best.ux / l, dz: best.uz / l };
+}
+
 // the three spots, from the map (deterministic)
 export async function views() {
   const g = G(), map = g.map, P = g.world.landmarks.poi.plaza;
-  const I = await import('/src/intro.js');
   const out = [];
-  // 1. up a street at Santa María (the drone intro's own spot, nearer the church)
-  const plan = I.introPlan(g);
-  out.push({ name: 'Hacia Santa María', x: plan.P.x + plan.dir.x * 12, z: plan.P.z + plan.dir.z * 12, h: plan.heading });
+  // 1. up a street at Santa María, 12 m along it
+  const cs = churchStreet(g);
+  out.push({ name: 'Hacia Santa María', x: cs.x + cs.dx * 12, z: cs.z + cs.dz * 12, h: Math.atan2(cs.dx, cs.dz) });
   // 2. a narrow straight street, houses both sides
   const tmp = {};
   let best = null;
@@ -128,7 +151,7 @@ export async function perf({ W = 1280, H = 720, n = 90 } = {}) {
   for (const id of ['pause', 'menu']) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
   const r = g.renderer, keepPR = r.getPixelRatio();
   r.setPixelRatio(1); if (g.composer) g.composer.setPixelRatio(1);
-  r.setSize(W, H, false); if (g.composer) g.composer.setSize(W, H); if (g.toon) g.toon.setSize(W, H);
+  r.setSize(W, H, false); if (g.composer) g.composer.setSize(W, H);
   g.camera.aspect = W / H; g.camera.updateProjectionMatrix();
   const keepResize = g.resize; g.resize = () => {};
   const gl = r.getContext(), px = new Uint8Array(4);
@@ -209,9 +232,7 @@ export async function closeups(tag = 'a', { W = 640, H = 400, hour = 14 } = {}) 
 // and speed: 0.55 m every 0.11 s), people and cars moving as they do, sampled at `fps` — in the claymation every frame
 // is a new pose. Saves .snaps/vid_<tag>_NN.jpg and, recorded in the page, .snaps/vid_<tag>.jpg (an MP4: rename it)
 const sleepExact = (ms) => new Promise((r) => { const t0 = performance.now(); const ch = new MessageChannel(); ch.port1.onmessage = () => (performance.now() - t0 >= ms ? r() : ch.port2.postMessage(0)); ch.port2.postMessage(0); });
-export async function walkVideo(tag = 'a', { W = 960, H = 600, fps = 12, seconds = 3.96, hour = 14, view = 1, origStep = 0.55, origDt = 0.11, record = true, spot = null, film = false } = {}) {
-  // (film: the «Película» mode as it plays — 24 frames a second, the puppets on twos, the film's grain and black bars)
-  if (film) fps = 24;
+export async function walkVideo(tag = 'a', { W = 960, H = 600, fps = 12, seconds = 3.96, hour = 14, view = 1, origStep = 0.55, origDt = 0.11, record = true, spot = null } = {}) {
   const g = G(), p = g.player, map = g.map, list = await views(), v = spot ? { x: spot[0], z: spot[1], h: spot[2] } : list[view], tmp = {};
   const P = await import('/src/plastilina.js');
   for (const id of ['pause', 'menu']) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
@@ -230,15 +251,12 @@ export async function walkVideo(tag = 'a', { W = 960, H = 600, fps = 12, seconds
     }
     g.cam.yaw = h + Math.PI + Math.sin(phase) * 0.25; g.cam.pitch = -0.08;
     g.sky.hour = hour;
-    if (film) { if (g.state !== 'play') g.state = 'play'; g.frame(1 / fps); } // (the game's own clock decides each pose)
-    else for (let k = 0; k < 2; k++) { if (g.state !== 'play') g.state = 'play'; g.frame(1 / (2 * fps)); }
+    for (let k = 0; k < 2; k++) { if (g.state !== 'play') g.state = 'play'; g.frame(1 / (2 * fps)); }
     // (each video frame is a pose: hold nothing back — but each puppet where the animator's hand put it)
-    if (!film) P.SM.tick = true;
-    if (film && g.grade) { g.grade.uniforms.uGrain.value = P.PLASTILINA.grain; g.grade.uniforms.uSeed.value = Math.random() * 100; }
+    P.SM.tick = true;
     P.SM.hold();
     renderInto(ctx, 0, 0, g.camera.position.toArray(), g.cam.target.toArray(), g.camera.fov, W, H);
     P.SM.release();
-    if (film) { const bar = Math.max(0, Math.round((H - W / 2.39) / 2)); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, bar); ctx.fillRect(0, H - bar, W, bar); }
     frames.push(await createImageBitmap(cv));
     await fetch('/__snap?name=vid_' + tag + '_' + String(i).padStart(2, '0'), { method: 'POST', body: cv.toDataURL('image/jpeg', 0.88) });
   }

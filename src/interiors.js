@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { StaticCollider } from './collision.js';
 import { mulberry32 } from './util.js';
 import { PERK } from './perks.js';
-import { INTERIOR_ORIGIN, WALL_H, T, boxGeo, planeGeo, cylGeo, pictureTexture, rugTexture, HouseBuilder, std, texMat, ringSegs, glassMat } from './housekit.js';
+import { INTERIOR_ORIGIN, WALL_H, boxGeo, planeGeo, cylGeo, pictureTexture, rugTexture, HouseBuilder, std, texMat, ringSegs, glassMat } from './housekit.js';
 import { buildVecino, HouseLife, houseProfile, setDescMaker, COP_DESC_REF, curtainGeo } from './houses.js';
 import { randomDesc } from './characters.js';
 import { COP_DESC } from './police.js';
@@ -1054,23 +1054,6 @@ export class Interiors {
         this.leaving = true; this.exit(c.key).finally(() => { this.leaving = false; });
       }
     }
-  }
-  // slam a door shut (horror). Picks the door nearest to (x, z) that the player is not standing in; returns it
-  slamNear(x, z, maxD = 9) {
-    const g = this.game, p = g.player, h = this.house;
-    if (!h || !h.doors) return null;
-    let best = null, bd = maxD;
-    for (const d of h.doors) {
-      const cx = d.pivot.position.x + Math.sin(d.base) * 0.43, cz = d.pivot.position.z + Math.cos(d.base) * 0.43;
-      if (Math.hypot(p.pos.x - cx, p.pos.z - cz) < 1.4 || d.cur < 0.3) continue;
-      const dd = Math.hypot(x - cx, z - cz);
-      if (dd < bd) { bd = dd; best = d; }
-    }
-    if (!best) return null;
-    best.target = 0.02; best.speed = 9;
-    const bx = best.pivot.position.x + Math.sin(best.base) * 0.43, bz = best.pivot.position.z + Math.cos(best.base) * 0.43;
-    setTimeout(() => g.audio.sfx('door_slam', { x: bx, z: bz }), 160);
-    return best;
   }
   // a nap in Annie's bed: two hours go by and she wakes up rested
   async nap() {

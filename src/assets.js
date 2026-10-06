@@ -3,7 +3,7 @@
 // Everything is optional: if a file can't be loaded the game keeps its procedural fallback.
 import * as THREE from 'three';
 import { STYLE } from './style.js';
-import { toonifyLayers } from './toon.js';
+import { clayRepaint } from './plastilina.js';
 
 export const ASSET_BASE = (() => {
   try { return new URL('assets/', document.baseURI).href; } catch (e) { return 'assets/'; }
@@ -17,8 +17,6 @@ export const DETAIL_SIZE = [1.6, 1.4, 2.0, 1.96, 1.2, 2.5, 4.0, 2.0];
 // photo materials for the ground (asphalt, concrete, dry earth, gravel, grass, dry grass) and their physical size (m)
 export const GROUND_DETAIL = ['asphalt_02', 'dirty_concrete', 'dry_ground_01', 'gravel_floor_02', 'sparse_grass', 'withered_grass'];
 export const GROUND_DETAIL_SIZE = [3.0, 3.0, 4.0, 2.0, 2.0, 2.0];
-// materials for house interiors
-export const INTERIOR_TEX = ['herringbone_parquet', 'floor_tiles_06', 'long_white_tiles', 'painted_plaster_wall', 'dark_wood', 'decrepit_wallpaper', 'concrete_floor_damaged_01', 'white_rough_plaster'];
 
 export function loadImage(url) {
   return new Promise((res) => {
@@ -146,32 +144,11 @@ export function loadTexture(name, suffix = '_d', { srgb = true, repeat = 1 } = {
   t.repeat.set(repeat, repeat);
   loadAssetImage('tex/' + name + suffix + '.jpg').then((im) => {
     if (!im) return;
-    if (STYLE.anime && suffix === '_d') { // repainted flat, like the rest of the anime town
+    if (STYLE.plastilina && suffix === '_d') { // claymation: the interiors' wood, tiles and plaster as pieces of plasticine
       const S = Math.min(512, im.width || 512), c = document.createElement('canvas'); c.width = c.height = S;
       const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, S, S);
       const id = x.getImageData(0, 0, S, S);
-      toonifyLayers(id.data, S, 1, { rColor: 6, rEdge: 2, levels: 5, posterize: 0.8, ink: 0.4, edge0: 20, edge1: 44 });
-      x.putImageData(id, 0, 0);
-      t.image = c;
-    } else if (STYLE.plastilina && suffix === '_d') { // claymation: the interiors' wood, tiles and plaster as pieces of plasticine
-      const S = Math.min(512, im.width || 512), c = document.createElement('canvas'); c.width = c.height = S;
-      const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, S, S);
-      const id = x.getImageData(0, 0, S, S);
-      toonifyLayers(id.data, S, 1, { rColor: 5, rEdge: 1, levels: 5, posterize: 0.55, ink: 0, saturation: 1.1 });
-      x.putImageData(id, 0, 0);
-      t.image = c;
-    } else if (STYLE.diorama && suffix === '_d' && /plaster/.test(name)) {
-      // the diorama's lime plaster (the visual spec): the scan's stains and blotches kept as soft differences of tone
-      const S = Math.min(1024, im.width || 1024), c = document.createElement('canvas'); c.width = c.height = S;
-      const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, S, S);
-      const id = x.getImageData(0, 0, S, S), d = id.data, M = [0, 0, 0];
-      for (let i = 0; i < d.length; i += 4) { M[0] += d[i]; M[1] += d[i + 1]; M[2] += d[i + 2]; }
-      const IV = [240, 230, 208], T = [0, 0, 0]; // (its mean moved most of the way to the ivory of fresh lime)
-      for (let k = 0; k < 3; k++) { M[k] /= d.length / 4; T[k] = M[k] + (IV[k] - M[k]) * 0.7; }
-      for (let i = 0; i < d.length; i += 4) {
-        const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-        for (let k = 0; k < 3; k++) d[i + k] = T[k] + (l + (d[i + k] - l) * 0.6 - M[k]) * 0.3;
-      }
+      clayRepaint(id.data, S, 1, { blur: 5, levels: 5, posterize: 0.55, saturation: 1.1 });
       x.putImageData(id, 0, 0);
       t.image = c;
     } else t.image = im;

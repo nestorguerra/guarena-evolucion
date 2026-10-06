@@ -1,7 +1,8 @@
 # Guareña de plastilina — plan de la estética stop motion / claymation
 
-Estado: plan aprobado para ejecutar en la versión Evolución (5 de octubre de 2026). Se añade como estética
-**Plastilina** en *Ajustes › Estética*, junto a Manga, Acuarela, Realista y Diorama.
+Estado: hecho en la versión Evolución (5 de octubre de 2026). Desde el 6 de octubre la **Plastilina** es la estética con
+la que arranca el juego; en *Ajustes › Estética* solo queda la otra, **Realista** (ver la sección 12). Las secciones de
+abajo cuentan cada pasada tal como se hizo, con las estéticas que había entonces.
 
 ## 1. Qué hemos aprendido de otras películas y juegos
 
@@ -162,7 +163,7 @@ Qué distingue una película de plastilina de un juego con aspecto de plastilina
 | **Imagen nítida** | Se fotografía cada pose con una cámara de cine: todo se ve definido, sin dientes de sierra. | Plastilina en calidad alta a la resolución completa de la pantalla (como el Manga), con la resolución dinámica que la baja un poco si el equipo no llega. Suelo pintado al doble de resolución. Muñecos modelados más finos y esquinas de las casas con más segmentos. |
 | **El hervor** (*boiling*) | Entre una foto y otra el animador ha tocado el muñeco: su superficie y su contorno nunca quedan igual, tiemblan un poco a cada pose. | El contorno de los muñecos se mueve 1–2 mm a cada pose (en el shader, a lo largo de la piel), además de las huellas que ya se movían. |
 | **La mano del animador** | Un muñeco recolocado nunca queda exactamente donde estaba. | En cada pose, cada muñeco se desplaza unos milímetros y una fracción de grado (tu personaje, menos). |
-| **Muñecos a doses, cámara a unos** | En los largometrajes los muñecos posan 12 veces por segundo y la cámara, montada en un brazo de control de movimiento, va a las 24 imágenes de la película. | Modo **Película** (Ajustes › Stop motion): tú también posas 12 veces por segundo, la cámara va a 24, grano de película nuevo en cada imagen y bandas negras de cine (2,39:1, nunca más del 11 % de la altura). El modo normal se queda como estaba, para jugar fluido. |
+| **Muñecos a doses, cámara a unos** | En los largometrajes los muñecos posan 12 veces por segundo y la cámara, montada en un brazo de control de movimiento, va a las 24 imágenes de la película. | Modo **Película** (Ajustes › Stop motion): tú también posas 12 veces por segundo, la cámara va a 24, grano de película nuevo en cada imagen y bandas negras de cine (2,39:1, nunca más del 11 % de la altura). El modo normal se queda como estaba, para jugar fluido. *(Retirado el 6 de octubre: el stop motion ya no se elige.)* |
 | **Pelo esculpido** | El pelo de un muñeco es una pieza de plastilina trabajada con un palillo: surcos, no hebras. | El pelo de los muñecos con surcos marcados y el brillo céreo de la plastilina, sin el brillo del pelo de verdad. (Se probó el pelo esculpido en volumen del juego antiguo: no encaja bien en las cabezas de ahora.) |
 | **Contraluz de estudio** | Una luz detrás y arriba separa al muñeco del decorado con un filo de luz cálida. | Un filo cálido en el borde de los muñecos, de arriba, sea cual sea el sol. |
 
@@ -305,3 +306,30 @@ Lo que queda distinto no es de la estética sino del pueblo y del juego:
 - Las casas de Guareña tienen la altura que les da el Catastro.
 - Los coches aparcados y la gente están donde los pone el juego.
 - El protagonista de la Evolución es Álex.
+
+## 12. Orden del código: dos estéticas y el stop motion siempre (6 de octubre de 2026)
+
+Petición del usuario: «la aplicación arranque solo en dos formatos… realista y plastilina. Nada más. El resto de las
+estéticas las eliminas… stop motion siempre que sea plastilina… No se puede elegir. El resto déjalo todo igual… elimina
+toda la parte del código que no se esté utilizando».
+
+- **Dos estéticas**: Plastilina (la de arranque) y Realista. Se quitaron Manga (el anime, con su pase de tinta
+  `toon.js`, la entrada con el dron `intro.js` e `assets/intro.jpg`, la música lo-fi `lofi.js`, su cielo, sus ojos, sus
+  árboles y su CSS), Acuarela y Diorama. Una partida guardada o un `?estilo=` con otra estética abre la Plastilina.
+- **Stop motion siempre** en la Plastilina, sin ajuste: personas, perros y coches a 12 poses por segundo y tú fluido
+  (`player.js` `setCharacter` saca al protagonista del stop motion). El modo Película (grano, cámara a 24 imágenes,
+  bandas) se quitó.
+- **La Diorama, dentro de la Plastilina**: lo que la Plastilina usaba de ella vive ahora en `plastilina.js` (la
+  oclusión de contacto `STUDIO_AO` y la gradación final `ClayGrade`); las ramas `STYLE.diorama` del cielo, las
+  fachadas, el suelo y los árboles pasaron a ser de la Plastilina, y lo que solo servía a la Diorama se quitó. El
+  repintado de texturas como plastilina es `clayRepaint` (el de `toon.js` sin el resto del anime: mismo resultado).
+- **Código muerto fuera**: importaciones sin usar en 22 archivos; funciones, constantes y métodos que nadie llamaba
+  (entre ellos los generadores de señales antiguos de `landmarks.js`, ya hechos por `signs.js`, y el atlas de 33
+  señales del que solo se usaba la placa del Ayuntamiento); herramientas de desarrollo de lo quitado.
+- **Comprobado**:
+  - Las tres vistas de `refcompare` en la Plastilina dan lo mismo que la séptima pasada (luminancia / contraste /
+    saturación: 151,6/48,4/0,302 · 151,4/46,4/0,288 · 148,4/42,4/0,297).
+  - La Realista, comparada con la versión anterior en las mismas vistas, da las mismas cifras (cambian la gente, los
+    coches y la pose).
+  - `runlab` recto, como en `docs/carrera.md`: pie apoyado 0,56 m/s, puntas que patinan 0 %, 60 poses por segundo.
+  - Rendimiento igual: las medidas de este equipo varían más entre dos cargas que entre las dos versiones.

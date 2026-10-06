@@ -33,9 +33,9 @@ mueve el personaje y cómo se mueve el personaje, sobre todo corriendo».
 
 ## 3. Qué se ha cambiado
 
-- **Protagonista fluido** (`plastilina.js` `SM.setFree`, `game.js`): Álex se dibuja con su pose de cada fotograma, a
-  60 por segundo; la gente, los perros y los coches siguen a 12 poses por segundo. En el modo **Película** Álex vuelve a
-  ir a doses, como todo. Su piel ya no «hierve» (`STEADY_BOIL`): en primer plano y a 60 fps sería un temblor.
+- **Protagonista fluido** (`player.js` `setCharacter` lo saca del stop motion, `plastilina.js` `SM.remove`): Álex se
+  dibuja con su pose de cada fotograma, a 60 por segundo; la gente, los perros y los coches siguen a 12 poses por
+  segundo. Su piel ya no «hierve» (`STEADY_BOIL`): en primer plano y a 60 fps sería un temblor.
 - **Bucles de esprint** (`assets/hero/moves.bin.gz`, `tools/mocaplab.js` `appendDB`): cuatro bucles nuevos de un ciclo
   cada uno (16_45 y 16_46 rectos, a 3,7–3,85 m/s; 16_48 y 16_49 en curva, a ±1 rad/s), cortados de talón a talón del pie
   derecho cuando el izquierdo no da para un ciclo. `appendDB` añade tomas sin tocar ni un bit de los clips que ya había:

@@ -2,7 +2,7 @@
 // Conventions: heading θ, forward f = (sin θ, cos θ), right r = (-cos θ, sin θ); model local +z = front, +x = left side.
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { clamp, lerp, smoothstep, wrapAngle, TAU } from './util.js';
+import { clamp, lerp, smoothstep, TAU } from './util.js';
 import { PERK } from './perks.js';
 import { STYLE } from './style.js';
 

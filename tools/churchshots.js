@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 const G = () => window.game;
 async function post(name) { const c = G().renderer.domElement; const o = document.createElement('canvas'); o.width = c.width; o.height = c.height; o.getContext('2d').drawImage(c, 0, 0); await fetch('/__snap?name=' + name, { method: 'POST', body: o.toDataURL('image/jpeg', 0.86) }); }
-function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); if (g.composer) g.composer.setSize(w, h); if (g.toon) g.toon.setSize(w, h); }
+function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); if (g.composer) g.composer.setSize(w, h); }
 // the views (church coordinates: x to the altar, z south): [name, eye, target, fov]
 export const VIEWS = [
   ['nave', [-21.2, 1.7, 0.6], [10, 6, 0], 62],
@@ -43,7 +43,6 @@ export async function shoot(tag = '', { hours = [10.5], W = 720, H = 900, only =
         cam.fov = fov; cam.position.set(O.x + e[0], e[1], O.z + e[2]); cam.lookAt(O.x + t[0], t[1], O.z + t[2]); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
         g.sky.update(0, cam.position, true);
         g.interiors.dimSky();
-        if (g.toon) g.toon.u.uNight && (g.toon.u.uNight.value = g.sky.night || 0);
         const keep = g.camera; g.camera = cam;
         try { g.renderView(cam); } finally { g.camera = keep; }
         const nm = `ch_${name}_${tag}${hours.length > 1 ? '_' + String(hour).replace('.', 'h') : ''}`;

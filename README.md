@@ -15,25 +15,9 @@ casas por dentro (sus ventanas dan a la calle de verdad), las tiendas del pueblo
 inventario, tu casa para decorarla y con caja fuerte, la armería, la pesca en el pantano, radio, un modo
 zombis y multijugador con tus amigos.
 
-Desde la versión 32 se ve **como un anime**, inspirado en la estética del juego web
-[Messenger](https://messenger.abeto.co/) (Abeto): luz de dos tonos con sombras frías, contornos de tinta
-dibujados a partir de la profundidad, texturas repintadas en colores planos, cielo turquesa con nubes planas, árboles de
-copas redondeadas y caras de ojos grandes y piel lisa.
-
-En *Ajustes › Estética* hay cinco formas de verlo: **Manga**, **Acuarela** (la Acuarela de dehesa: aguadas claras
-sobre papel de grano, el pigmento acumulado donde se tocan dos colores, el papel en blanco para las luces y un lápiz
-suave debajo), **Realista** (el aspecto fotográfico de antes), **Diorama** y **Plastilina**. Manga y Acuarela cambian al
-momento; las demás, al recargar.
-
-La **Diorama** sigue la especificación visual «realismo estilizado cálido con acabado de diorama artesanal»: cal marfil y
-crema con su grano, zócalos ocre tostado, tejas terracota, puertas verde profundo con jambas de piedra arenisca, rejas
-de carbón cálido, aceras de arena y asfalto gris cálido; tarde luminosa de sol lateral cálido, cielo azul con cúmulos
-suaves, sombras algo más frías con penumbra corta, oclusión de contacto (GTAO) donde las cosas se tocan y la luz que
-rebota de la calle; la vegetación hacia el verde oliva. Toda su configuración está junta en `src/diorama.js` (paleta,
-rugosidades, oclusión, gradación final) y en las ramas `STYLE.diorama` del cielo, las fachadas y el suelo. Para
-compararla con las otras: `tools/lookcompare.js` (las tres vistas de prueba —hacia Santa María, una calle estrecha y un
-cruce— con la cámara y la luz fijas, más plaza, atardecer, noche, un coche, el campo y el pueblo desde arriba, y la
-medida del tiempo por fotograma).
+Se ve de dos formas (*Ajustes › Estética*; el cambio se aplica al recargar):
+- **Plastilina**, con la que arranca siempre: Guareña como una película de stop motion de plastilina.
+- **Realista**: el aspecto fotográfico, con texturas escaneadas y el cielo físico.
 
 La **Plastilina** es Guareña como una película de stop motion de plastilina (claymation), a la manera de Aardman,
 *La LEGO Película* o *Kirby and the Rainbow Curse* (el plan, la investigación y la evaluación, en
@@ -49,11 +33,10 @@ La **Plastilina** es Guareña como una película de stop motion de plastilina (c
 - La iglesia y los edificios de piedra, con piedras de plastilina metidas en una masa más blanda.
 - Cielo de decorado con nubes de algodón, humo de algodón, luz de estudio cálida con sombras suaves y, como en una
   maqueta fotografiada, el fondo lejano apenas suave.
-- **Stop motion**: personas, perros y coches posan 12 veces por segundo (el agua, el viento y el humo también); en cada
-  pose la superficie de los muñecos «hierve» un milímetro o dos y quedan un poco distintos, como recolocados a mano. La
-  cámara, tu personaje (su pose también, en cada fotograma: corre fluido) y tu coche van fluidos, para jugar igual que
-  siempre. *Ajustes › Stop motion*: Sí, **Película** (tú también a doses, la cámara a las 24 imágenes por segundo del
-  cine, grano de película y bandas negras) o No.
+- **Stop motion**, siempre en la Plastilina: personas, perros y coches posan 12 veces por segundo (el agua, el viento y
+  el humo también); en cada pose la superficie de los muñecos «hierve» un milímetro o dos y quedan un poco distintos,
+  como recolocados a mano. La cámara, tu personaje (su pose también, en cada fotograma: corre fluido) y tu coche van
+  fluidos, para jugar igual que siempre.
 - Como las imágenes de referencia del usuario, medido superficie a superficie (`tools/refcompare.js`):
   - cámara de maqueta a la altura de la calle;
   - paredes crema alisadas a mano;
@@ -67,10 +50,12 @@ La **Plastilina** es Guareña como una película de stop motion de plastilina (c
 - Pelo de plastilina con surcos de palillo y ropa modelada (sin el tejido de la ropa de verdad); un contraluz cálido de
   estudio separa a los muñecos del decorado. En calidad alta, a la resolución completa de la pantalla.
 
-Todo está en `src/plastilina.js` y en las ramas `STYLE.plastilina` de casas, fachadas, árboles, personajes, coches y
-cielo (las cabezas de muñeco, en `charbuild.js`: `MH_PUPPET` y `puppetShape`). `tools/lookcompare.js` saca las vistas
-fijas, los primeros planos (`closeups`) y vídeos del juego (`walkVideo`); `tools/puppetlab.js`, las caras sin y con el
-esculpido de muñeco.
+Todo está en `src/plastilina.js` (también la oclusión de contacto, `STUDIO_AO`, y la gradación final, `ClayGrade`) y en
+las ramas `STYLE.plastilina` de casas, fachadas, árboles, personajes, coches y cielo (las cabezas de muñeco, en
+`charbuild.js`: `MH_PUPPET` y `puppetShape`). `tools/lookcompare.js` saca las tres vistas de prueba (hacia Santa María,
+una calle estrecha y un cruce), los primeros planos (`closeups`), vídeos del juego (`walkVideo`) y el tiempo por
+fotograma (`perf`); `tools/refcompare.js` reproduce las imágenes de referencia y `tools/puppetlab.js` enseña las caras
+sin y con el esculpido de muñeco.
 
 **Cómo corre Álex** (en [docs/carrera.md](docs/carrera.md), con lo investigado en otros juegos y las medidas):
 - Captura de movimiento real elegida por *motion matching*, con bucles de esprint, rectos y en curva.

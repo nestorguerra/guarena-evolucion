@@ -124,7 +124,6 @@ export class Mesh {
   }
   get size() { return this.peers.size; }
   get brokersUp() { let n = 0; for (const b of this.brokers.values()) if (b.up) n++; return n; }
-  get directCount() { let n = 0; for (const p of this.peers.values()) if (p.direct) n++; return n; }
   async start(room, name, desc) {
     this.room = room;
     Object.assign(this, await roomKeys(room));

@@ -29,34 +29,29 @@ const KEYS = [
   { a: 0.35, zen: 0x2f6bd0, hor: 0xa9cbee, warm: 0xd4e2f2, gnd: 0xb3ab98, sun: 0xfff2d8 },
   { a: 1.0, zen: 0x2a62cc, hor: 0x9cc4ec, warm: 0xc9dcf2, gnd: 0xb8b0a0, sun: 0xffffff },
 ];
-// the anime sky: a clean teal by day, a pale mint horizon, sunsets of apricot and rose, a deep blue night
-const KEYS_ANIME = [
-  { a: -0.3, zen: 0x0b1433, hor: 0x1b2a4e, warm: 0x24325a, gnd: 0x0c1020, sun: 0x000000 },
-  { a: -0.08, zen: 0x1d2c5e, hor: 0x5b4a78, warm: 0xb0677a, gnd: 0x1e1c2c, sun: 0x6a3a2a },
-  { a: 0.0, zen: 0x3f5f9e, hor: 0xf0a880, warm: 0xffb27a, gnd: 0x5a4a48, sun: 0xff9a5a },
-  { a: 0.12, zen: 0x5aa6b4, hor: 0xf1d4ac, warm: 0xffd3a0, gnd: 0x9a8c78, sun: 0xffd6a0 },
-  { a: 0.35, zen: 0x6cbdbb, hor: 0xb0e0d6, warm: 0xd3ede5, gnd: 0xb9b4a0, sun: 0xfff4de },
-  { a: 1.0, zen: 0x68bab9, hor: 0xa9ddd4, warm: 0xc9e9e1, gnd: 0xbdb8a4, sun: 0xffffff },
-];
-// the diorama's sky: a clear, deeper blue than the physical one, a pale horizon, warm low suns
-const KEYS_DIORAMA = [
+// claymation: the sky is the studio's backdrop — one even cyan blue by day, painted on plaster (no pale horizon), as in
+// the user's pictures; a deeper blue than the physical sky at dawn, dusk and night, and warm low suns
+const KEYS_CLAY = [
   { a: -0.3, zen: 0x08102a, hor: 0x16203c, warm: 0x1c2640, gnd: 0x0a0c12, sun: 0x000000 },
   { a: -0.08, zen: 0x1a2a58, hor: 0x4a3c58, warm: 0x8a5a50, gnd: 0x1a1816, sun: 0x5a3020 },
   { a: 0.0, zen: 0x2f4f96, hor: 0xe09a68, warm: 0xff9a50, gnd: 0x5a4a3c, sun: 0xff8a40 },
   { a: 0.12, zen: 0x3570c0, hor: 0xeac49a, warm: 0xffc078, gnd: 0x9a8668, sun: 0xffc98a },
-  { a: 0.35, zen: 0x3a7ccc, hor: 0xa8cdea, warm: 0xe6d8c2, gnd: 0xbfa880, sun: 0xffe0b4 },
-  { a: 1.0, zen: 0x3576c8, hor: 0xa0c7e8, warm: 0xd8dfe8, gnd: 0xc4ad87, sun: 0xffecd2 },
-];
-// claymation: the sky is the studio's backdrop — one even cyan blue by day, painted on plaster (no pale horizon), as in
-// the user's pictures; dawn, dusk and night as the diorama's
-const KEYS_CLAY = KEYS_DIORAMA.slice(0, 4).concat([
   { a: 0.35, zen: 0x5aa7cc, hor: 0x7bb8d2, warm: 0xd2dcd8, gnd: 0xbfa880, sun: 0xffe2b8 },
   { a: 1.0, zen: 0x57a5cb, hor: 0x78b6d1, warm: 0xcedad8, gnd: 0xc4ad87, sun: 0xffeccf },
-]);
+];
 const _ca = new THREE.Color(), _cb = new THREE.Color();
 const NIGHT_FILL = new THREE.Color(0.27, 0.33, 0.47), NIGHT_GND = new THREE.Color(0.11, 0.1, 0.09);
+const WHITE = new THREE.Color(1, 1, 1);
+// claymation: the studio's lamps and fills (warm: no blue in the shade)
+const CLAY = {
+  sun: new THREE.Color(1, 0.97, 0.9), key: new THREE.Color(1.0, 0.89, 0.74), fill: new THREE.Color(0.98, 0.94, 0.88),
+  studio: new THREE.Color(1.0, 0.91, 0.8), ground: new THREE.Color(0.88, 0.76, 0.58), bounce: new THREE.Color(1.0, 0.84, 0.64),
+  air: new THREE.Color(0.93, 0.88, 0.8), walls: new THREE.Color(0.96, 0.89, 0.76),
+};
+const REAL = { fill: new THREE.Color(0.86, 0.84, 0.8), walls: new THREE.Color(0.9, 0.84, 0.72), haze: new THREE.Color(0.8, 0.77, 0.72) };
+const _c = new THREE.Color(), _sunCol = new THREE.Color();
 function paletteAt(alt, key, out) {
-  const K = STYLE.anime ? KEYS_ANIME : STYLE.plastilina ? KEYS_CLAY : STYLE.diorama ? KEYS_DIORAMA : KEYS;
+  const K = STYLE.plastilina ? KEYS_CLAY : KEYS;
   let i = 0;
   while (i < K.length - 2 && alt > K[i + 1].a) i++;
   const A = K[i], B = K[i + 1];
@@ -113,110 +108,6 @@ function makeSkyMaterial(uniforms) {
         float nightK = smoothstep(-0.03, -0.15, uSun.y); // 0: the physical sky shows, 1: our night sky
         vec3 full = mix(col, cc, cov * 0.85);
         gl_FragColor = vec4(mix(cc, full, nightK), mix(cov * 0.85, 1.0, nightK));
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-      }`,
-  });
-}
-
-// the anime sky (the whole of it, day and night): a gentle gradient, a flat sun with a halo, and big flat clouds cut
-// with a clean edge — a paler lit side and a shaded belly, a second layer of darker teal clouds behind
-function makeAnimeSkyMaterial(uniforms) {
-  return new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms,
-    vertexShader: `varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w; }`,
-    fragmentShader: `
-      uniform vec3 uSun, uZen, uHor, uWarm, uGnd, uSunCol; uniform float uTime, uNight, uCloud;
-      varying vec3 vDir;
-      float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
-      float n2(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h2(i),h2(i+vec2(1,0)),f.x), mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x), f.y); }
-      float fbm(vec2 p){ float s=0.0, a=0.5; for(int i=0;i<5;i++){ s+=a*n2(p); p=p*2.03+vec2(1.7,9.2); a*=0.5; } return s; }
-      float cut(float v, float t) { float e = max(fwidth(v) * 0.9, 0.002); return smoothstep(t - e, t + e, v); }
-      void main(){
-        vec3 d = normalize(vDir);
-        float h = d.y;
-        vec2 hs = normalize(uSun.xz + 1e-5), hd = normalize(d.xz + 1e-5);
-        float toward = pow(max(dot(hs, hd), 0.0), 2.5);
-        vec3 hor = mix(uHor, uWarm, toward * 0.85);
-        vec3 col = mix(hor, uZen, smoothstep(0.0, 0.62, pow(max(h, 0.0), 0.8)));
-        col = mix(col, uGnd, smoothstep(0.0, -0.1, h));
-        float sd = dot(d, uSun);
-        // the sun: a flat disc and a soft halo round it (no glare)
-        float up = step(-0.04, uSun.y);
-        col = mix(col, mix(col, uSunCol * 1.25 + 0.3, 0.55), smoothstep(0.975, 0.9985, sd) * 0.45 * up);
-        col = mix(col, uSunCol * 1.6 + 0.45, smoothstep(0.99935, 0.9996, sd) * up);
-        // night: a scatter of glow near the horizon (the town), the rest is the stars' layer
-        col += vec3(0.16, 0.11, 0.08) * exp(-max(h, 0.0) * 12.0) * uNight * 0.35;
-        if (h > -0.03) {
-          vec2 uv = d.xz / (h + 0.16) * 0.85 + vec2(uTime * 0.0035, uTime * 0.0012);
-          vec2 w = vec2(fbm(uv * 0.6 + 3.1), fbm(uv * 0.6 + 7.7)) - 0.5;
-          float fade = smoothstep(-0.02, 0.12, h);
-          // brush-stroke clouds: long diagonal streaks of a deeper teal across the whole sky (the reference's sky),
-          // warmer at sunset, and a few paler strokes between them
-          vec2 su = mat2(0.8, -0.6, 0.6, 0.8) * uv * vec2(0.5, 1.8);
-          vec2 sw = vec2(fbm(su * 0.5 + 1.3), fbm(su * 0.5 + 9.1)) - 0.5;
-          float csk = fbm(su * 0.8 + sw * 1.2 + 21.0);
-          float ms = cut(csk, 0.6 - uCloud * 0.1) * fade;
-          vec3 deep = mix(uZen * vec3(0.72, 0.82, 0.86), uWarm * 0.72, 0.55 * (1.0 - smoothstep(0.05, 0.4, uSun.y)));
-          col = mix(col, deep, ms * (0.82 - 0.35 * uNight));
-          float cp = fbm(su * 1.25 + sw + 37.0);
-          col = mix(col, mix(col, vec3(1.0), 0.28), cut(cp, 0.7) * fade * (1.0 - ms) * (1.0 - uNight));
-          // near clouds: cream-white, their lower part in shade
-          float c = fbm(uv + w * 1.1);
-          float t = 1.0 - uCloud * 0.45;
-          float m = cut(c, t) * fade;
-          float lit = cut(fbm(uv + w * 1.1 + vec2(0.0, 0.05) + vec2(uSun.x, uSun.z) * 0.06), t + 0.035);
-          vec3 cl = mix(vec3(1.0, 0.985, 0.95), uSunCol * 1.15 + vec3(0.18), 0.35 * (1.0 - smoothstep(0.0, 0.45, uSun.y)));
-          vec3 cs = mix(hor, uZen, 0.35) * 0.9 + cl * 0.18;
-          vec3 cc = mix(cs, cl, lit);
-          cc = mix(cc, uZen * 0.55 + vec3(0.03, 0.04, 0.07), uNight * 0.8);
-          col = mix(col, cc, m * (0.9 - 0.3 * uNight));
-        }
-        gl_FragColor = vec4(col, 1.0);
-      }`,
-  });
-}
-
-// the diorama's sky (all of it, day and night): a clean gradient, the sun with a soft glow, and soft cumulus — white
-// lit tops, bluish-grey bellies, thinning towards the zenith (no ink, no hard cut: the reference renders' summer sky)
-function makeDioramaSkyMaterial(uniforms) {
-  return new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms,
-    vertexShader: `varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w; }`,
-    fragmentShader: `
-      uniform vec3 uSun, uZen, uHor, uWarm, uGnd, uSunCol; uniform float uTime, uNight, uCloud;
-      varying vec3 vDir;
-      float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
-      float n2(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h2(i),h2(i+vec2(1,0)),f.x), mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x), f.y); }
-      float fbm(vec2 p){ float s=0.0, a=0.5; for(int i=0;i<5;i++){ s+=a*n2(p); p=p*2.03+vec2(1.7,9.2); a*=0.5; } return s; }
-      void main(){
-        vec3 d = normalize(vDir);
-        float h = d.y;
-        vec2 hs = normalize(uSun.xz + 1e-5), hd = normalize(d.xz + 1e-5);
-        float toward = pow(max(dot(hs, hd), 0.0), 2.5);
-        vec3 hor = mix(uHor, uWarm, toward * 0.7);
-        vec3 col = mix(hor, uZen, smoothstep(0.0, 0.55, pow(max(h, 0.0), 0.75)));
-        col = mix(col, uGnd, smoothstep(0.0, -0.1, h));
-        float sd = max(dot(d, uSun), 0.0), up = step(-0.03, uSun.y);
-        col += uSunCol * (pow(sd, 8.0) * 0.16 + pow(sd, 64.0) * 0.3) * up;
-        col = mix(col, uSunCol * 1.5 + 0.4, smoothstep(0.99955, 0.9998, sd) * up);
-        col += vec3(0.16, 0.11, 0.08) * exp(-max(h, 0.0) * 12.0) * uNight * 0.3;
-        if (h > -0.02) {
-          vec2 uv = d.xz / (h + 0.14) * 1.1 + vec2(uTime * 0.003, uTime * 0.001);
-          vec2 w = vec2(fbm(uv * 0.7 + 3.1), fbm(uv * 0.7 + 7.7)) - 0.5;
-          float c = fbm(uv + w * 0.9);
-          float t = 0.68 - uCloud * 0.18;
-          float m = smoothstep(t, t + 0.12, c) * smoothstep(-0.01, 0.1, h) * (1.0 - smoothstep(0.45, 0.9, h) * 0.7);
-          float lit = smoothstep(t, t + 0.22, fbm(uv + w * 0.9 + vec2(uSun.x, uSun.z) * 0.05 + vec2(0.0, 0.04)));
-          vec3 cl = mix(vec3(1.0, 0.985, 0.96), uSunCol * 1.1 + vec3(0.15), 0.3 * (1.0 - smoothstep(0.0, 0.45, uSun.y)));
-          vec3 cs = mix(hor, uZen, 0.4) * 0.9 + cl * 0.14;
-          vec3 cc = mix(cs, cl, 0.3 + 0.7 * lit);
-          cc = mix(cc, uZen * 0.5 + vec3(0.03, 0.04, 0.07), uNight * 0.85);
-          col = mix(col, cc, m * (0.95 - 0.35 * uNight));
-        }
-        gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -322,15 +213,17 @@ export class SkySystem {
       uWarm: { value: new THREE.Color() }, uGnd: { value: new THREE.Color() }, uSunCol: { value: new THREE.Color() },
       uTime: { value: 0 }, uNight: { value: 0 }, uCloud: { value: 0.42 },
     };
-    this.mat = STYLE.anime ? makeAnimeSkyMaterial(this.uniforms) : STYLE.plastilina ? makeClaySkyMaterial(this.uniforms) : STYLE.diorama ? makeDioramaSkyMaterial(this.uniforms) : makeSkyMaterial(this.uniforms);
-    // physical daytime sky (Rayleigh + Mie scattering): real blues, a white haze at the horizon, orange sunsets
-    this.phys = new Sky();
-    this.phys.scale.setScalar(3800);
-    this.phys.frustumCulled = false;
-    this.phys.renderOrder = -101;
-    const pu = this.phys.material.uniforms;
-    pu.turbidity.value = 3.2; pu.rayleigh.value = 1.35; pu.mieCoefficient.value = 0.0038; pu.mieDirectionalG.value = 0.82;
-    scene.add(this.phys);
+    const skyMaterial = () => (STYLE.plastilina ? makeClaySkyMaterial(this.uniforms) : makeSkyMaterial(this.uniforms));
+    this.mat = skyMaterial();
+    if (!STYLE.plastilina) { // physical daytime sky (Rayleigh + Mie scattering): real blues, a white haze at the horizon, orange sunsets
+      this.phys = new Sky();
+      this.phys.scale.setScalar(3800);
+      this.phys.frustumCulled = false;
+      this.phys.renderOrder = -101;
+      const pu = this.phys.material.uniforms;
+      pu.turbidity.value = 3.2; pu.rayleigh.value = 1.35; pu.mieCoefficient.value = 0.0038; pu.mieDirectionalG.value = 0.82;
+      scene.add(this.phys);
+    }
     this.dome = new THREE.Mesh(new THREE.SphereGeometry(4000, 32, 16), this.mat);
     this.dome.frustumCulled = false;
     this.dome.renderOrder = -100;
@@ -392,19 +285,19 @@ export class SkySystem {
     sc.near = 1; sc.far = 600;
     this.sun.shadow.bias = -0.00025;
     this.sun.shadow.normalBias = 0.035;
-    this.sun.shadow.radius = STYLE.plastilina ? 6.5 : STYLE.diorama ? 3.5 : 2.5; // (claymation: the soft shadows of studio lamps)
+    this.sun.shadow.radius = STYLE.plastilina ? 6.5 : 2.5; // (claymation: the soft shadows of studio lamps)
     scene.add(this.sun, this.sun.target);
     this.hemi = new THREE.HemisphereLight(0xbfd8ff, 0x8a7a60, 0.6);
     scene.add(this.hemi);
-    // the diorama's bounce: the sunlit street and walls lighting the shade back, warm (a fill light: no shadows)
-    if (STYLE.diorama) { this.bounce = new THREE.DirectionalLight(0xffdcb0, 0); scene.add(this.bounce, this.bounce.target); }
+    // claymation: the bounce of the sunlit street and walls lighting the shade back, warm (a fill light: no shadows)
+    if (STYLE.plastilina) { this.bounce = new THREE.DirectionalLight(0xffdcb0, 0); scene.add(this.bounce, this.bounce.target); }
     this.fog = new THREE.Fog(0xcad6e0, 150, 1600);
     scene.fog = this.fog;
     this.sunDir = new THREE.Vector3();
     // IBL: the same sky rendered into a PMREM environment map
     this.pmrem = new THREE.PMREMGenerator(renderer);
     this.envScene = new THREE.Scene();
-    this.envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), STYLE.anime ? makeAnimeSkyMaterial(this.uniforms) : STYLE.plastilina ? makeClaySkyMaterial(this.uniforms) : STYLE.diorama ? makeDioramaSkyMaterial(this.uniforms) : makeSkyMaterial(this.uniforms)));
+    this.envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), skyMaterial()));
     this.envGround = new THREE.Mesh(new THREE.CircleGeometry(90, 24), new THREE.MeshBasicMaterial({ color: 0x8a7e6c }));
     this.envGround.rotation.x = -Math.PI / 2; this.envGround.position.y = -2;
     this.envScene.add(this.envGround);
@@ -431,7 +324,7 @@ export class SkySystem {
   // the dome, the stars, the moon and the sun's shadow box around another point (the street seen from a window)
   placeAt(focus) {
     if (!this.lightDir) return;
-    this.dome.position.copy(focus); this.phys.position.copy(focus); this.stars.position.copy(focus); if (this.cotton) this.cotton.position.set(focus.x, 0, focus.z);
+    this.dome.position.copy(focus); if (this.phys) this.phys.position.copy(focus); this.stars.position.copy(focus); if (this.cotton) this.cotton.position.set(focus.x, 0, focus.z);
     this.moon.position.copy(focus).addScaledVector(this.moonDir, 3500);
     const texel = (this.shadowSize * 2) / this.sun.shadow.mapSize.x;
     this.sun.target.position.set(Math.round(focus.x / texel) * texel, 0, Math.round(focus.z / texel) * texel);
@@ -457,26 +350,30 @@ export class SkySystem {
     U.uNight.value = this.night;
     this.dome.position.copy(focus);
     if (this.cotton) this.cotton.position.set(focus.x, 0, focus.z);
-    this.phys.position.copy(focus);
-    this.phys.material.uniforms.sunPosition.value.copy(d);
-    this.phys.material.uniforms.turbidity.value = 2.8 + this.cloud * 2.4; // hazier with more cloud
-    this.phys.visible = !STYLE.anime && !STYLE.diorama && alt > -0.2;
+    if (this.phys) {
+      this.phys.position.copy(focus);
+      this.phys.material.uniforms.sunPosition.value.copy(d);
+      this.phys.material.uniforms.turbidity.value = 2.8 + this.cloud * 2.4; // hazier with more cloud
+      this.phys.visible = alt > -0.2;
+    }
     this.stars.position.copy(focus);
     this.stars.material.uniforms.uOpacity.value = this.night * (1 - (this.cloud || 0) * 0.5);
     // moon opposite-ish to the sun, high at night
-    const md = new THREE.Vector3(-d.x * 0.6 + 0.2, Math.max(0.15, -d.y * 0.9 + 0.25), -d.z * 0.6 - 0.3).normalize();
-    this.moonDir = md;
+    const md = (this.moonDir || (this.moonDir = new THREE.Vector3())).set(-d.x * 0.6 + 0.2, Math.max(0.15, -d.y * 0.9 + 0.25), -d.z * 0.6 - 0.3).normalize();
     this.moon.position.copy(focus).addScaledVector(md, 3500);
     this.moon.material.opacity = this.night;
     // sun light
-    const sunCol = paletteAt(Math.max(alt, 0.0), 'sun', new THREE.Color());
+    const sunCol = paletteAt(Math.max(alt, 0.0), 'sun', _sunCol);
     if (alt > -0.02) {
-      this.sun.color.copy(sunCol).lerp(new THREE.Color(1, 1, 1), 0.25);
-      this.sun.intensity = (STYLE.anime ? 2.6 : STYLE.diorama ? 5.2 : 4.4) * smoothstep(-0.02, 0.16, alt);
-      if (STYLE.diorama) this.sun.color.copy(sunCol).lerp(new THREE.Color(1, 0.97, 0.9), 0.1); // (the afternoon sun stays warm)
       let ld = d;
-      if (STYLE.plastilina) {
-        this.sun.intensity *= 0.74; this.sun.color.lerp(new THREE.Color(1.0, 0.89, 0.74), 0.4); // (the key lamp of a studio set: warm, softer — the whites never burn out, so the clay's dabs show in the light too)
+      if (!STYLE.plastilina) {
+        this.sun.color.copy(sunCol).lerp(WHITE, 0.25);
+        this.sun.intensity = 4.4 * smoothstep(-0.02, 0.16, alt);
+      } else {
+        // (the key lamp of a studio set: the afternoon sun's warmth, softer — the whites never burn out, so the clay's
+        // dabs show in the light too)
+        this.sun.color.copy(sunCol).lerp(CLAY.sun, 0.1).lerp(CLAY.key, 0.4);
+        this.sun.intensity = 5.2 * 0.74 * smoothstep(-0.02, 0.16, alt);
         // (and never overhead: a lamp at most 40° up, where the sun stands round the sky — one pavement in the light, the
         // other in shade, every dab of clay standing out, as in the user's pictures)
         const s40 = Math.sin(40 * Math.PI / 180);
@@ -486,7 +383,7 @@ export class SkySystem {
       this.lightDir = (this.lightDir || new THREE.Vector3()).copy(ld);
     } else {
       this.sun.color.setRGB(0.6, 0.7, 0.95);
-      this.sun.intensity = (STYLE.anime ? 0.45 : 0.9) * this.night; // moonlight: soft blue light and long shadows
+      this.sun.intensity = 0.9 * this.night; // moonlight: soft blue light and long shadows
       this.sun.position.copy(focus).addScaledVector(md, 250);
       this.lightDir = (this.lightDir || new THREE.Vector3()).copy(md);
     }
@@ -496,66 +393,54 @@ export class SkySystem {
     this.sun.target.updateMatrixWorld();
     // hemisphere: sky & ground bounce
     // at night the moon and the glow of the town on the haze keep every street readable (never pitch black)
-    this.hemi.color.copy(U.uZen.value).lerp(U.uHor.value, 0.55).lerp(new THREE.Color(0.86, 0.84, 0.8), 0.62 * day).lerp(NIGHT_FILL, this.night * 0.85);
-    this.hemi.groundColor.copy(U.uGnd.value).multiplyScalar(0.85).lerp(NIGHT_GND, this.night * 0.8);
-    this.hemi.intensity = lerp(0.45, 0.5, day) + this.night * 0.8;
-    if (STYLE.anime) { // the shade is the sky's: cool, clear, never dark (the two tones of an anime background)
-      this.hemi.color.copy(U.uZen.value).lerp(U.uHor.value, 0.45).lerp(new THREE.Color(0.9, 0.96, 1.0), 0.35 * day).lerp(NIGHT_FILL, this.night * 0.7);
-      this.hemi.groundColor.copy(U.uGnd.value).lerp(new THREE.Color(0.62, 0.66, 0.7), 0.4).lerp(NIGHT_GND, this.night * 0.7);
-      this.hemi.intensity = lerp(0.42, 1.9, day) + this.night * 0.12; // (night: a deep blue, the lamps do the rest)
-    }
-    if (STYLE.diorama) { // a clear, warm shade (never blue-grey); the ground bounce warm like the sand of the pavements
-      this.hemi.color.copy(U.uZen.value).lerp(U.uHor.value, 0.5).lerp(new THREE.Color(0.98, 0.94, 0.88), 0.7 * day).lerp(NIGHT_FILL, this.night * 0.85);
-      this.hemi.groundColor.copy(U.uGnd.value).lerp(new THREE.Color(0.88, 0.76, 0.58), 0.7 * day).lerp(NIGHT_GND, this.night * 0.8);
-      this.hemi.intensity = lerp(0.45, 1.6, day) + this.night * 0.8;
+    if (!STYLE.plastilina) {
+      this.hemi.color.copy(U.uZen.value).lerp(U.uHor.value, 0.55).lerp(REAL.fill, 0.62 * day).lerp(NIGHT_FILL, this.night * 0.85);
+      this.hemi.groundColor.copy(U.uGnd.value).multiplyScalar(0.85).lerp(NIGHT_GND, this.night * 0.8);
+      this.hemi.intensity = lerp(0.45, 0.5, day) + this.night * 0.8;
+    } else { // claymation: the studio fills the set — a clear, warm shade, never dark (the key lamp still models it)
+      this.hemi.color.copy(U.uZen.value).lerp(U.uHor.value, 0.5).lerp(CLAY.fill, 0.7 * day).lerp(NIGHT_FILL, this.night * 0.85).lerp(CLAY.studio, 0.82 * day);
+      this.hemi.groundColor.copy(U.uGnd.value).lerp(CLAY.ground, 0.7 * day).lerp(NIGHT_GND, this.night * 0.8); // (warm like the sand of the pavements)
+      this.hemi.intensity = lerp(0.5, 1.35, day) + this.night * 0.8;
       // the bounce comes from the side away from the sun, a little above the street
       const b = this.bounce;
-      b.color.copy(U.uGnd.value).lerp(new THREE.Color(1.0, 0.84, 0.64), 0.65);
-      b.intensity = (STYLE.plastilina ? 0.95 : 0.85) * day * smoothstep(-0.02, 0.16, alt);
-      if (STYLE.plastilina) { // (claymation: the studio fills the set — warm, never a dark shade, but the key lamp still models it)
-        this.hemi.color.lerp(new THREE.Color(1.0, 0.91, 0.8), 0.82 * day); // (the studio's fill is warm: no blue in the shade)
-        this.hemi.intensity = lerp(0.5, 1.35, day) + this.night * 0.8;
-      }
+      b.color.copy(U.uGnd.value).lerp(CLAY.bounce, 0.65);
+      b.intensity = 0.95 * day * smoothstep(-0.02, 0.16, alt);
       b.target.position.copy(focus);
       b.position.set(-d.x, 0, -d.z).normalize().setY(0.35).normalize().multiplyScalar(100).add(focus);
       b.target.updateMatrixWorld();
     }
     // fog matches the horizon
-    this.fog.color.copy(U.uHor.value).lerp(U.uZen.value, 0.15);
-    this.fog.near = lerp(60, 280, day);
-    this.fog.far = lerp(800, 2600, day);
-    this.renderer.toneMappingExposure = lerp(1.08, 0.68, day) + golden * day * 0.06;
-    if (STYLE.diorama) { // only as much air as the distance needs: no milky haze over the streets
-      this.fog.color.copy(U.uHor.value).lerp(new THREE.Color(0.93, 0.88, 0.8), 0.25 * day);
+    if (!STYLE.plastilina) {
+      this.fog.color.copy(U.uHor.value).lerp(U.uZen.value, 0.15);
+      this.fog.near = lerp(60, 280, day); this.fog.far = lerp(800, 2600, day);
+      this.renderer.toneMappingExposure = lerp(1.08, 0.68, day) + golden * day * 0.06;
+    } else { // (claymation: only as much air as the distance needs, no milky haze over the streets; the whites keep their clay)
+      this.fog.color.copy(U.uHor.value).lerp(CLAY.air, 0.25 * day);
       this.fog.near = lerp(120, 520, day); this.fog.far = lerp(1200, 4200, day);
-      this.renderer.toneMappingExposure = (STYLE.plastilina ? 0.9 : 1.0) + golden * day * 0.05; // (claymation: the whites keep their clay)
-    }
-    if (STYLE.anime) {
-      this.fog.color.copy(U.uHor.value).lerp(U.uZen.value, 0.25);
-      this.fog.near = lerp(90, 380, day); this.fog.far = lerp(1100, 3400, day);
-      this.renderer.toneMappingExposure = lerp(0.55, 0.95, day);
+      this.renderer.toneMappingExposure = 0.9 + golden * day * 0.05;
     }
     // environment map (IBL), refreshed occasionally
     this.envTimer -= dt;
     if (forceEnv || this.envTimer <= 0) {
       this.envTimer = 3;
-      this.envGround.material.color.copy(U.uGnd.value);
-      if (STYLE.diorama) this.envGround.material.color.lerp(new THREE.Color(0.78, 0.66, 0.5), 0.6 * day); // (warm sand below)
       const sunK = smoothstep(-0.02, 0.2, alt);
-      this.envBand.material.color.copy(U.uHor.value).multiplyScalar(0.35).lerp(new THREE.Color(0.9, 0.84, 0.72).multiply(U.uSunCol.value), sunK * 0.85);
-      this.envHaze.material.color.copy(U.uHor.value).lerp(new THREE.Color(0.8, 0.77, 0.72), 0.6).multiplyScalar(0.25 + 0.75 * day);
-      this.envHaze.material.opacity = (STYLE.diorama ? 0.12 : 0.38) * day;
-      if (STYLE.diorama) this.envBand.material.color.copy(U.uHor.value).multiplyScalar(0.3).lerp(new THREE.Color(0.96, 0.89, 0.76).multiply(U.uSunCol.value), sunK * 0.95);
-      if (STYLE.plastilina) { // (claymation: the studio round the set reflects warm — its walls, its lamps — never the painted blue)
-        this.envHaze.material.color.setRGB(0.93, 0.83, 0.7).multiplyScalar(0.3 + 0.7 * day); this.envHaze.material.opacity = 0.62 * day;
+      if (!STYLE.plastilina) {
+        this.envGround.material.color.copy(U.uGnd.value);
+        this.envBand.material.color.copy(U.uHor.value).multiplyScalar(0.35).lerp(_c.copy(REAL.walls).multiply(U.uSunCol.value), sunK * 0.85);
+        this.envHaze.material.color.copy(U.uHor.value).lerp(REAL.haze, 0.6).multiplyScalar(0.25 + 0.75 * day);
+        this.envHaze.material.opacity = 0.38 * day;
+      } else { // (claymation: the studio round the set reflects warm — its walls, its lamps — never the painted blue)
         this.envGround.material.color.setRGB(0.6, 0.5, 0.42);
+        this.envBand.material.color.copy(U.uHor.value).multiplyScalar(0.3).lerp(_c.copy(CLAY.walls).multiply(U.uSunCol.value), sunK * 0.95);
+        this.envHaze.material.color.setRGB(0.93, 0.83, 0.7).multiplyScalar(0.3 + 0.7 * day);
+        this.envHaze.material.opacity = 0.62 * day;
       }
       const rt = this.pmrem.fromScene(this.envScene, 0, 0.1, 400);
       if (this.envRT) this.envRT.dispose();
       this.envRT = rt;
       this.scene.environment = rt.texture;
     }
-    this.scene.environmentIntensity = STYLE.anime ? lerp(0.3, 0.45, day) : STYLE.diorama ? lerp(0.45, 0.6, day) : lerp(0.4, 0.55, day);
+    this.scene.environmentIntensity = STYLE.plastilina ? lerp(0.45, 0.6, day) : lerp(0.4, 0.55, day);
     return this.night;
   }
 }

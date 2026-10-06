@@ -58,9 +58,7 @@ export function arrayTexture(data, size, layers, { srgb = true, aniso = 8 } = {}
 // detail = { alb, nrm, mean[], size[], on, normals }
 export function makeBuildingMaterial(facadeTex, detail = null) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0.0, side: THREE.DoubleSide });
-  if (STYLE.anime) m.defines = { ANIME: '' };
-  else if (STYLE.plastilina) m.defines = { DIORAMA: '', CLAY: '', CLAY_RELIEF: '1.6', CLAY_TONE: '1.8', CLAY_SET: '0', CLAY_TILE: '2.4', CLAY_AMP: '0.062', CLAY_CAV: '0.12' }; // (a set: worked hard by hand; its marks in the colour too, for the shade and the whitewash)
-  else if (STYLE.diorama) m.defines = { DIORAMA: '' };
+  if (STYLE.plastilina) m.defines = { CLAY: '', CLAY_RELIEF: '1.6', CLAY_TONE: '1.8', CLAY_SET: '0', CLAY_TILE: '2.4', CLAY_AMP: '0.062', CLAY_CAV: '0.12' }; // (a set: worked hard by hand; its marks in the colour too, for the shade and the whitewash)
   const dOn = detail && detail.on ? 1 : 0;
   const nOn = detail && detail.on && detail.normals ? 1 : 0;
   const dummy = new THREE.DataArrayTexture(new Uint8Array([128, 128, 255, 255]), 1, 1, 1);
@@ -293,15 +291,6 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
       // sky reflection, stronger at grazing angles
       float fres = pow(1.0 - abs(rd.z), 3.0);
       col = mix(col, mix(vec3(0.6, 0.7, 0.8), vec3(0.04, 0.05, 0.08), uNight), gGlass * (0.1 + 0.45 * fres));
-      #ifdef ANIME
-      { // the painter's glass: a pale sky tint and one or two white diagonal glints across the pane
-        vec2 cu = fract(vUvF);
-        float sk = fract((cu.x * 0.85 + cu.y) * 1.3 + vTex.z * 0.37 + bay * 0.21);
-        float glint = step(0.72, sk) * step(sk, 0.84) + step(0.9, sk) * step(sk, 0.93);
-        col = mix(col, vec3(0.62, 0.8, 0.84), gGlass * 0.25 * (1.0 - uNight));
-        col = mix(col, vec3(0.95, 0.98, 1.0), gGlass * glint * 0.75 * (1.0 - uNight));
-      }
-      #endif
     }
   }
   // dirt streaks washed down from sills and balconies (chorreones)
@@ -319,22 +308,6 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
   if (!isRoof && vWallH > 0.0) col *= mix(1.0, 0.8, smoothstep(vWallH - 0.9, vWallH, vWY));
   // base darkening (ambient occlusion near the ground)
   col *= mix(0.62, 1.0, smoothstep(0.0, 1.6, vWY));
-  #ifdef ANIME
-  if (!isRoof) { // the painter's imperfections: whitewash laid on by hand, a grubby foot, here and there an ink crack
-    vec2 wn = normalize(vWNrm.xz + vec2(1e-5));
-    vec2 wp = vec2(dot(vWPos.xz, vec2(-wn.y, wn.x)), vWPos.y);
-    float pn = gNoise(wp * vec2(0.45, 0.6) + vTex.z * 7.0), pn2 = gNoise(wp * 1.7 + 3.1);
-    col *= mix(1.0, 0.94 + 0.08 * pn + 0.03 * pn2, wallMask);
-    col *= 1.0 - 0.1 * (1.0 - smoothstep(0.0, 0.3 + 0.55 * pn2, vWY)) * wallMask;
-    float fw = fwidth(wp.x) + fwidth(wp.y);
-    if (fw < 0.03) {
-      float zone = smoothstep(0.74, 0.8, gNoise(wp * 0.21 + vTex.z * 3.0 + 11.0));
-      float r = abs(gNoise(wp * vec2(1.6, 0.8) + 5.0) - 0.5) + 0.02 * gNoise(wp * 9.0);
-      float ln = 1.0 - smoothstep(0.004, 0.009 + fw * 0.6, r);
-      col *= 1.0 - 0.6 * ln * zone * wallMask * (1.0 - smoothstep(0.015, 0.03, fw));
-    }
-  }
-  #endif
   diffuseColor.rgb *= col;
   #ifdef CLAY
   // (claymation: the whitewash is cream-coloured clay, warm as in the user's pictures — the lime itself a peach cream,
@@ -351,9 +324,6 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
 if (uDetNOn > 0.5 && gDetK > 0.01) {
   vec3 mapN = texture(uDetN, vec3(gDetUV, gDetL)).xyz * 2.0 - 1.0;
   mapN.xy *= gDetK;
-#ifdef DIORAMA
-  mapN.xy *= 1.5; // (the diorama: the grain of the lime plaster legible under the side sun)
-#endif
   mat3 tbn = cotangentFrame(normal, -vViewPosition, gDetUV);
   normal = normalize(tbn * mapN);
 }
@@ -528,7 +498,7 @@ mat3 gCotangent(vec3 N, vec3 p, vec2 uv) {
 
 export function makeGroundMaterial(groundTex, { polygonOffset = 0, roughness = 0.95, transparentEdges = false, fx = null } = {}) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness, metalness: 0 });
-  if (STYLE.diorama) m.defines = STYLE.plastilina ? { DIORAMA: '', CLAY_RELIEF: '1.8', CLAY_TONE: '2.0', CLAY_SET: '1', CLAY_TILE: '6.0', CLAY_AMP: '0.016', CLAY_CAV: '0.25' } : { DIORAMA: '' }; // (the ground's clay crumbly at a model's scale, as in the user's pictures)
+  if (STYLE.plastilina) m.defines = { CLAY_RELIEF: '1.8', CLAY_TONE: '2.0', CLAY_SET: '1', CLAY_TILE: '6.0', CLAY_AMP: '0.016', CLAY_CAV: '0.25' }; // (the ground's clay crumbly at a model's scale, as in the user's pictures)
   if (polygonOffset) {
     m.polygonOffset = true;
     m.polygonOffsetFactor = -polygonOffset;
@@ -592,9 +562,6 @@ ${GROUND_GLSL}`)
       vec3 d = texture(uGDet, vec3(duv, float(dl))).rgb;
       float mn = max(uGDetMean[dl], 0.05);
       bool lumOnly = false;
-#ifdef DIORAMA
-      lumOnly = layer < 1.5; // the diorama keeps its warm painted asphalt: the scan only lends it its grain
-#endif
       if (lumOnly) col *= mix(1.0, clamp(dot(d, vec3(0.3333)) / mn, 0.62, 1.38), 0.85);
       else if (mode > 1.5) col = mix(col, col * d / mn, 0.7);
       else if (mode > 0.5) col = mix(col, d * vTint * (layer > 0.5 && layer < 1.5 ? vec3(0.86) : layer > 6.5 && layer < 7.5 ? vec3(1.1, 1.0, 0.82) : vec3(1.0)), 0.85);

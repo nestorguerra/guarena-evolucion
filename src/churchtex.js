@@ -4,16 +4,13 @@
 // replaced; the pews' varnished wood, rubbed pale where people sit and hold on; the runner up the middle, a red weave with
 // its border, flattened and faded along its middle; the granite of the columns in its drums; the tomb slabs in the floor.
 import * as THREE from 'three';
-import { mulberry32, clamp } from './util.js';
-import { STYLE } from './style.js';
-import { toonifyCanvas } from './toon.js';
+import { mulberry32 } from './util.js';
 
 const CACHE = new Map();
-function make(key, w, h, draw, { repeat = true, toon = true } = {}) {
+function make(key, w, h, draw, { repeat = true } = {}) {
   if (CACHE.has(key)) return CACHE.get(key);
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h, mulberry32(key.length * 977 + key.charCodeAt(0) * 13));
-  if (STYLE.anime && toon && w === h) toonifyCanvas(c, { levels: 7, ink: 0.22 });
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -80,7 +77,7 @@ export function plinthTexture() {
     x.fillStyle = g; x.fillRect(0, 0, W, H);
     x.strokeStyle = 'rgba(235,230,215,0.35)'; x.lineWidth = 3; x.beginPath(); for (let i = 0; i <= 40; i++) { const px = (i / 40) * W, py = H * (0.42 + 0.06 * Math.sin(i * 0.7) + 0.03 * Math.sin(i * 2.3)); i ? x.lineTo(px, py) : x.moveTo(px, py); } x.stroke();
     for (let i = 0; i < 6; i++) { x.fillStyle = 'rgba(120,110,95,0.5)'; x.beginPath(); x.arc(r() * W, H * (0.1 + r() * 0.15), 2 + r() * 4, 0, 6.283); x.fill(); } // chips at the arrises
-  }, { toon: false });
+  });
 }
 // granite: the grains of quartz, feldspar and mica (base: its grey)
 function granite(x, W, H, r, base) {
@@ -124,7 +121,7 @@ export function floorTexture() {
       if (r() < 0.3) { const cx = x0 + (r() < 0.5 ? 4 : sw - 4), cy = y0 + (r() < 0.5 ? 4 : sh - 4); x.fillStyle = '#5a554e'; x.beginPath(); x.arc(cx, cy, 5 + r() * 7, 0, 6.283); x.fill(); }
     }
     for (let i = 0; i < 2000; i++) { x.fillStyle = `rgba(${r() < 0.5 ? '255,255,255' : '40,36,32'},${0.04 + r() * 0.08})`; x.fillRect(r() * W, r() * H, 1 + r(), 1 + r()); }
-  }, { toon: false });
+  });
 }
 // the pews: oak, varnished dark, rubbed pale and glossy where people sit and hold on (a 1 m tile along the grain)
 export function pewTexture() {
@@ -160,7 +157,7 @@ export function carpetTexture() {
     const g = x.createLinearGradient(0, 0, W, 0); g.addColorStop(0, 'rgba(255,220,200,0)'); g.addColorStop(0.35, 'rgba(255,214,196,0.13)'); g.addColorStop(0.5, 'rgba(255,214,196,0.18)'); g.addColorStop(0.65, 'rgba(255,214,196,0.13)'); g.addColorStop(1, 'rgba(255,220,200,0)');
     x.fillStyle = g; x.fillRect(0, 0, W, H);
     blots(x, W, H, r, 8, '50,10,10', 8, 26, 0.08, 0.2);
-  }, { toon: false });
+  });
 }
 // a tomb slab in the floor: granite, a cross and lettering worn by feet
 export function tombTexture(i) {
@@ -176,5 +173,5 @@ export function tombTexture(i) {
     const g = x.createRadialGradient(W / 2, H * 0.55, 20, W / 2, H * 0.55, H * 0.45); g.addColorStop(0, 'rgba(180,176,168,0.5)'); g.addColorStop(1, 'rgba(180,176,168,0)');
     x.fillStyle = g; x.fillRect(0, 0, W, H);
     crack(x, r() * W, r() * H, 20, r, 'rgba(50,46,42,0.6)', 1.4);
-  }, { repeat: false, toon: false });
+  }, { repeat: false });
 }

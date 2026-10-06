@@ -1,7 +1,7 @@
 // Boot, menus (title flyover, character select with live 3D preview in the Plaza de España), pause & settings.
 import * as THREE from 'three';
 import { Game, QUALITY } from './game.js';
-import { PLAYER_PRESETS, SKIN, HAIR, CLOTH, mhTexReady } from './characters.js';
+import { PLAYER_PRESETS, SKIN, HAIR, CLOTH } from './characters.js';
 import { PERKS } from './perks.js';
 import { colorFor } from './net.js';
 import { newRoomCode } from './online.js';
@@ -9,12 +9,10 @@ import { Editor } from './editor.js';
 let GameAudio;
 try { ({ GameAudio } = await import('./audio.js')); } catch (e) { console.warn('audio.js unavailable, using silent audio', e); }
 if (typeof GameAudio !== 'function') ({ GameAudio } = await import('./audio_stub.js'));
-import { safeStorage, clamp, readSave } from './util.js';
-import { applyDioramaPalette } from './textures.js';
+import { safeStorage, readSave } from './util.js';
+import { applyClayPalette } from './textures.js';
 import { installClayChunks, installPillowBoxes } from './plastilina.js';
-import { STYLE, setStyle, LOOK_NAMES } from './style.js';
-import { installToonChunks, LOOKS } from './toon.js';
-import { INTRO, introPlan, droneAt, coverFov, IntroFlight } from './intro.js';
+import { STYLE, setStyle, LOOKS } from './style.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -75,17 +73,13 @@ async function boot(hot = {}) {
   try { audio = safeAudio(new GameAudio()); } catch (e) { console.warn(e); audio = safeAudio({ stationName: 'Radio Apagada' }); }
   const raw = await loadMapData();
   const q = defaultQuality(store);
-  // the look (anime unless the player chose the photographic one): it has to be set before anything is built
+  // the look (Plastilina unless the player chose the photographic one): it has to be set before anything is built
   let style = null;
   try { style = JSON.parse(readSave(store)).style; } catch (e) { /* ignore */ }
   try { const u = new URLSearchParams(location.search).get('estilo'); if (u) style = u; } catch (e) { /* (?estilo=real: a look for this visit only) */ }
-  setStyle(style || 'anime');
-  if (STYLE.anime) installToonChunks();
-  if (STYLE.diorama) applyDioramaPalette(); // (the façades in the diorama's palette, before the town is painted)
-  if (STYLE.plastilina) { installClayChunks(); installPillowBoxes(); } // (claymation: clay on every lit surface, soft boxes; before anything is made)
-  document.body.dataset.look = STYLE.name;
-  // the anime look comes in without a menu: the drone's picture of the town drifts closer while it is built
-  const intro = STYLE.anime && !hot.resume ? introPicture() : null;
+  setStyle(style);
+  // (claymation, before anything is made: the façades' warm palette, clay on every lit surface, soft boxes)
+  if (STYLE.plastilina) { applyClayPalette(); installClayChunks(); installPillowBoxes(); }
   game = new Game({ canvas: ui.canvas, ui, raw, quality: q, audio });
   refreshSavedCharacter();
   ui.onPause = () => openPause();
@@ -97,100 +91,19 @@ async function boot(hot = {}) {
   if (window.claude?.hot?.snapshot) window.claude.hot.snapshot(() => game.snapshot());
   window.game = game;
   $('loading').hidden = true;
-  if (intro) await beginIntro(intro);
-  else showMenu();
+  showMenu();
   let last = performance.now();
   const loop = (now) => {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     try {
       if (mode === 'play') game.frame(dt);
-      else if (mode === 'intro') introFrame(dt);
       else menuFrame(dt);
     } catch (e) { console.error(e); }
     requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);
   if (hot.preset && hot.resume) { previewDesc = hot.preset; startGame(); }
-}
-
-// ------------------------------------------------------------ the way in (anime look): the drone's picture, then the flight
-// the painted view of the town covers the screen and drifts slowly closer (a CSS transition: smooth even while the
-// page is busy building the town)
-function introPicture() {
-  const box = $('intro'), img = $('introImg');
-  if (!box || !img) return null;
-  if (!box.hidden) return { box, img }; // (the page's own script has already put it up and set it drifting)
-  box.hidden = false;
-  const fit = () => {
-    const vw = innerWidth, vh = innerHeight, k = Math.max(vw / 1920, vh / 1080);
-    Object.assign(img.style, { width: 1920 * k + 'px', height: 1080 * k + 'px', left: (vw - 1920 * k) / 2 + 'px', top: (vh - 1080 * k) / 2 + 'px' });
-  };
-  fit(); addEventListener('resize', fit);
-  const go = () => { img.classList.add('on'); requestAnimationFrame(() => requestAnimationFrame(() => { img.style.transition = `transform ${INTRO.zoomTime}s cubic-bezier(0.25, 0.55, 0.35, 1), opacity 0.7s`; img.style.transform = `scale(${INTRO.zoomMax})`; })); };
-  if (img.complete && img.naturalWidth) go(); else img.addEventListener('load', go, { once: true });
-  return { box, img, fit };
-}
-function pictureScale(img) {
-  const m = getComputedStyle(img).transform;
-  const a = m && m !== 'none' ? parseFloat(m.slice(m.indexOf('(') + 1)) : 1;
-  return Number.isFinite(a) && a > 0 ? a : 1;
-}
-let flight = null, introBits = null;
-async function beginIntro(pic) {
-  const g = game, cam = g.camera;
-  const plan = introPlan(g);
-  g.sky.hour = INTRO.hour;
-  // Álex already in his street, the game started behind the picture (its HUD hidden until the flight has landed)
-  g.pendingMode = 'normal';
-  g.start(PLAYER_PRESETS[0], { at: { x: plan.P.x, z: plan.P.z, heading: plan.heading } });
-  if (g.weapons && g.weapons.cur !== 'punos') { g.weapons.select('punos'); if (g.weapons.syncModel && g.player.char) g.weapons.syncModel(g.player.char); } // (empty-handed on his street; the rest stays in his pockets)
-  $('hud').hidden = true;
-  // his own figure built, its skin and eyes painted, before the drone comes down to him (the picture drifts on meanwhile)
-  for (let t = 0; t < 15000 && !(g.player.char && g.player.char.ready); t += 50) await new Promise((r) => setTimeout(r, 50));
-  await Promise.race([mhTexReady(), new Promise((r) => setTimeout(r, 5000))]);
-  // where the game's own camera will be: the end of the flight
-  g.cam.update(0, g.input);
-  const endPos = cam.position.clone(), endLook = g.cam.target.clone(), endFov = g.cam.fov;
-  // the live camera exactly where the picture has got to, the picture frozen there
-  const s = pictureScale(pic.img);
-  pic.img.style.transition = 'none'; pic.img.style.transform = `scale(${s})`;
-  cam.fov = coverFov(innerWidth / Math.max(1, innerHeight));
-  droneAt(plan, s, cam.position); cam.lookAt(plan.T); cam.updateProjectionMatrix();
-  // a few frames behind the picture: the town around the drone streamed in, the shaders warm
-  for (let i = 0; i < 4; i++) { g.sky.update(0.016, cam.position); g.world.update(0.016, g.sky.night, cam.position); g.chars.updateLods(cam.position, true); g.render(); await new Promise((r) => setTimeout(r, 0)); }
-  flight = new IntroFlight(plan, cam.position, cam.fov, endPos, endLook, endFov);
-  introBits = { pic, t: 0 };
-  pic.box.classList.add('out'); // (the picture fades into the live view)
-  mode = 'intro';
-  // the first touch or key wakes the sound (browsers keep it asleep until then)
-  const wake = () => { audio.unlock(); removeEventListener('pointerdown', wake); removeEventListener('keydown', wake); };
-  addEventListener('pointerdown', wake); addEventListener('keydown', wake);
-}
-// (for the test tools, whose hidden page gets no animation frames: step the way in by hand)
-window.guarenaIntro = { step: (dt) => mode === 'intro' && introFrame(dt), get mode() { return mode; } };
-function introFrame(dt) {
-  const g = game;
-  flight.update(dt, g.camera);
-  introBits.t += dt;
-  if (introBits.t > 1.2 && !introBits.pic.box.hidden) introBits.pic.box.hidden = true;
-  g.sky.update(dt, g.camera.position);
-  g.world.update(dt, g.sky.night, g.camera.position);
-  g.fleet.streamParked(g.camera.position.x, g.camera.position.z);
-  g.fleet.update(dt, g.sky.night);
-  const ch = g.player && g.player.char;
-  if (ch) ch.update(dt, 0, {});
-  g.chars.updateLods(g.camera.position, true);
-  g.render();
-  if (flight.done) { // landed: you are playing
-    flight = null;
-    $('hud').hidden = false;
-    ui.touch.classList.add('playing');
-    mode = 'play';
-    game.input.wantLock = true;
-    // arriving with a friend's invitation (a link ending in #sala-XXXXX): into their room
-    if (game.net.invited && !game.net.connected) { game.net.invited = false; game.state = 'paused'; game.input.exitLock(); openMulti(); }
-  }
 }
 
 // ------------------------------------------------------------ title menu with flyover
@@ -390,6 +303,8 @@ function startGame() {
   game.pendingMode = selMode;
   game.start(d);
   announcePerk(d);
+  // arriving with a friend's invitation (a link ending in #sala-XXXXX): into their room
+  if (game.net.invited && !game.net.connected) { game.net.invited = false; game.state = 'paused'; game.input.exitLock(); openMulti(); }
 }
 // ------------------------------------------------------------ multiplayer lobby
 let mpUnsub = null, selReturn = null;
@@ -620,50 +535,37 @@ function settingsHtml() {
   const times = [['Mañana', 10], ['Tarde', 17], ['Atardecer', 19.9], ['Noche', 23]];
   return `
     <div class="setting"><span>Calidad gráfica <small style="opacity:.6">(se aplica al recargar)</small></span><span class="seg" id="sQ">${Object.entries(QUALITY).map(([k, v]) => `<button data-q="${k}" class="${k === q ? 'on' : ''}">${v.name}</button>`).join('')}</span></div>
-    <div class="setting"><span>Estética <small style="opacity:.6">(Manga y Acuarela al momento; las demás al recargar)</small></span><span class="seg" id="sLook">${[...LOOKS.map((l) => [l.id, l.id === 'acuarela' ? 'Acuarela' : l.name]), ['real', 'Realista'], ['diorama', 'Diorama'], ['plastilina', 'Plastilina']].map(([id, n]) => `<button data-look="${id}" class="${(STYLE.anime ? (game.toon && game.toon.look) || 'manga' : STYLE.name) === id ? 'on' : ''}">${n}</button>`).join('')}</span></div>
-    ${STYLE.plastilina ? `<div class="setting"><span>Stop motion <small style="opacity:.6">(los muñecos posan 12 veces por segundo; «Película»: tú también, y la cámara a 24 imágenes por segundo, con grano y bandas de cine)</small></span><span class="seg" id="sSM"><button data-sm="on" class="${game.save.stopMotion !== false && game.save.stopMotion !== 'cine' ? 'on' : ''}">Sí</button><button data-sm="cine" class="${game.save.stopMotion === 'cine' ? 'on' : ''}">Película</button><button data-sm="off" class="${game.save.stopMotion === false ? 'on' : ''}">No</button></span></div>` : ''}
+    <div class="setting"><span>Estética <small style="opacity:.6">(se aplica al recargar)</small></span><span class="seg" id="sLook">${LOOKS.map(([id, n]) => `<button data-look="${id}" class="${STYLE.name === id ? 'on' : ''}">${n}</button>`).join('')}</span></div>
     <div class="setting"><span>Resolución <small style="opacity:.6">(automática: baja un poco solo si el juego va a tirones)</small></span><span class="seg" id="sR"><button data-r="auto" class="${game.save.dynRes !== false ? 'on' : ''}">Automática</button><button data-r="fija" class="${game.save.dynRes === false ? 'on' : ''}">Fija</button></span></div>
     <div class="setting"><span>Hora del día</span><span class="seg" id="sT">${times.map(([n, h]) => `<button data-h="${h}">${n}</button>`).join('')}</span></div>
-    ${STYLE.anime ? `<div class="setting"><span>Música lo-fi <small style="opacity:.6">(suena bajito mientras paseas)</small></span><span class="seg" id="sL"><button data-l="on" class="${game.save.lofi !== false ? 'on' : ''}">Sí</button><button data-l="off" class="${game.save.lofi === false ? 'on' : ''}">No</button></span></div>` : ''}
     <div class="setting"><span>Música (radio)</span><input id="sMus" type="range" min="0" max="1" step="0.05" value="${game.save.music ?? 0.55}"></div>
     <div class="setting"><span>Efectos</span><input id="sSfx" type="range" min="0" max="1" step="0.05" value="${game.save.sfx ?? 0.9}"></div>
     <div class="setting"><span>Sensibilidad del ratón</span><input id="sSens" type="range" min="0.3" max="2.5" step="0.1" value="${game.cam.sens}"></div>`;
 }
+// a row of choices: the one picked lit
+function pickIn(segId, b) { document.querySelectorAll('#' + segId + ' button').forEach((x) => x.classList.toggle('on', x === b)); }
+// a setting that takes a reload offers it right there, beside its choices (the HUD notice is not visible from the menu)
+function offerReload(segId, needed) {
+  const id = segId + 'Reload';
+  let rl = $(id);
+  if (!needed) { if (rl) rl.remove(); return; }
+  if (rl) return;
+  rl = document.createElement('button'); rl.id = id; rl.className = 'btn ghost'; rl.style.cssText = 'margin-left:8px;padding:6px 12px;font-size:14px';
+  rl.textContent = 'Recargar ahora'; rl.onclick = () => { game.persist(); location.reload(); };
+  $(segId).after(rl);
+}
 function bindSettings() {
   document.querySelectorAll('#sQ button').forEach((b) => (b.onclick = () => {
     game.setQuality(b.dataset.q);
-    document.querySelectorAll('#sQ button').forEach((x) => x.classList.toggle('on', x === b));
-    // it takes a reload: offer it right there (the HUD notice is not visible from the title menu)
-    const seg = $('sQ'); let rl = $('sQReload');
-    if (b.dataset.q !== game.qKey) {
-      if (!rl) { rl = document.createElement('button'); rl.id = 'sQReload'; rl.className = 'btn ghost'; rl.style.cssText = 'margin-left:8px;padding:6px 12px;font-size:14px'; rl.textContent = 'Recargar ahora'; rl.onclick = () => { game.persist(); location.reload(); }; seg.after(rl); }
-    } else if (rl) rl.remove();
-  }));
-  document.querySelectorAll('#sS button').forEach((b) => (b.onclick = () => {
-    game.save.style = b.dataset.s; game.persist();
-    document.querySelectorAll('#sS button').forEach((x) => x.classList.toggle('on', x === b));
-    const seg = $('sS'); let rl = $('sSReload');
-    if (b.dataset.s !== STYLE.name) {
-      if (!rl) { rl = document.createElement('button'); rl.id = 'sSReload'; rl.className = 'btn ghost'; rl.style.cssText = 'margin-left:8px;padding:6px 12px;font-size:14px'; rl.textContent = 'Recargar ahora'; rl.onclick = () => { game.persist(); location.reload(); }; seg.after(rl); }
-    } else if (rl) rl.remove();
+    pickIn('sQ', b);
+    offerReload('sQ', b.dataset.q !== game.qKey);
   }));
   document.querySelectorAll('#sLook button').forEach((b) => (b.onclick = () => {
-    // Manga and Acuarela are the anime look's own (they change at once); Realista, Diorama and Plastilina are built
-    // differently from the start: those take a reload
-    const id = b.dataset.look, base = LOOK_NAMES.includes(id) ? id : 'anime';
-    if (base === 'anime') game.save.look = id;
-    game.save.style = base; game.persist();
-    document.querySelectorAll('#sLook button').forEach((x) => x.classList.toggle('on', x === b));
-    const seg = $('sLook'); let rl = $('sLookReload');
-    if (base === STYLE.name) { if (game.toon) game.toon.setLook(id); if (game.state !== 'play') game.render(); if (rl) rl.remove(); return; }
-    if (!rl) { rl = document.createElement('button'); rl.id = 'sLookReload'; rl.className = 'btn ghost'; rl.style.cssText = 'margin-left:8px;padding:6px 12px;font-size:14px'; rl.textContent = 'Recargar ahora'; rl.onclick = () => { game.persist(); location.reload(); }; seg.after(rl); }
+    game.save.style = b.dataset.look; game.persist(); // (the looks are built differently from the start)
+    pickIn('sLook', b);
+    offerReload('sLook', b.dataset.look !== STYLE.name);
   }));
-  document.querySelectorAll('#sSM button').forEach((b) => (b.onclick = () => {
-    game.save.stopMotion = b.dataset.sm === 'cine' ? 'cine' : b.dataset.sm === 'on'; game.persist(); if (game.setStopMotion) game.setStopMotion(game.save.stopMotion);
-    document.querySelectorAll('#sSM button').forEach((x) => x.classList.toggle('on', x === b));
-  }));
-  document.querySelectorAll('#sR button').forEach((b) => (b.onclick = () => { game.save.dynRes = b.dataset.r === 'auto'; game.persist(); document.querySelectorAll('#sR button').forEach((x) => x.classList.toggle('on', x === b)); }));
-  document.querySelectorAll('#sL button').forEach((b) => (b.onclick = () => { game.save.lofi = b.dataset.l === 'on'; game.persist(); document.querySelectorAll('#sL button').forEach((x) => x.classList.toggle('on', x === b)); }));
+  document.querySelectorAll('#sR button').forEach((b) => (b.onclick = () => { game.save.dynRes = b.dataset.r === 'auto'; game.persist(); pickIn('sR', b); }));
   document.querySelectorAll('#sT button').forEach((b) => (b.onclick = () => { game.sky.hour = parseFloat(b.dataset.h); game.sky.update(0, game.camera.position, true); game.render(); }));
   const mus = $('sMus'), sfx = $('sSfx'), sens = $('sSens');
   if (mus) mus.oninput = () => { game.save.music = +mus.value; audio.setVolumes({ music: +mus.value }); game.persist(); };
@@ -851,7 +753,7 @@ function wire() {
   document.querySelectorAll('#modeSeg button').forEach((b) => b.addEventListener('click', () => { audio.unlock(); audio.sfx('ui_select'); setModeSel(b.dataset.mode); }));
   setModeSel(game.save.modePref || 'normal');
   ui.onMenu = () => { $('hEnd').hidden = true; game.state = 'paused'; game.persist(); showMenu(); };
-  click('bPlay', () => { if (STYLE.anime) { previewDesc = { ...PLAYER_PRESETS[0] }; startGame(); } else if (game.save.custom) { previewDesc = { ...game.save.custom }; startGame(); } else openSelect(); });
+  click('bPlay', () => { if (game.save.custom) { previewDesc = { ...game.save.custom }; startGame(); } else openSelect(); });
   click('bMulti', openMulti);
   click('mpBack', () => { game.net.leave(); showMenu(); });
   click('mpReady', () => { const net = game.net; if (net.online && !net.connected) { if (!net.connecting) net.connect(mpName(), mpDesc()).then(renderMulti); renderMulti(); return; } const playing = [...net.players.values()].some((p) => p.playing); net.setReady(net.online || playing ? true : !net.ready); });

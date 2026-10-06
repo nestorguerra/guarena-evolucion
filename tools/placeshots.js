@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 const G = () => window.game;
 async function post(name) { const c = G().renderer.domElement; const o = document.createElement('canvas'); o.width = c.width; o.height = c.height; o.getContext('2d').drawImage(c, 0, 0); await fetch('/__snap?name=' + name, { method: 'POST', body: o.toDataURL('image/jpeg', 0.86) }); }
-function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); if (g.toon) g.toon.setSize(w, h); }
+function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); }
 export function ll(lat, lon) {
   const o = G().map.raw.origin, R = 6378137, KX = Math.cos((o[0] * Math.PI) / 180) * R * Math.PI / 180, KZ = R * Math.PI / 180;
   return [(lon - o[1]) * KX, -(lat - o[0]) * KZ];

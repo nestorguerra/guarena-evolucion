@@ -21,7 +21,7 @@ const H = 1 / 60; // simulation step
 
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
 const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _m = new THREE.Matrix4();
-const _q = new THREE.Quaternion(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
+const _q = new THREE.Quaternion(), _qa = new THREE.Quaternion(), _qc = new THREE.Quaternion();
 const _qh = new THREE.Quaternion(), _qs = new THREE.Quaternion(), _qk = new THREE.Quaternion(), _qn = new THREE.Quaternion();
 const _I = new THREE.Quaternion(), _AX = new THREE.Vector3(1, 0, 0);
 const _pc = { x: 0, z: 0 };

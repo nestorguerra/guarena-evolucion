@@ -1,7 +1,8 @@
 // Player controller (on foot & driving, entering/exiting & carjacking, melee) and the third-person camera rig.
 import * as THREE from 'three';
 import { STYLE } from './style.js';
-import { clamp, lerp, damp, dampAngle, wrapAngle, smoothstep, polyNearest, polySample, TAU } from './util.js';
+import { SM } from './plastilina.js';
+import { clamp, lerp, damp, dampAngle, wrapAngle, smoothstep, polyNearest, polySample } from './util.js';
 import { springCharacter, springAngle, springDamper } from './springs.js';
 import { PERK, setPerk, applyFitness } from './perks.js';
 
@@ -31,6 +32,7 @@ export class Player {
   setCharacter(ch) {
     if (this.char) { this.game.scene.remove(this.char.object); this.char.dispose(); }
     this.char = ch;
+    if (STYLE.plastilina) SM.remove(ch.object); // (claymation: not a puppet held between poses — as fluid as the camera that follows it)
     this.applyPerks();
     this.game.scene.add(ch.object);
     ch.object.traverse((o) => { if (o.isMesh) o.castShadow = true; });
@@ -783,15 +785,13 @@ export class CameraRig {
       springDamper(lv.y, -ldx * s * sk * idt, aim ? 0.02 : 0.035, dt); springDamper(lv.p, -ldy * s * sk * idt, aim ? 0.02 : 0.035, dt);
       this.yaw += lv.y.x * dt;
       this.pitch = clamp(this.pitch + lv.p.x * dt, -1.1, 0.55);
-      // (the anime look frames its courier as the reference does: lower and closer, over the shoulder of a child)
-      const ks = (p.char && p.char.scale) || 1, an = STYLE.anime;
       if (p.knock) { tx = p.pos.x; ty = 0.9; tz = p.pos.z; }
-      else { tx = p.pos.x; ty = p.pos.y + (p.mode === 'swim' ? 0.55 : p.mode === 'sit' ? 1.15 : p.crouch ? 1.05 : an ? 1.42 : 1.55) * (an && p.mode !== 'swim' ? ks : 1); tz = p.pos.z; }
+      else { tx = p.pos.x; ty = p.pos.y + (p.mode === 'swim' ? 0.55 : p.mode === 'sit' ? 1.15 : p.crouch ? 1.05 : 1.55); tz = p.pos.z; }
       // (claymation: the miniature street seen from above and further back through a longer lens, the puppet small in
       // the middle of its set — the user's reference pictures)
       const clay = STYLE.plastilina && !aim;
       if (clay && !p.knock && p.mode !== 'swim' && p.mode !== 'sit') ty += 0.2;
-      this.footDist = damp(this.footDist ?? this.dist, aim ? 2.2 : an ? this.dist * 0.8 : clay ? this.dist * 1.25 : this.dist, 9, dt);
+      this.footDist = damp(this.footDist ?? this.dist, aim ? 2.2 : clay ? this.dist * 1.25 : this.dist, 9, dt);
       dist = this.footDist;
       if (aim) fovT = 50; else if (clay) fovT = 50;
       // shoulder offset to the right (more while aiming)
@@ -825,21 +825,6 @@ export class CameraRig {
       springDamper(ts.z, gz, hl, dt);
       springDamper(ts.y, ty, aim ? 0.04 : 0.14, dt);
       [tx, tz] = outOfWalls(ts.x.x, ts.z.x); ty = ts.y.x;
-      // (the anime look) standing still a while, hands off the keys: the camera drifts slowly round you, a little back
-      // and up, and the HUD fades — a moment to look at the town. Any key or a look brings it all back
-      if (an) {
-        const still = !aim && Math.hypot(p.vel.x, p.vel.z) < 0.15 && Math.abs(ldx) + Math.abs(ldy) < 0.5 && Math.hypot(input.moveX, input.moveY) < 0.05 && p.mode !== 'dead';
-        this.idleT = still ? (this.idleT || 0) + dt : 0;
-        this.idleK = damp(this.idleK || 0, smoothstep(9, 13, this.idleT), this.idleT > 0 ? 0.8 : 4, dt);
-        if (this.idleK > 0.01) {
-          this.yaw += dt * 0.075 * this.idleK;
-          this.pitch = damp(this.pitch, -0.3, 0.35 * this.idleK, dt);
-          dist *= 1 + 0.6 * this.idleK;
-          ty += 0.25 * this.idleK;
-        }
-        const idle = this.idleK > 0.5;
-        if (idle !== this.idleShown) { this.idleShown = idle; document.body.classList.toggle('contemplar', idle); }
-      }
     }
     this.fov = damp(this.fov, fovT, fovT < 55 ? 9 : 3, dt);
     // camera position on a sphere behind the target (yaw points from target to camera)

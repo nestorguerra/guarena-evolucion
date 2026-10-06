@@ -35,7 +35,7 @@ export function buildBody(H, mat) {
 }
 
 async function post(name) { const url = G().renderer.domElement.toDataURL('image/jpeg', 0.88); await fetch('/__snap?name=' + name, { method: 'POST', body: url }); }
-function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); if (g.composer) { g.composer.setSize(w, h); if (g.bloom) g.bloom.setSize(w, h); } if (g.toon) g.toon.setSize(w, h); }
+function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); if (g.composer) { g.composer.setSize(w, h); if (g.bloom) g.bloom.setSize(w, h); } }
 // render a view and copy it at once into a 2D canvas (before the drawing buffer can be cleared)
 export function renderInto(ctx, dx, dy, pos, look, fov, w, h) {
   const g = G(); size(w, h);

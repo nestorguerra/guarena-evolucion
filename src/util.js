@@ -133,22 +133,8 @@ export function orientedRect(r) {
   }
   return best;
 }
-// Distance from point to segment
-export function distToSeg(px, pz, ax, az, bx, bz) {
-  const dx = bx - ax, dz = bz - az;
-  const l2 = dx * dx + dz * dz;
-  let t = l2 > 0 ? ((px - ax) * dx + (pz - az) * dz) / l2 : 0;
-  t = clamp(t, 0, 1);
-  const cx = ax + dx * t, cz = az + dz * t;
-  return Math.hypot(px - cx, pz - cz);
-}
 
 // Polyline helpers: pts flat array [x,z,...]
-export function polyLength(p) {
-  let L = 0;
-  for (let i = 2; i < p.length; i += 2) L += Math.hypot(p[i] - p[i - 2], p[i + 1] - p[i - 1]);
-  return L;
-}
 export function polyCum(p) {
   const c = new Float32Array(p.length / 2);
   let L = 0;

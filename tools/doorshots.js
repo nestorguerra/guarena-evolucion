@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 const G = () => window.game;
 async function post(name) { const c = G().renderer.domElement; const o = document.createElement('canvas'); o.width = c.width; o.height = c.height; o.getContext('2d').drawImage(c, 0, 0); await fetch('/__snap?name=' + name, { method: 'POST', body: o.toDataURL('image/jpeg', 0.86) }); }
-function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); if (g.toon) g.toon.setSize(w, h); }
+function size(w, h) { const g = G(); g.renderer.setSize(w, h, false); }
 export const VIEWS = [
   ['lejos', 'oeste', 9.5, 2.2, 1.6, 0, 0, 7.5, 74],
   ['cerca', 'oeste', 5.5, 0.6, 1.7, 0, 0, 2.6, 60],
@@ -45,7 +45,6 @@ export async function shoot(tag = '', { hours = [11], W = 720, H = 900, only = n
         const gy = g.map.groundAt ? g.map.groundAt(ex, ez) : 0;
         cam.fov = fov; cam.position.set(ex, gy + ey, ez); cam.lookAt(lx, gy + ly, lz); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
         g.sky.update(0, cam.position, true);
-        if (g.toon) g.toon.u.uNight && (g.toon.u.uNight.value = g.sky.night || 0);
         const keep = g.camera; g.camera = cam;
         try { g.renderView(cam); } finally { g.camera = keep; }
         const nm = `door_${name}_${tag}${hours.length > 1 ? '_' + String(hour).replace('.', 'h') : ''}`;

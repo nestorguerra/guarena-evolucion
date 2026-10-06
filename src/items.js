@@ -89,7 +89,6 @@ export const FISH = [
   { id: 'lata', name: 'Una lata oxidada', junk: true, w: 3 },
 ];
 
-export function itemDef(id) { return ITEMS[id] || null; }
 // «Cuadro de las Vegas» → «cuadro de las Vegas» (a name in the middle of a sentence)
 export function lc(t) { return t ? t.charAt(0).toLowerCase() + t.slice(1) : t; }
 

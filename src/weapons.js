@@ -3,7 +3,7 @@
 // auto-aim at whoever is in front. Hitscan against people, police, cars and walls, with tracers, muzzle flash,
 // ejected brass, impacts and reloads. The guns are detailed models held with both hands (see gunrig.js).
 import * as THREE from 'three';
-import { clamp, wrapAngle } from './util.js';
+import { clamp } from './util.js';
 import { buildGun } from './gunmodels.js';
 import { GunRig } from './gunrig.js';
 import { PERK } from './perks.js';
