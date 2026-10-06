@@ -313,6 +313,7 @@ export class Activities {
       const jo = J.option();
       if (jo) return jo;
     }
+    if (g.charla && g.charla.open) return null; // (talking with someone: the conversation has the keys)
     if (g.interiors && g.interiors.picking) return { label: `Forzando la cerradura… <b>${g.interiors.pickPct} %</b>`, info: true };
     const hd = g.mode === 'normal' && g.interiors && g.interiors.doorNear(p.pos.x, p.pos.z, 1.8);
     if (hd && !this.armedAt(p)) {
@@ -429,6 +430,7 @@ export class Activities {
   // ------------------------------------------------------------ people
   talkTo(ped) {
     const g = this.game;
+    if (g.charla && g.charla.start(ped)) return; // a neighbour of the padrón: a real conversation (charla.js)
     g.peds.talk(ped);
     // the old folks sometimes slip you something for a coffee
     if (ped.talks === 1 && ped.char.desc.elderly && Math.random() < 0.18) {

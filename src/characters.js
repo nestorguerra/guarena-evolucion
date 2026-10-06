@@ -58,6 +58,16 @@ export function randomDesc(rnd) {
   if (d.face) d.face = d.face.slice();
   return normalize(colorize(d, rnd));
 }
+// a neighbour of the town (census.js): a shape of their sex and age group from the pool, in colours of their own —
+// the same rnd, the same person every time
+export function pedDesc(gender, ageGroup, rnd) {
+  const all = pool();
+  let P = all.filter((p) => p.gender === gender && p.ageGroup === ageGroup);
+  if (!P.length) P = all.filter((p) => p.gender === gender);
+  const d = { ...P[Math.floor(rnd() * P.length)] };
+  if (d.face) d.face = d.face.slice();
+  return normalize(colorize(d, rnd));
+}
 
 const q = (v, step) => Math.round(v / step) * step;
 // descriptor → what changes the sculpted shape (everything else is colour). Accessories come as their own fields

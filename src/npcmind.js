@@ -235,6 +235,18 @@ export const GREET = {
   madrugada: { mayor: ['¿Qué haces por ahí a estas horas, {hijo|hija}?', 'Buenas noches.'], adulto: ['Buenas noches.', '¡Buenas!'], joven: ['¡Ey!', '¿Qué pasa? ¿De fiesta?'] },
 };
 // two neighbours who pass each other in the street
+// two who know each other only by sight, in passing: the town's short greeting, by age and time of day (<m|f>: the
+// one greeted), and its answer
+export const BY_SIGHT = {
+  mañana: { mayor: ['¡Buenos días!', '¡Adiós!', 'Buenos días nos dé Dios.', '¡Muy buenas!', '¡Adiós, <hijo|hija>!'], adulto: ['¡Buenos días!', '¡Buenas!', '¡Adiós!', '¡Muy buenas!', '¡Adiós, buenos días!'], joven: ['¡Buenas!', '¡Ey!', '¡Buenos días!', '¡Adiós!'] },
+  tarde: { mayor: ['¡Buenas tardes!', '¡Adiós!', '¡Adiós, <hijo|hija>!', 'Vaya usted con Dios.', '¿Qué, de paseo?'], adulto: ['¡Buenas tardes!', '¡Adiós!', '¡Buenas!', '¡Adiós, buenas!', '¡Hasta luego!'], joven: ['¡Buenas!', '¡Ey!', '¿Qué pasa?', '¡Adiós!'] },
+  noche: { mayor: ['¡Buenas noches!', '¡Adiós!', '¡Hasta mañana, si Dios quiere!', '¡Adiós, <hijo|hija>!'], adulto: ['¡Buenas noches!', '¡Adiós!', '¡Hasta mañana!', '¡Buenas!'], joven: ['¡Buenas!', '¡Ey!', '¡Hasta luego!', '¿Qué pasa?'] },
+};
+export const BY_SIGHT_RE = {
+  mañana: ['¡Buenos días!', '¡Adiós!', '¡Igualmente!', '¡Muy buenas!', '¡Adiós, adiós!', '¡Buenas!'],
+  tarde: ['¡Adiós!', '¡Buenas tardes!', '¡Adiós, adiós!', '¡Igualmente!', '¡Hasta luego!', '¡Buenas!'],
+  noche: ['¡Buenas noches!', '¡Adiós!', '¡Hasta mañana!', '¡Igualmente!', '¡Adiós, adiós!'],
+};
 export const PASSING = {
   mañana: [['¡Buenos días, @!', '¡Buenos días! ¿Ya vas a por el pan?'], ['¡Adiós, @!', '¡Adiós, <hijo|hija>!'], ['¡Buenas!', '¡Muy buenas! ¿Qué tal todo?'], ['¡Buenos días!', '¡Buenos días! Qué mañanita más buena.']],
   tarde: [['¡Buenas tardes, @!', '¡Buenas tardes!'], ['¡Adiós, @!', '¡Adiós! Recuerdos a los tuyos.'], ['¡Adiós!', '¡Adiós, <hijo|hija>, adiós!'], ['¿Dónde vas con este caló, @?', 'Aquí, a hacer un recao.']],
@@ -323,19 +335,59 @@ export const TALKS = [
   { where: ['plaza'], when: ['tarde', 'noche'], lines: [[0, 'Cuánta gente hay hoy en la plaza.'], [1, 'Es que con el buen tiempo sale todo el pueblo.'], [2, 'Como tiene que ser.']] },
   { who: 'adulto', lines: [[0, '¿Has visto a ese que va por ahí con la mochila roja?'], [1, 'El repartidor. Ese conoce el pueblo mejor que el cartero.']] },
 ];
+// a grown-up and the children they are taking to school or bringing back (role 0: the grown-up, 1: the child)
+export const KID_TALKS = [
+  { kid: true, lines: [[0, '¿Qué tal en el cole?'], [1, 'Bien. Hoy hemos hecho un mural de las cigüeñas.'], [0, '¡Qué bonito! Luego me lo enseñas.']] },
+  { kid: true, lines: [[1, '¿Me compras unas pipas?'], [0, 'Si te comes toda la comida, sí.'], [1, '¡Vale!']] },
+  { kid: true, lines: [[1, '¿Qué hay de comer?'], [0, 'Lentejas.'], [1, '¡Jo, otra vez!'], [0, 'Las lentejas: si quieres las comes, y si no, las dejas.']] },
+  { kid: true, lines: [[1, 'El viernes hay excursión al pantano.'], [0, '¿Y tienes la autorización firmada?'], [1, 'Está en la mochila.']] },
+  { kid: true, lines: [[0, 'Dame la mano para cruzar.'], [1, 'Ya sé cruzar sol[o|a]…'], [0, 'Que me des la mano, te digo.']] },
+  { kid: true, lines: [[1, '¿Puedo ir luego al parque?'], [0, 'Cuando hagas los deberes.'], [1, 'Jo…']] },
+  { kid: true, lines: [[0, '¿Te has comido todo el bocadillo?'], [1, 'Casi todo…'], [0, '¿Casi?']] },
+  { kid: true, lines: [[1, 'La seño dice que el sábado hay teatro en la Casa de la Cultura.'], [0, 'Pues iremos a verlo, si te portas bien.']] },
+  { kid: true, lines: [[0, 'Mira, las cigüeñas en la torre de Santa María.'], [1, '¿Cuántas hay?'], [0, 'Cuéntalas tú.']] },
+  { kid: true, lines: [[1, 'Hoy en el recreo hemos jugado al fútbol.'], [0, '¿Y quién ha ganado?'], [1, 'Nosotros, cinco a tres.']] },
+  { kid: true, lines: [[0, '¿Qué os ha mandado la seño?'], [1, 'Una ficha de mates.'], [0, 'Pues nada más comer, la hacemos.']] },
+  { kid: true, lines: [[1, 'Mañana hay que llevar un tetrabrik pa manualidades.'], [0, 'Pues mira a ver si queda alguno de leche.']] },
+  { kid: true, lines: [[1, '¿Sabes que a Lucas se le ha caído un diente?'], [0, '¿Y le va a venir el Ratoncito Pérez?'], [1, '¡Esta noche!']] },
+  { kid: true, lines: [[0, 'Ponte bien la mochila, que vas torcid<o|a>.'], [1, 'Es que pesa un montón.']] },
+  { kid: true, lines: [[1, 'Tengo un hambre…'], [0, 'Pues hay cocido.'], [1, '¡Bien!']] },
+  { kid: true, lines: [[1, 'Hemos aprendido una canción de las cigüeñas.'], [0, 'A ver, cántamela.'], [1, 'Que me da vergüenza…']] },
+  { kid: true, lines: [[0, '¿Te has puesto la chaqueta en el recreo?'], [1, 'Sí…'], [0, 'Ya, ya.']] },
+  { kid: true, lines: [[1, 'El jueves es el cumple de Martina y nos invita a todos.'], [0, 'Pues habrá que comprarle algo.']] },
+  { kid: true, lines: [[1, 'La seño me ha puesto un positivo.'], [0, '¡Muy bien! ¿Y eso?'], [1, 'Por leer en voz alta sin trabarme.']] },
+];
+// what was said lately anywhere in the town (real seconds): the next group talks about something else
+const RECENT = new Map();
+const recentlyUsed = (t) => { const at = RECENT.get(t); return at !== undefined && performance.now() - at < 75000; };
 // the line that closes a chat when someone has to go
-export const BYE = [['Bueno, me voy, que se me hace tarde.', '¡Adiós, adiós! Recuerdos a los tuyos.'], ['Venga, que tengo que hacer la comida.', '¡Hasta luego!'], ['Me voy, que me están esperando.', 'Anda, ve, ve.']];
+export const BYE = [
+  ['Bueno, me voy, que se me hace tarde.', '¡Adiós, adiós! Recuerdos a los tuyos.'], ['Venga, que tengo que hacer la comida.', '¡Hasta luego!'],
+  ['Me voy, que me están esperando.', 'Anda, ve, ve.'], ['Bueno, pues nada, ya nos veremos.', '¡Venga, hasta otra!'],
+  ['Me voy yendo, que tengo la lavadora puesta.', 'Ea, pues hala, hasta luego.'], ['Venga, que se me enfría el pan.', '¡Adiós, <guapo|guapa>!'],
+  ['Bueno, que te dejo, que llevarás prisa.', 'Qué va, pero sí, me voy yendo. ¡Adiós!'], ['Hala, saluda a tu madre de mi parte.', 'De tu parte. ¡Adiós!'],
+  ['Me voy, que viene el chiquillo del colegio.', '¡Corre, corre! Hasta luego.'], ['Bueno, a ver si nos vemos más.', '¡Eso, eso! Adiós.'],
+];
 
-// choose a conversation that suits who, where and when
+// choose a conversation that suits who, where and when (today's news of the town first, now and then: ctx.extra)
 export function chooseTalk(ctx, used = null) {
+  const t = chooseTalk0(ctx, used);
+  if (t) RECENT.set(t, performance.now());
+  return t;
+}
+function chooseTalk0(ctx, used) {
+  const fresh = (A) => { const F = A.filter((t) => !recentlyUsed(t)); return F.length ? F : A; };
+  const X = ctx.extra && fresh(ctx.extra.filter((t) => !used || !used.has(t)));
+  if (X && X.length && (ctx.kidOnly || Math.random() < 0.45)) return X[Math.floor(Math.random() * X.length)];
+  if (ctx.kidOnly) return ctx.extra.length ? ctx.extra[Math.floor(Math.random() * ctx.extra.length)] : null;
   const L = TALKS.filter((t) =>
     (!t.when || t.when.includes(ctx.part)) && (!t.where || t.where.includes(ctx.where)) && (!t.who || t.who === ctx.who || (t.who === 'adulto' && ctx.who === 'mayor')) &&
     (!t.wd || t.wd.includes(ctx.wd)) && (!t.need || ctx.needs.includes(t.need)) && (t.lines.reduce((m, l) => Math.max(m, l[0]), 0) < ctx.n));
   if (!L.length) return null;
-  const fresh = used ? L.filter((t) => !used.has(t)) : L;
+  const unused = fresh(used ? L.filter((t) => !used.has(t)) : L);
   // things that are happening come first
-  const urgent = fresh.filter((t) => t.need);
-  return pick(urgent.length && Math.random() < 0.8 ? urgent : fresh.length ? fresh : L);
+  const urgent = unused.filter((t) => t.need);
+  return pick(urgent.length && Math.random() < 0.8 ? urgent : unused.length ? unused : L);
 }
 // fill in the agreement marks for one line, said by `sp` to `to` (persona objects)
 export function fillLine(text, sp, to) {
@@ -361,7 +413,7 @@ export class Chat {
     // whoever begins: someone of the age the talk is for, if there is one
     // whoever begins: someone of the age the talk is for, if there is one; otherwise whoever (not always the same one)
     const who = this.talk.who;
-    const cand = who ? this.members.filter((m) => m.persona && m.persona.age === who) : this.members;
+    const cand = this.talk.kid ? this.members.filter((m) => m.persona && m.persona.r && m.persona.r.age >= 18) : who ? this.members.filter((m) => m.persona && m.persona.age === who) : this.members;
     const lead = cand.length ? cand[Math.floor(Math.random() * cand.length)] : null;
     if (lead) { const k = this.members.indexOf(lead); this.members.splice(k, 1); this.members.unshift(lead); }
     if (this.members.length > 2 && Math.random() < 0.5) { const rest = this.members.slice(1).reverse(); this.members.splice(1, rest.length, ...rest); }

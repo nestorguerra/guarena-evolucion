@@ -1009,7 +1009,7 @@ export function charBuilderMain(mhLib) {
   }
   // hats cut away all the hair above their lower edge (and a margin round them), so nothing pokes through;
   // the hair still shows below the edge of a cap, a beret, a beanie or a straw hat
-  const HATS = { gorra: 1, boina: 1, gorro: 1, sombrero: 1 };
+  const HATS = { gorra: 1, boina: 1, gorro: 1, sombrero: 1, casco: 1 };
   function hatCut(L, R, hat) {
     if (!HATS[hat]) return;
     const { H, Sh } = headFrame(R);
@@ -1019,6 +1019,7 @@ export function charBuilderMain(mhLib) {
     if (hat === 'gorra') L.int(P_plane([0, -0.2, 0.043], H(0, 0.068, -0.1)), o);       // above the cap's rim (tilted: lower at the back)
     else if (hat === 'boina') L.int(P_plane([0, -1, 0], H(0, 0.1, 0)), o);
     else if (hat === 'gorro') L.int(P_plane([0, -1, 0.25], H(0, 0.08, 0)), o);        // the beanie comes down over the ears at the back
+    else if (hat === 'casco') L.int(P_plane([0, -1, 0.55], H(0, 0.06, 0)), o);        // the helmet: over the ears and the nape
     else L.int(P_plane([0, -1, 0.1], H(0, 0.1, 0)), o);                               // straw hat: the crown sits on the head
     L.end(0.006, true);
   }
@@ -1221,6 +1222,16 @@ export function charBuilderMain(mhLib) {
       L.int(P_plane([0, -1, 0.25], H(0, 0.085, 0)), { reg: REG.capBrim });
       L.int(P_plane([0, 1, -0.25], H(0, 0.118, 0)), { reg: REG.capBrim });
       L.end(0.004);
+    } else if (hat === 'casco') {
+      // an open-face (jet) helmet, as the scooters of the town wear it: a round shell over the skull, down over the
+      // ears and the nape, the face left open, a short peak over the brow
+      const sc = scalp(R);
+      L.group();
+      L.add(P_ell(H(sc.c[0], sc.c[1] + 0.002, sc.c[2] - 0.008), [sc.r[0] * Sh * 1.22, sc.r[1] * Shy * 1.18, sc.r[2] * Sh * 1.2]), { inf: 0.02 * Sh, bone: 'head', reg: REG.cap });
+      L.int(P_plane([0, -1, 0.55], H(0, 0.045, 0)), { reg: REG.cap });
+      L.sub(P_ell(H(0, 0.03, 0.105), [0.066 * Sh, 0.08 * Shy, 0.075 * Sh]), { k: 0.01, reg: REG.capBrim });
+      L.end(0.008);
+      L.add(P_ell(H(0, 0.118, 0.1), [0.064 * Sh, 0.009 * Shy, 0.026 * Sh], rotX(0.3)), { k: 0.006, bone: 'head', reg: REG.capBrim });
     } else {
       // straw hat (sombrero de paja): a rounded crown with a band, a wide brim
       // (the crown sits a little forward and roomier: the forehead used to poke through its front)
@@ -1770,7 +1781,7 @@ export function charBuilderMain(mhLib) {
     if (!HATS[hat]) return null;
     const { H, Sh } = headFrame(R);
     const c = H(0, 0.1, -0.01), r = 0.2 * Sh;
-    const [n0, p0] = hat === 'gorra' ? [[0, -0.2, 0.043], H(0, 0.068, -0.1)] : hat === 'boina' ? [[0, -1, 0], H(0, 0.1, 0)] : hat === 'gorro' ? [[0, -1, 0.25], H(0, 0.08, 0)] : [[0, -1, 0.1], H(0, 0.1, 0)];
+    const [n0, p0] = hat === 'gorra' ? [[0, -0.2, 0.043], H(0, 0.068, -0.1)] : hat === 'boina' ? [[0, -1, 0], H(0, 0.1, 0)] : hat === 'gorro' ? [[0, -1, 0.25], H(0, 0.08, 0)] : hat === 'casco' ? [[0, -1, 0.55], H(0, 0.06, 0)] : [[0, -1, 0.1], H(0, 0.1, 0)];
     const n = nrm(n0), d0 = dot(n, p0);
     return (x, y, z) => Math.hypot(x - c[0], y - c[1], z - c[2]) < r && n[0] * x + n[1] * y + n[2] * z - d0 < -margin * Sh;
   }

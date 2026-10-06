@@ -221,7 +221,10 @@ export class MapData {
         if (avoid && avoid(e)) continue;
         const nxt = this.otherEnd(e, cur);
         const w = (e.cls === 'track' ? 1.8 : e.cls === 'service' ? 1.4 : e.cls === 'primary' ? 0.8 : 1) * (opts.weight ? opts.weight(e) : 1);
-        const ng = g[cur] + e.len * w;
+        const ein = came[cur] >= 0 ? this.edges[came[cur]] : cur === fromNode ? opts.startEdge : null; // (the street they come in by)
+        const tc = opts.turnCost && ein ? opts.turnCost(ein, e, cur) : 0; // (metres more for the turn)
+        if (tc === Infinity) continue;
+        const ng = g[cur] + e.len * w + tc;
         if (ng < g[nxt]) {
           g[nxt] = ng; f[nxt] = ng + h(nxt); came[nxt] = ei; cameDir[nxt] = e.a === cur ? 1 : -1;
           open.push(nxt);

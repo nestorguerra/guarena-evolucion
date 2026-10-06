@@ -260,6 +260,7 @@ export class Fleet {
     }
     // a hard knock on two wheels throws the rider off
     if (v.spec.twoWheel && v.driver === 'player' && imp > 6) { const p = this.game.player; p.exitVehicle(true); p.knockDown(v.vx * 0.6, v.vz * 0.6, Math.min(35, imp * 2.5)); }
+    else if (v.spec.twoWheel && v.rider && imp > 5 && this.game.traffic) { this.game.traffic.throwRider(v, v.vx, v.vz); this.game.traffic.release(v); v.driver = null; }
   }
 
   explode(v) {

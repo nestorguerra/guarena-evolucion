@@ -68,6 +68,36 @@ sin y con el esculpido de muñeco.
 
 `tools/runlab.js` juega carreras de prueba y las mide.
 
+**Un pueblo que vive** (en [docs/ciudadanos.md](docs/ciudadanos.md), con los datos, las normas y las medidas):
+- **El padrón**: los 6.665 vecinos de Guareña (INE, 1 de enero de 2025), en 2.818 hogares sobre las puertas reales del
+  mapa y con la pirámide de edades del pueblo. Cada uno tiene nombre, dos apellidos (y a veces el mote de la familia),
+  dirección, oficio, familia, amigos y una rutina para cada día de la semana. Los vecinos son inventados; el número y
+  las edades, los reales.
+- **La gente que ves son esos vecinos**: la misma cara, el mismo nombre y la misma memoria cada vez. Cuántos hay y dónde
+  sale de sus rutinas:
+  - el pan a primera hora;
+  - la puerta del colegio a las nueve y a las dos;
+  - el mercadillo de los miércoles;
+  - la salida de misa;
+  - el paseo de la tarde por la Plaza de España;
+  - las sillas del fresco a la puerta por la noche.
+- **Civismo a pie**:
+  - Por la acera, rodeando farolas, contenedores y corros.
+  - Cruzan por el paso de cebra si hay uno a menos de 40 m, o por la esquina, mirando a los dos lados y esperando a que
+    los coches puedan parar.
+  - Hacen cola en la panadería y se saludan según se conozcan.
+  - Las familias van juntas; los niños, de la mano, y a las dos salen corriendo del colegio hacia quien los recoge.
+- **Conversaciones con memoria**: eliges qué decir (presentarte, qué tal, qué se cuenta, adónde va, a qué se dedica,
+  cómo se va a un sitio…). Te contesta con su vida, con las noticias del día en el pueblo, que corren de boca en boca, y
+  con lo que hablasteis la última vez.
+- **Coches, motos y bicis por el Reglamento General de Circulación**:
+  - 20, 30, 50 y 90 km/h según la vía; STOP con parada completa; ceda el paso; prioridad a la derecha.
+  - Ceden a los peatones en los pasos de cebra y al girar; 1,5 m al adelantar a una bici.
+  - Arrancan y frenan con calma. Las motos llevan casco.
+  - El mercadillo corta su carretera los miércoles de 9 a 14.
+
+`tools/townlab.js` lo mide en siete escenas del pueblo: la gente, el civismo, el tráfico y las conversaciones.
+
 ![Guareña desde el aire: la Iglesia de Santa María y la Plaza de España con el Ayuntamiento](docs/portada.jpg)
 
 ## Jugar
@@ -131,8 +161,9 @@ python3 tools/build_map.py          # regenera data/map.json desde OpenStreetMap
   Catastro se descargan con `tools/fetch_catastro.py`)
 - `tools/` — empaquetado, servidor local, mapa y pruebas automáticas: `audit.js` recorre todas las calles a pie
   y en coche, `missionbot.js` juega las misiones, `playtest.js` conduce, pelea, hace de taxista… `faces.js`
-  retrata a los personajes de cerca, `runlab.js` graba y mide carreras (pies, cámara, temblor) y `mocaplab.js`
-  adapta la captura de movimiento (`appendDB` añade tomas sin tocar las que ya hay)
+  retrata a los personajes de cerca, `runlab.js` graba y mide carreras (pies, cámara, temblor), `mocaplab.js`
+  adapta la captura de movimiento (`appendDB` añade tomas sin tocar las que ya hay) y `townlab.js` mide la vida del
+  pueblo (gente, civismo, tráfico, conversaciones) en siete escenas
 - `multijugador/` — el servidor de la sala · `.github/workflows/pages.yml` — publica el juego en GitHub Pages
 
 Si defines la variable de repositorio `GUARENA_MP_URL` con la dirección de un servidor propio, las copias que no
@@ -155,3 +186,5 @@ pueden jugar online (navegadores sin WebRTC) enlazan con él desde la pantalla *
   `tools/mocaplab.js` la adapta al esqueleto del juego en `assets/hero/moves.bin.gz`.
 - Personajes, vehículos, historias y misiones son ficticios. Los bares y comercios llevan nombres inventados:
   ningún negocio real aparece por su nombre.
+- Los vecinos del padrón también son inventados (nombres, familias y oficios al azar). Del INE solo vienen el número de
+  habitantes (6.665 a 1 de enero de 2025) y la forma de la pirámide de edades (censo de 2021).

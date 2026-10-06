@@ -200,6 +200,18 @@ body.photo #hud > * { opacity: 0 !important; }
 #orderMenu button b, .listMenu button b { font-family: var(--display); color: var(--money); font-weight: 400; }
 #orderMenu kbd, .listMenu kbd { min-width: 1.4em; text-align: center; }
 .listMenu button.off { opacity: 0.45; }
+/* a conversation with a neighbour (charla.js): who they are, what they said, what you can answer */
+#charla { position: absolute; left: 50%; bottom: max(92px, calc(env(safe-area-inset-bottom) + 80px)); transform: translateX(-50%); width: min(560px, 94vw); background: var(--panel); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 12px 14px 8px; pointer-events: auto; z-index: 4; box-shadow: 0 12px 34px rgba(0,0,0,0.45); }
+#charla h3 { margin: 0 0 6px; font-family: var(--cond); font-weight: 800; font-size: 19px; letter-spacing: 0.03em; color: var(--trigo); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+#charla h3 small { font-family: var(--body); font-weight: 500; font-size: 12px; letter-spacing: 0; color: rgba(255,255,255,0.6); }
+#charla p { margin: 0 0 8px; line-height: 1.38; }
+#charla p.mine { font-size: 13px; color: rgba(255,255,255,0.62); font-style: italic; }
+#charla p.mine::before { content: '— '; }
+#charla p.line { font-size: 16px; font-weight: 600; color: #fff; }
+#charla button { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; width: 100%; text-align: left; font: inherit; font-size: 14px; color: inherit; background: rgba(255,255,255,0.04); border: 1px solid transparent; border-radius: 9px; padding: 5px 10px; margin-bottom: 3px; cursor: pointer; }
+#charla button.on, #charla button:hover { background: rgba(242,182,50,0.16); border-color: var(--trigo); }
+#charla kbd { min-width: 1.4em; text-align: center; }
+#charla > small { display: block; margin-top: 4px; opacity: 0.6; font-size: 12px; }
 #orderMenu small, .listMenu small { display: block; margin-top: 4px; opacity: 0.65; font-size: 12px; }
 #wState.visto { color: #ff6b5e; }
 #wState.busca { color: #9cc4ff; animation: wsBlink 1s steps(2) infinite; }

@@ -1,13 +1,17 @@
-// Pedestrians of Guareña: each one is going somewhere that suits the hour and who they are (npcmind.js), along the
-// sidewalks of the real streets; they cross looking out for cars, keep to the right when they meet someone, stop to
-// greet a neighbour, go in at the door they were heading for (and others come out of theirs); they chat in the plazas,
-// at their doors and on the benches — real little conversations — flee from trouble, get knocked down (and get back
+// Pedestrians of Guareña: the neighbours of the town's padrón (census.js) out in the street — each one going where
+// their day takes them now (the bread, the school gate, mass, the evening walk round the plaza, home), as many as are
+// out there at that hour, along the sidewalks of the real streets. They cross at the zebra crossings or at the corners,
+// looking out for the cars (who give way to them at the zebras), keep to the right when they meet someone, greet the
+// ones they know (by their names, the friends and the family), stop to chat, go in at the door they were heading for
+// (and come out of their own); they sit out at their doors and on the benches, in groups in the plazas and on the bar
+// terraces — real little conversations, about the town's own news — flee from trouble, get knocked down (and get back
 // up), and speak castúo.
 import * as THREE from 'three';
 import { randomDesc } from './characters.js';
 import { polySample, polyNearest, clamp, lerp, dampAngle, wrapAngle, mulberry32, hash1 } from './util.js';
 import { Dogs } from './dogs.js';
-import { Places, routeBetween, personaOf, Chat, greetLine, errandLine, PASSING, BUSY, ANNOYED, ANNOYED_SAT, WARY, AFTER_DARK, FOLLOWED, CLOSE, BYE, partOfDay, weekday, massTime, fillLine } from './npcmind.js';
+import { Places, routeBetween, personaOf, Chat, greetLine, errandLine, PASSING, BY_SIGHT, BY_SIGHT_RE, BUSY, ANNOYED, ANNOYED_SAT, WARY, AFTER_DARK, FOLLOWED, CLOSE, BYE, partOfDay, weekday, massTime, fillLine, KID_TALKS } from './npcmind.js';
+import { noticias } from './charla.js';
 
 export const FRASES = {
   bump: ['¡Chacho, ten cuidao!', '¡Mira por dónde vas!', '¡Coile, qué susto!', '¡Ay, madre!', '¡Que me escachas!', '¡Acho, que no estás {solo|sola}!'],
@@ -49,6 +53,7 @@ const CALL = {
 };
 const CALL_END = ['Ya vienen, ya vienen…', 'Ahora viene la Guardia Civil, ya verás.', 'Ya les he avisado.'];
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const wdOf = (g) => weekday(g.sky);
 
 export class Peds {
   constructor(game) {
@@ -84,7 +89,30 @@ export class Peds {
     if (m && m.phase !== 'durante') needs.push('misa');
     const t = this.trouble, a = members && members[0];
     if (t && this.now - t.t < 240 && (!a || Math.hypot(a.x - t.x, a.z - t.z) < 260)) needs.push('jaleo');
-    return { part: partOfDay(h), where, wd, needs, who: a && a.persona ? a.persona.age : 'adulto', n: members ? members.length : 2 };
+    const ctx = { part: partOfDay(h), where, wd, needs, who: a && a.persona ? a.persona.age : 'adulto', n: members ? members.length : 2 };
+    // what the town is talking about today, about its own people (the same news all over town: charla.js)
+    const C = g.census;
+    if (C && members && members.length >= 2) ctx.extra = members.some((m) => m.persona && m.persona.r && m.persona.r.age < 12) ? KID_TALKS : this.newsTalks(C, members);
+    if (ctx.extra === KID_TALKS) ctx.kidOnly = true;
+    return ctx;
+  }
+  // two or three little conversations made from today's news, for these people (who know whom: family say so)
+  newsTalks(C, members) {
+    const day = this.game.sky.day || 0, N = noticias(C, day), out = [];
+    const a = members[0] && members[0].persona && members[0].persona.r;
+    // (the day's news goes round the town: each group talks about some of it, not all about the same)
+    const k0 = Math.floor(Math.random() * Math.max(1, N.length));
+    for (let i = 0; i < N.length; i++) {
+      const n = N[(k0 + i) % N.length];
+      if (out.length >= 2) break;
+      if (a && n.about.includes(a)) continue;
+      const fam = a && n.about[0] && C.acquaintance(a, n.about[0]) >= 4;
+      const txt = n.txt(C);
+      const open = n.about.length ? pick(['¿Te has enterao de lo de ' + C.nameOf(n.about[0], 'pueblo') + '?', '¿Sabes lo de ' + C.nameOf(n.about[0], 'pueblo') + '?']) : pick(['¿Te has enterao?', '¿Sabes lo que me han dicho?', 'Oye, ¿te has enterao?']);
+      const ask = pick(n.about.length ? ['¿Qué ha pasao?', 'No, ¿qué?', 'Cuenta, cuenta.', '¿Qué le pasa?', 'Pues no, ¿qué?'] : ['¿El qué?', 'No, ¿qué?', 'Cuenta, cuenta.', 'A ver, dime.']);
+      out.push({ news: n.k, lines: n.about.length ? [[0, open], [1, ask], [0, (fam ? 'Pues que, mira, es de mi familia: ' : '') + txt], [1, pick(n.re)]] : [[0, open], [1, ask], [0, txt], [1, pick(n.re)]] });
+    }
+    return out;
   }
   startChat(members, where, opts = {}) {
     const c = new Chat(this, members, this.ctx(where, members), opts);
@@ -94,8 +122,16 @@ export class Peds {
   }
 
   targetCount() {
-    const h = this.game.sky.hour;
-    const base = this.game.q.peds || 26;
+    const g = this.game, h = g.sky.hour, C = g.census;
+    const base = g.q.peds || 26;
+    if (C) {
+      // as many as the padrón says are out within 130 m now (the plazas at the evening walk, the school gate at two,
+      // the church door after mass), up to what the quality can draw
+      const budget = { alta: 115, media: 70, baja: 38 }[g.qKey] || base;
+      const p = g.player.pos;
+      const n = C.countNear(p.x, p.z, 130);
+      return clamp(Math.round(n * 0.85), h < 6.5 ? 0 : 2, budget);
+    }
     const f = h < 7 ? 0.2 : h < 10 ? 0.6 : h < 14.5 ? 1 : h < 17 ? 0.55 /* siesta */ : h < 22.5 ? 1.15 /* paseo */ : h < 24 ? 0.5 : 0.25;
     return Math.round(base * f);
   }
@@ -108,11 +144,13 @@ export class Peds {
 
   update(dt) {
     const g = this.game, p = g.player.pos;
-    if (!this.places && g.world && g.shops) this.places = new Places(g);
+    if (!this.places && g.world && g.shops) this.places = g.census ? g.census.places : new Places(g);
     this.spawnT -= dt;
     if (this.spawnT <= 0) {
       this.spawnT = 0.25;
-      if (this.list.filter((x) => !x.fixed).length < this.targetCount()) { if (!(Math.random() < 0.4 && this.spawnFromDoor(p))) this.trySpawn(p); }
+      const want = this.targetCount();
+      if (g.census) { let n = this.list.filter((x) => x.state !== 'dead').length; for (let k = 0; k < 3 && n < want; k++, n++) if (!this.spawnResident(p)) break; }
+      else if (this.list.filter((x) => !x.fixed).length < want) { if (!(Math.random() < 0.4 && this.spawnFromDoor(p))) this.trySpawn(p); }
       this.ensureBenchSitters(p);
       this.ensurePlazaGroups(p);
       this.ensureFresco(p);
@@ -151,7 +189,7 @@ export class Peds {
   // move gives way to the one standing; sitters and the fallen do not move)
   separate() {
     const L = this.list, R = 0.58;
-    const mob = (q) => q.state === 'walk' || q.state === 'idle' || q.state === 'stroll' || q.state === 'cross' || q.state === 'follow' || q.state === 'window' || q.state === 'chat' || q.state === 'flee' || q.state === 'call';
+    const mob = (q) => q.state === 'walk' || q.state === 'idle' || q.state === 'stroll' || q.state === 'cross' || q.state === 'kerb' || q.state === 'follow' || q.state === 'window' || q.state === 'chat' || q.state === 'flee' || q.state === 'call' || q.state === 'queue' || q.state === 'enter' || q.state === 'exit' || q.state === 'toBench';
     for (let i = 0; i < L.length; i++) {
       const a = L[i];
       if (!mob(a)) continue;
@@ -196,9 +234,208 @@ export class Peds {
     }
   }
 
-  spawnAt(x, z, desc) {
+  // somebody of the padrón who is out in the street around here now: going somewhere, coming back, or out where they
+  // spend the time (the plaza, the park, the mercadillo, the school gate, a bar terrace). Out of sight, or coming out
+  // of their own front door
+  spawnResident(p) {
+    const g = this.game, C = g.census, map = this.map;
+    if (!C || !this.places) return this.trySpawn(p);
+    const cand = C.near(p.x, p.z, 140);
+    if (!cand.length) return false;
+    const fwd = g.cam.forwardYaw;
+    const seen = (x, z, d) => { const dx = x - p.x, dz = z - p.z; return d < 75 && (dx * Math.sin(fwd) + dz * Math.cos(fwd)) / (d || 1) > 0.25 && map.collider.raycast(p.x, p.z, x, z, 1.7, 1.7) > 0.98; };
+    for (let k = 0; k < 10; k++) {
+      const e = cand[Math.floor(Math.random() * cand.length)];
+      const o = e.w.o, kind = o.kind;
+      if (kind === 'fresco') continue; // (the chairs at the doors: ensureFresco)
+      const r = e.r, home = C.household(r).door;
+      // leaving the house just now: out of their own door
+      if (e.w.phase === 'ida' && e.w.k < 0.3) {
+        const dd = Math.hypot(home.x - p.x, home.z - p.z);
+        if (dd > 14 && dd < 80 && !this.map.buildingAt(home.x, home.z)) { if (this.spawnAtDoor(r, home, o)) return true; continue; }
+      }
+      // nearly there, and there is close to you: met there already (the town's clock runs at forty times yours: walking
+      // the last of the way they would get to the school gate when the children were home)
+      const there = e.w.phase === 'alli' || (e.w.phase === 'ida' && e.w.k > 0.45 && (o.out || o.terraza) && o.place && !o.fuera && Math.hypot(o.place.x - p.x, o.place.z - p.z) < 90);
+      if (!there && (e.d < 12 || (e.d < 75 && seen(e.x, e.z, e.d)))) continue; // (never in sight; behind you or round a corner, even close)
+      // out where they spend the time
+      if (there) {
+        if (o.terraza && this.seatAtTerrace(r, o.place)) return true;
+        const pl = o.place;
+        if (!pl) continue;
+        const R = kind === 'mercadillo' ? 16 : kind === 'paseo' || kind === 'plaza' ? 14 : kind === 'colegio' ? 7 : 10;
+        const pt = this.pointNear(pl.x, pl.z, R);
+        const dd = Math.hypot(pt.x - p.x, pt.z - p.z);
+        if (dd >= 12 && !seen(pt.x, pt.z, dd)) {
+          const ped = this.spawnAt(pt.x, pt.z, null, r);
+          this.rejoin(ped);
+          ped.goal = pl; ped.route = null;
+          if (kind === 'colegio') { ped.state = 'idle'; ped.idleT = Math.max(4, (o.t1 - g.sky.hour) * 90); ped.char.setBase(Math.random() < 0.3 ? 'phone' : null); ped.waitAt = pl; }
+          else { ped.state = 'stroll'; ped.strollT = Math.max(20, (o.t1 - g.sky.hour) * 90); ped.strollTo = this.pointNear(pl.x, pl.z, R); }
+          // the afternoon in the park or the plaza: the little ones come along with whoever looks after them
+          const kids = C.carer && C.carer.get(r.id), hh = g.sky.hour;
+          if (kids && hh > 17 && hh < 20.6 && (kind === 'parque' || kind === 'plaza' || kind === 'paseo')) this.takeKids(ped, kids);
+          return true;
+        }
+        // (there is in sight: they come walking up to it instead, from round a corner)
+        if (!pl || o.fuera) continue;
+      }
+      // on the way there, or back home. (The town keeps the game's clock — an hour is a minute and a half — so whoever
+      // is on their way somewhere is met on the last stretch of it, not across the town: they get there in time)
+      const going = there || e.w.phase === 'ida';
+      const goal = going ? (o.fuera ? null : o.place) : this.homePlace(r);
+      let q = null, tail = null;
+      if (going && goal && goal.edge) {
+        // the last 25–60 m of their way there, by the streets (from the side of home if they are there already)
+        const from = e.w.phase === 'ida' ? e : home;
+        const q0 = map.nearestEdge(from.x, from.z, 40, this.walkOk);
+        const route = q0 && routeBetween(map, { edge: q0.edge, s: q0.s }, { edge: goal.edge, s: goal.s }, this.walkOk);
+        if (!route) continue;
+        const b = this.backAlong(route, q0.s, goal.s, 25 + Math.random() * 35);
+        q = { edge: b.edge, s: b.s }; tail = route.slice(b.i); tail[0] = { edge: b.edge, dir: b.dir };
+      } else {
+        q = map.nearestEdge(e.x, e.z, 25, this.walkOk);
+        if (!q || q.d > 25) continue;
+      }
+      const side = Math.random() < 0.5 ? 1 : -1;
+      const pt = this.sidePoint(q.edge, q.s, side, this.tmp);
+      const dd = Math.hypot(pt.x - p.x, pt.z - p.z);
+      if (dd < 14 || map.buildingAt(pt.x, pt.z) || seen(pt.x, pt.z, dd)) continue;
+      const ped = this.spawnAt(pt.x, pt.z, null, r);
+      ped.edge = q.edge; ped.s = q.s; ped.side = side; ped.dir = Math.random() < 0.5 ? 1 : -1; ped.walkSide = side * ped.dir;
+      ped.state = 'walk'; ped.idleT = 3 + Math.random() * 10;
+      if (tail) { ped.goal = goal; ped.route = tail; ped.ri = 0; ped.dir = tail[0].dir; ped.walkSide = ped.side * ped.dir; ped.t = 0; }
+      else if (!(goal && this.plan(ped, goal))) this.plan(ped);
+      if (kind === 'colegio' && o.kids && ((e.w.phase === 'ida' && o.t0 < 11) || (e.w.phase === 'vuelta' && o.t1 > 13))) this.takeKids(ped, o.kids);
+      else this.withCompany(ped);
+      return true;
+    }
+    return false;
+  }
+  // the point of a route m metres before its end (route from s0 on its first street to sEnd on its last): the street,
+  // the place along it, the way they walk it and the step of the route it is
+  backAlong(route, s0, sEnd, m) {
+    for (let i = route.length - 1; i >= 0; i--) {
+      const { edge, dir } = route[i];
+      const b = i === route.length - 1 ? sEnd : dir > 0 ? edge.len : 0;
+      const a = i === 0 ? s0 : dir > 0 ? 0 : edge.len;
+      const len = Math.abs(b - a);
+      if (m <= len || i === 0) return { edge, s: clamp(b - dir * Math.min(m, len), 0, edge.len), dir, i };
+      m -= len;
+    }
+    return { edge: route[0].edge, s: s0, dir: route[0].dir, i: 0 };
+  }
+  // children by the hand: the little ones of the house walking with whoever takes them (to school, from school)
+  takeKids(ped, kids, from = null) {
+    const C = this.game.census;
+    if (!C || !kids || !kids.length) return;
+    ped.kids = ped.kids || [];
+    const hx = Math.sin(ped.heading), hz = Math.cos(ped.heading);
+    kids.forEach((kr, i) => {
+      if (C.spawned.has(kr.id) || ped.kids.length >= 3) return;
+      // (beside them; or out of the school gate, to run across to them)
+      const f = from ? this.spawnAt(from.x + (Math.random() - 0.5) * 2.4, from.z + (Math.random() - 0.5) * 2.4, null, kr) : this.spawnAt(ped.x + hz * 0.55 - hx * 0.3 * i, ped.z - hx * 0.55 - hz * 0.3 * i, null, kr);
+      f.state = 'follow'; f.leader = ped; f.slot = ped.kids.length + (ped.follower ? 1 : 0); f.child = true;
+      f.edge = ped.edge; f.s = ped.s; f.dir = ped.dir; f.side = ped.side; f.heading = ped.heading;
+      f.walkSpeed = 1.15 + Math.random() * 0.2;
+      ped.walkSpeed = Math.min(ped.walkSpeed, 1.15);
+      if (!ped.follower) ped.follower = f;
+      ped.kids.push(f);
+    });
+    if (ped.kids.length && !ped.chat && Math.random() < 0.7) this.startChat([ped, ped.kids[0]], 'calle', { loop: true });
+  }
+  // at the school door in the morning: in they go (until two); the grown-up waits a moment, then off
+  dropKids(ped) {
+    const K = ped.kids, C = this.game.census;
+    if (!K || !K.length) return;
+    ped.kids = null; if (ped.follower && K.includes(ped.follower)) ped.follower = null;
+    for (const k of K) {
+      if (!this.list.includes(k)) continue;
+      k.leader = null; k.goal = ped.goal; k.state = 'enter'; k.enterPhase = 1; k.t = 0;
+      if (C && k.persona.r) C.inside.set(k.persona.r.id, this.game.time + Math.max(0.5, 14 - this.game.sky.hour) * 90);
+    }
+    this.say(K[0], pick(['¡Adiós! ¡Hasta luego!', '¡Adiós, mamá!', '¡Adiós, abuela!', '¡Hasta luego!']));
+  }
+  // at two: out they come, and home with whoever came for them
+  // two o'clock at the school gate: out they come, and run to whoever has come for them
+  pickUpKids(ped, gate = null) {
+    const C = this.game.census, r = ped.persona && ped.persona.r;
+    if (!C || !r || ped.kids) return false;
+    const kids = C.carer && C.carer.get(r.id);
+    if (!kids || this.game.sky.hour < 13.9) return false;
+    for (const k of kids) C.inside.delete(k.id);
+    this.takeKids(ped, kids, gate && Math.hypot(gate.x - ped.x, gate.z - ped.z) < 25 ? gate : null);
+    if (!ped.kids || !ped.kids.length) return false;
+    this.later.push({ ped: ped.kids[0], t: 1.5 + Math.random(), text: pick(['¡Hola! ¿Qué hay de comer?', '¡Mira lo que he hecho en clase!', '¡Hola! ¿Me compras unas pipas?', 'Hoy la seño nos ha puesto un montón de deberes.', '¡Mamá, mamá! ¡Mira!', '¿Puedo ir al parque luego?']) });
+    return true;
+  }
+  // a home as a place to walk to (the pavement in front of the door, then the threshold)
+  homePlace(r) {
+    if (r._home) return r._home;
+    const C = this.game.census, d = C.household(r).door, map = this.map;
+    const q = map.nearestEdge(d.x, d.z, 20, this.walkOk);
+    if (!q || q.d > 20) return null;
+    const t = map.sample(q.edge, q.s, {});
+    const side = (d.x - t.x) * -t.dz + (d.z - t.z) * t.dx >= 0 ? 1 : -1;
+    return (r._home = { kind: 'casa', name: 'casa', x: d.x, z: d.z, fx: d.wx, fz: d.wz, edge: q.edge, s: q.s, side, home: true });
+  }
+  // out of their own front door, onto the pavement, and off
+  spawnAtDoor(r, d, o) {
+    const map = this.map, g = this.game;
+    const q = map.nearestEdge(d.x, d.z, 14, this.walkOk);
+    if (!q || q.d > 14) return false;
+    const t = map.sample(q.edge, q.s, {});
+    const side = (d.x - t.x) * -t.dz + (d.z - t.z) * t.dx >= 0 ? 1 : -1;
+    const ped = this.spawnAt(d.wx ?? d.x, d.wz ?? d.z, null, r);
+    ped.state = 'exit'; ped.exitTo = this.sidePoint(q.edge, q.s, side, {});
+    ped.edge = q.edge; ped.s = q.s; ped.side = side; ped.dir = Math.random() < 0.5 ? 1 : -1; ped.walkSide = side * ped.dir;
+    ped.heading = Math.atan2(ped.exitTo.x - ped.x, ped.exitTo.z - ped.z);
+    if (!(o && o.place && !o.fuera && this.plan(ped, o.place))) this.plan(ped);
+    if (Math.hypot(d.x - g.player.pos.x, d.z - g.player.pos.z) < 25) g.audio.sfx('door_open', { x: d.x, z: d.z, vol: 0.25 });
+    if (o && o.kind === 'colegio' && o.kids && o.t0 < 11) this.takeKids(ped, o.kids);
+    else this.withCompany(ped);
+    return true;
+  }
+  // a couple, a mother and her grown-up daughter, two friends: some go out with someone of the house or a friend
+  withCompany(ped) {
+    const g = this.game, C = g.census, r = ped.persona && ped.persona.r, h = g.sky.hour;
+    if (!C || !r || ped.follower || !ped.route) return null;
+    if (Math.random() > (h > 18 && h < 22.5 ? 0.3 : 0.15)) return null;
+    const mates = [...C.relatives(r), ...(r.friends || []).map((id) => C.residents[id])].filter((m) => m && !C.spawned.has(m.id) && m.age >= 13 && Math.abs(m.age - r.age) < (m.h === r.h ? 60 : 15));
+    if (!mates.length) return null;
+    return this.companion(ped, mates[Math.floor(Math.random() * mates.length)]);
+  }
+  // a chair on the terrace of the bar they came to (they sit, and chat with whoever is at the next chair)
+  seatAtTerrace(r, bar) {
+    const g = this.game, S = g.seats && g.seats.seats;
+    if (!S || !bar) return false;
+    const p = g.player.pos;
+    let best = null, bd = 30;
+    for (const s of S) {
+      if (s.kind !== 'terraza' || s.taken || s.npc) continue;
+      const d = Math.hypot(s.x - bar.x, s.z - bar.z);
+      const dp = Math.hypot(s.x - p.x, s.z - p.z);
+      if (dp < 18 || dp > 140) continue;
+      if (d < bd) { bd = d; best = s; }
+    }
+    if (!best) return false;
+    const ped = this.spawnAt(best.x, best.z, null, r);
+    ped.fixed = true; ped.state = 'sit'; ped.heading = best.h; ped.terrace = best;
+    best.taken = true; best.npc = ped;
+    ped.char.setBase('sitTalk');
+    ped.sitT = 60 + Math.random() * 200; ped.fixed = false; // (they get up and go after a while)
+    // whoever sits at the same table: a chat
+    const mate = this.list.find((q) => q !== ped && q.terrace && Math.hypot(q.x - ped.x, q.z - ped.z) < 1.6 && !q.chat);
+    if (mate) this.startChat([mate, ped], 'plaza', { loop: true });
+    return true;
+  }
+  spawnAt(x, z, desc, who = null) {
+    const C = this.game.census;
+    if (!who && C && !desc) who = C.someoneFor(x, z, { adult: true });
+    if (who && C) desc = C.descOf(who);
     const char = this.makeChar(desc);
-    const persona = personaOf(char.desc, Math.random());
+    const persona = who && C ? C.persona(who) : personaOf(char.desc, Math.random());
+    if (who && C) C.spawned.add(who.id);
     const ped = {
       char, x, z, y: 0, heading: Math.random() * Math.PI * 2, speed: 0, state: 'walk', t: 0, persona, seedT: Math.random() * 3,
       walkSpeed: (char.desc.elderly ? 0.85 : 1.2) + persona.hurry * 0.35 + Math.random() * 0.12, hp: 100, animAcc: 0,
@@ -211,6 +448,14 @@ export class Peds {
     return ped;
   }
   despawn(ped, i) {
+    // (children never stay out on their own: they go with whoever they came with)
+    if (ped.kids) { const K = ped.kids; ped.kids = null; for (const k of K) if (this.list.includes(k)) this.despawn(k); }
+    const C = this.game.census, r = ped.persona && ped.persona.r;
+    if (C && r) {
+      C.spawned.delete(r.id);
+      // gone in at a door: inside until what they went in for is over (not to be met again in the street meanwhile)
+      if (ped.gone) { const w = C.whereNow(r, this.game.sky.day || 0, this.game.sky.hour); const left = w && w.o ? Math.max(0.2, w.o.t1 - this.game.sky.hour) : 0.6; C.inside.set(r.id, this.game.time + left * 90); }
+    }
     if (ped.call) this.endCall(ped, ped.call.started || ped.call.delay <= 0);
     if (ped.follower && ped.follower.leader === ped) ped.follower.leader = null;
     if (ped.leader && ped.leader.follower === ped) ped.leader.follower = null;
@@ -222,6 +467,8 @@ export class Peds {
     if (ped.bench && !this.list.some((o) => o !== ped && o.bench === ped.bench)) ped.bench.used = false;
     if (ped.group && !(ped.group.members && ped.group.members.length)) ped.group.used = false;
     if (ped.fresco) this.leaveFresco(ped);
+    if (ped.terrace) { ped.terrace.taken = false; ped.terrace.npc = null; ped.terrace = null; }
+    if (ped.queue) { ped.queue.list = ped.queue.list.filter((m) => m !== ped); ped.queue = null; }
     this.list.splice(i ?? this.list.indexOf(ped), 1);
   }
 
@@ -246,6 +493,15 @@ export class Peds {
     const rnd = mulberry32(Math.floor(s.seed * 1e9) >>> 0);
     const seats = part === 'mañana' ? s.seats.slice(0, 2) : s.seats;
     grp.seats = seats.slice();
+    // who sits there: whoever lives in that house (the older ones first), then neighbours of the street
+    const C = g.census, who = [];
+    if (C) {
+      const hh = C.householdNear ? C.householdNear(s.x, s.z) : null;
+      if (hh) for (const id of hh.members) { const r = C.residents[id]; if (r.age >= 14 && !C.spawned.has(id)) who.push(r); }
+      who.sort((a, b) => b.age - a.age);
+      while (who.length < seats.length) { const nb = C.someoneFor(s.x, s.z, { old: rnd() < 0.7, within: 90, rnd }); if (!nb || who.includes(nb)) break; who.push(nb); }
+      grp.house = hh;
+    }
     seats.forEach((seat, si) => {
       const ch = new THREE.Mesh(G[s.kind], mat);
       ch.position.set(seat.x, 0, seat.z);
@@ -262,10 +518,11 @@ export class Peds {
       }
       desc.cane = false;
       const fx = Math.sin(seat.ang), fz = Math.cos(seat.ang);
-      const ped = this.spawnAt(seat.x + fx * 0.05, seat.z + fz * 0.05, desc);
+      const ped = this.spawnAt(seat.x + fx * 0.05, seat.z + fz * 0.05, who[si] ? null : desc, who[si] || null);
       ped.fixed = true; ped.fresco = grp; ped.seatIndex = si;
       ped.state = 'sit'; ped.heading = seat.ang;
-      ped.char.setBase(desc.elderly && desc.gender === 'f' && rnd() < 0.25 ? 'sitFan' : 'sitTalk');
+      const pd = ped.char.desc;
+      ped.char.setBase(pd.elderly && pd.gender === 'f' && rnd() < 0.25 ? 'sitFan' : 'sitTalk');
       grp.members.push(ped);
     });
     // in the evening there is often a chair left for whoever wants to sit a while
@@ -343,9 +600,13 @@ export class Peds {
       gs.used = true;
       gs.members = [];
       const n = 2 + Math.floor(Math.random() * 2);
+      const C = this.game.census;
+      const first = C ? C.someoneFor(gs.x, gs.z, { adult: true, within: 260 }) : null;
+      const mates = first ? [first, ...(first.friends || []).map((id) => C.residents[id]).filter((m) => m && !C.spawned.has(m.id))] : [];
       for (let k = 0; k < n; k++) {
         const a = (k / n) * Math.PI * 2 + Math.random() * 0.4;
-        const ped = this.spawnAt(gs.x + Math.cos(a) * 0.75, gs.z + Math.sin(a) * 0.75);
+        const who = mates[k] || (C ? C.someoneFor(gs.x, gs.z, first && first.age > 60 ? { old: true, within: 300 } : { adult: true, within: 300 }) : null);
+        const ped = this.spawnAt(gs.x + Math.cos(a) * 0.75, gs.z + Math.sin(a) * 0.75, null, who);
         this.joinGroup(ped, gs, a);
       }
       gs.chat = this.startChat(gs.members.slice(), 'plaza', { loop: true });
@@ -381,7 +642,7 @@ export class Peds {
     if (gs.chat) { gs.chat.members = gs.chat.members.filter((m) => m !== ped); gs.chat.t = Math.max(gs.chat.t, 3); }
     ped.chat = null; ped.group = null; ped.fixed = false;
     ped.char.setBase(null); ped.char.speaking = false; ped.char.lookAt(null);
-    this.rejoin(ped);
+    this.rejoin(ped, false);
     ped.state = 'walk';
     this.plan(ped);
     if (!others.length) { gs.used = false; gs.chat = null; }
@@ -398,6 +659,7 @@ export class Peds {
       if (hash1(Math.floor(b.x * 13 + b.z)) > 0.55) { b.used = true; continue; }
       b.used = true;
       const rnd = mulberry32(Math.floor(b.x * 7 + b.z * 3) >>> 0);
+      const C = this.game.census;
       const desc = randomDesc(rnd);
       desc.elderly = rnd() < 0.7;
       if (desc.elderly) { desc.hair = 6; if (desc.gender === 'm') { desc.accessory = 'boina'; desc.accessoryColor = '#2a2a2a'; } }
@@ -409,7 +671,10 @@ export class Peds {
         const o = two ? (k ? -0.42 : 0.42) : 0;
         const dk = k ? randomDesc(rnd) : desc;
         if (k) { dk.elderly = desc.elderly && rnd() < 0.8; if (dk.elderly) { dk.hair = 6; if (dk.gender === 'm') { dk.accessory = 'boina'; dk.accessoryColor = '#2a2a2a'; } } dk.cane = false; }
-        const ped = this.spawnAt(b.x + fx * 0.12 + lx * o, b.z + fz * 0.12 + lz * o, dk);
+        // (the people of the padrón: an older neighbour, and a friend of theirs beside them)
+        let who = null;
+        if (C) { const prev = sitters[0] && sitters[0].persona.r; who = prev && prev.friends ? prev.friends.map((id) => C.residents[id]).find((m) => m && !C.spawned.has(m.id)) || null : null; if (!who) who = C.someoneFor(b.x, b.z, { old: rnd() < 0.7, within: 260, rnd }); }
+        const ped = this.spawnAt(b.x + fx * 0.12 + lx * o, b.z + fz * 0.12 + lz * o, who ? null : dk, who);
         ped.fixed = true; ped.bench = b;
         ped.state = 'sit'; ped.heading = b.ang;
         ped.char.setBase(two ? 'sitTalk' : 'sit');
@@ -418,17 +683,81 @@ export class Peds {
       if (two) this.startChat(sitters, 'banco', { loop: true });
     }
   }
+  // the nearest free bench within r that can be walked to in a straight line (not across a street with traffic)
   freeBench(x, z, r) {
     let best = null, bd = r;
-    for (const b of this.benches) { if (b.used) continue; const d = Math.hypot(b.x - x, b.z - z); if (d < bd) { bd = d; best = b; } }
+    const map = this.map, open = (px, pz) => { const e = map.roadAt(px, pz, 0.3); return !e || e.closed; };
+    for (const b of this.benches) {
+      if (b.used) continue;
+      const d = Math.hypot(b.x - x, b.z - z);
+      if (d >= bd) continue;
+      if (!open(x + (b.x - x) / 3, z + (b.z - z) / 3) || !open(x + (b.x - x) * 2 / 3, z + (b.z - z) * 2 / 3) || map.collider.raycast(x, z, b.x, b.z, 1, 0.4) < 0.97) continue;
+      bd = d; best = b;
+    }
     return best;
   }
 
+  // the walking line of one side of a street: the middle of its pavement (never inside the houses: where the pavement
+  // is a mere strip, at the kerb)
   sidePoint(e, s, side, out) {
     polySample(e.pts, e.cum, clamp(s, 0, e.len), out);
-    const off = e.walkOnly ? (e.w / 2) * 0.6 : e.w / 2 + (e.sw > 0.5 ? e.sw * 0.5 : 0.6);
+    let off = e.walkOnly ? (e.w / 2) * 0.6 : e.w / 2 + (e.sw > 0.5 ? e.sw * 0.5 : 0.6);
+    if (!e.walkOnly && e.facade > 0) off = Math.max(e.w / 2 + 0.05, Math.min(off, e.facade / 2 - 0.42));
     out.x += -out.dz * off * side; out.z += out.dx * off * side;
     return out;
+  }
+  // the stretch of a street walked between its corners (to the kerb of the street it meets); the place they are going
+  // to, if it is on it, is always inside
+  walkSpan(e, goal) {
+    const na = this.map.nodes[e.a], nb = this.map.nodes[e.b], o = this._span || (this._span = { a: 0, b: 0 });
+    o.a = Math.min(e.len * 0.45, (na && na.degree >= 3 ? na.radius || 0 : 0) + 0.4);
+    o.b = Math.max(e.len * 0.55, e.len - (nb && nb.degree >= 3 ? nb.radius || 0 : 0) - 0.4);
+    if (goal && goal.edge === e) { o.a = Math.min(o.a, goal.s); o.b = Math.max(o.b, goal.s); }
+    return o;
+  }
+  // a lamp post, a bin, a tree, the chairs a neighbour has out on the pavement, someone standing still: round it on
+  // whichever side is free (off the kerb for a step if the pavement is narrow) and back onto the line once past it
+  // (m to the right of the way they walk)
+  wayRound(ped, e, dt) {
+    ped.wayT = (ped.wayT ?? Math.random() * 0.25) - dt;
+    if (ped.wayT > 0) return ped.way || 0;
+    ped.wayT = 0.25;
+    const col = this.map.collider, t = this._wt || (this._wt = {}), p = this._wp || (this._wp = { x: 0, z: 0 });
+    const still = this._still || (this._still = []);
+    still.length = 0;
+    for (const o of this.list) {
+      if (o === ped || o.speed > 0.25 || o === ped.leader || o === ped.follower || o.state === 'dead' || o.state === 'lie' || o.state === 'fly') continue;
+      if (Math.abs(o.x - ped.x) < 3.5 && Math.abs(o.z - ped.z) < 3.5) still.push(o);
+    }
+    const free = (o) => {
+      for (let f = 0.7; f < 2.2; f += 0.7) {
+        this.sidePoint(e, ped.s + ped.dir * f, ped.side, t);
+        const x = t.x - t.dz * ped.dir * o, z = t.z + t.dx * ped.dir * o;
+        p.x = x; p.z = z;
+        if (col.resolveCircle(p, 0.3).hit && Math.abs(p.x - x) + Math.abs(p.z - z) > 0.06) return false;
+        for (const q of still) if (Math.abs(q.x - x) < 0.62 && Math.abs(q.z - z) < 0.62) return false;
+      }
+      return true;
+    };
+    const cur = ped.way || 0;
+    if (free(0)) return (ped.way = 0);
+    if (cur && Math.abs(cur) <= 1.3 && free(cur)) return cur;
+    const fac = ped.side * ped.dir; // (the house side of the line; the other way is the road)
+    for (const m of [0.45, 0.9, 1.3]) for (const k of [fac, -fac]) if (free(k * m)) return (ped.way = k * m);
+    return cur;
+  }
+  // a footpath that comes out across a street: at the kerb, a look both ways and the cars let by before stepping out
+  kerbAhead(ped) {
+    const map = this.map;
+    const ax = ped.x + Math.sin(ped.heading) * 1.2, az = ped.z + Math.cos(ped.heading) * 1.2;
+    const road = map.roadAt(ax, az, 0.15);
+    if (!road) { if (ped.kerbOk && !map.roadAt(ped.x, ped.z, 0.15)) ped.kerbOk = null; return false; }
+    if (road === ped.kerbOk || map.roadAt(ped.x, ped.z, 0.15)) return false; // (already on their way over)
+    const T = this.game.traffic, Z = T && T.zebrasOn ? T.zebrasOn(road) : null;
+    const q = polyNearest(road.pts, road.cum, ax, az);
+    const z = Z && Z.find((k) => Math.abs(k.s - q.s) < 4);
+    ped.state = 'kerb'; ped.kerb = { road, s: q.s, zebra: z ? z.key : null, t: 0.5 + Math.random() * 0.8, waitT: 0 };
+    return true;
   }
 
   updatePed(ped, dt, dPlayer) {
@@ -440,19 +769,32 @@ export class Peds {
         const e = ped.edge;
         if (!e) { ped.state = 'idle'; break; }
         const sp = ped.walkSpeed * (ped.slowK ?? 1);
-        ped.s += ped.dir * sp * dt;
+        // along the street by what their feet really covered (someone held up by a lamp post or a group does not run on
+        // ahead of themselves, to cut across the road after it to catch up)
+        if (ped.ledge === e) ped.s += ped.dir * clamp((ped.x - ped.lx) * ped.ltx + (ped.z - ped.lz) * ped.ltz, 0, sp * dt * 2 + 0.05);
+        else ped.s += ped.dir * sp * dt;
         const last = ped.route && ped.ri === ped.route.length - 1;
         // on the street of the place they are going to: the right side of it first (crossing where it is clear)
         if (last && ped.goal && ped.side !== ped.goal.side && Math.abs(ped.s - ped.goal.s) < 16) { this.startCross(ped); break; }
+        // there (or as near as the people already there let them get: they wait at the back of the crowd)
         if (last && ped.goal && (ped.dir > 0 ? ped.s >= ped.goal.s - 0.3 : ped.s <= ped.goal.s + 0.3)) { this.arrive(ped); break; }
-        if (ped.s < 0 || ped.s > e.len) this.nextEdge(ped);
-        const ee = ped.edge, na = this.map.nodes[ee.a], nb = this.map.nodes[ee.b];
-        const ra = Math.min(ee.len * 0.45, (na && na.degree >= 3 ? na.radius || 0 : 0) + 0.4), rb = Math.max(ee.len * 0.55, ee.len - (nb && nb.degree >= 3 ? nb.radius || 0 : 0) - 0.4);
-        const tgt = this.sidePoint(ee, clamp(ped.s + ped.dir * 1.5, ra, rb), ped.side, this.tmp);
+        if (last && ped.goal && ped.goal.open && (ped.slowK ?? 1) < 0.6 && Math.abs(ped.s - ped.goal.s) < 7) { this.arrive(ped); break; }
+        // round the corner as soon as they are at it (not standing there while the junction goes by)
+        let span = this.walkSpan(e, last && ped.goal);
+        if (ped.dir > 0 ? ped.s >= span.b : ped.s <= span.a) { this.nextEdge(ped); span = this.walkSpan(ped.edge, ped.route && ped.ri === ped.route.length - 1 && ped.goal); }
+        const ee = ped.edge;
+        // a footpath that comes out across a street: they stop at the kerb first
+        if (ee.walkOnly && this.kerbAhead(ped)) break;
+        const tgt = this.sidePoint(ee, clamp(ped.s + ped.dir * 1.5, span.a, span.b), ped.side, this.tmp);
+        if (Math.hypot(tgt.x - ped.x, tgt.z - ped.z) > 24) { this.rejoin(ped); break; } // (lost their street: the one they are in)
+        const tx = this.tmp.dx * ped.dir, tz = this.tmp.dz * ped.dir;
         // keep to the right of whoever comes the other way, round whoever stands in the way, overtake the slow
         let lat = this.avoid(ped, dt);
-        if (lat) { const room = e.walkOnly ? 1.2 : Math.max(0.3, (e.sw || 0) * 0.45); lat = clamp(lat, -room, room); } // (a step aside, not off the kerb)
-        if (lat) { const tx = this.tmp.dx * ped.dir, tz = this.tmp.dz * ped.dir; tgt.x += -tz * lat; tgt.z += tx * lat; }
+        if (lat) { const room = ee.walkOnly ? 1.2 : Math.max(0.3, (ee.sw || 0) * 0.45); lat = clamp(lat, -room, room); } // (a step aside, not off the kerb)
+        // and round whatever stands on the pavement
+        lat = clamp(lat + this.wayRound(ped, ee, dt), -1.5, 1.5);
+        if (lat) { tgt.x += -tz * lat; tgt.z += tx * lat; }
+        ped.lx = ped.x; ped.lz = ped.z; ped.ltx = tx; ped.ltz = tz; ped.ledge = ee;
         this.steerTo(ped, tgt.x, tgt.z, sp, dt);
         // someone stops to read a message now and then; a wanderer stops to look about
         if (ped.persona.age !== 'mayor' && ped.t > 30 && Math.random() < dt * 0.003) { ped.state = 'idle'; ped.idleT = 3 + Math.random() * 4; ped.char.setBase('phone'); ped.t = 0; }
@@ -464,6 +806,7 @@ export class Peds {
         ped.idleT -= dt;
         if (ped.idleT <= 0) {
           if (!ped.group) ped.char.setBase(null);
+          if (ped.waitAt) { const w = ped.waitAt; ped.waitAt = null; if (this.pickUpKids(ped, w)) { ped.idleT = 4 + Math.random() * 2.5; break; } } // (the children run over; then home)
           if (ped.resume === 'window' || ped.resume === 'stroll') { ped.state = ped.resume; ped.resume = null; break; }
           ped.resume = null;
           ped.state = ped.edge ? 'walk' : 'idle'; ped.idleT = 5;
@@ -474,7 +817,7 @@ export class Peds {
       case 'exit': {
         // out of their door and onto the pavement
         const t = ped.exitTo;
-        if (!t || Math.hypot(t.x - ped.x, t.z - ped.z) < 0.4) { ped.state = 'walk'; ped.exitTo = null; if (!ped.route) this.plan(ped); break; }
+        if (!t || Math.hypot(t.x - ped.x, t.z - ped.z) < 0.4 || ped.t > 8) { ped.state = 'walk'; ped.exitTo = null; if (!ped.route) this.plan(ped); break; } // (or as near as the people at the door let them)
         this.steerTo(ped, t.x, t.z, ped.walkSpeed * 0.8, dt);
         break;
       }
@@ -491,15 +834,34 @@ export class Peds {
         }
         if (c.phase === 'look') {
           ped.speed = lerp(ped.speed, 0, 1 - Math.exp(-8 * dt));
-          c.t -= dt;
+          c.t -= dt; c.waitT += dt;
+          // at the kerb, facing the road, a look one way and the other
+          const tt = this.sidePoint(e, c.s, -c.to, this.tmp2 || (this.tmp2 = {}));
+          ped.heading = dampAngle(ped.heading, Math.atan2(tt.x - ped.x, tt.z - ped.z), 4, dt);
           const t = polySample(e.pts, e.cum, clamp(c.s + (Math.floor(c.t * 1.3) % 2 ? 9 : -9), 0, e.len), this.tmp);
           ped.char.lookAt((ped._lc || (ped._lc = new THREE.Vector3())).set(t.x, 1.0, t.z));
-          if (c.t <= 0 && (this.clearToCross(ped) || c.t < -14)) { c.phase = 'go'; ped.char.lookAt(null); }
+          if (c.t <= 0 && this.clearToCross(ped)) { c.phase = 'go'; ped.char.lookAt(null); }
         } else {
           const t = this.sidePoint(e, c.s + ped.dir * 1.2, c.to, this.tmp);
           this.steerTo(ped, t.x, t.z, ped.walkSpeed * 1.15, dt);
-          if (Math.hypot(t.x - ped.x, t.z - ped.z) < 0.5) { ped.side = c.to; ped.walkSide = ped.side * ped.dir; ped.s = c.s + ped.dir * 1.2; ped.cross = null; ped.state = 'walk'; }
+          if (Math.hypot(t.x - ped.x, t.z - ped.z) < 0.5) {
+            ped.side = c.to; ped.s = c.s + ped.dir * 1.2; ped.cross = null; ped.state = 'walk';
+            // (crossed at a zebra or a corner behind them: back along this side to where they were going)
+            if (ped.goal && ped.route && ped.ri === ped.route.length - 1 && ped.goal.edge === e) { ped.dir = ped.goal.s >= ped.s ? 1 : -1; ped.route[ped.ri].dir = ped.dir; }
+            ped.walkSide = ped.side * ped.dir;
+          }
         }
+        break;
+      }
+      case 'kerb': {
+        // where a footpath crosses a street: a look one way and the other, the cars let by, then over
+        const k = ped.kerb;
+        ped.speed = lerp(ped.speed, 0, 1 - Math.exp(-8 * dt));
+        if (!k) { ped.state = 'walk'; break; }
+        k.t -= dt; k.waitT += dt;
+        const t = polySample(k.road.pts, k.road.cum, clamp(k.s + (Math.floor(k.t * 1.3) % 2 ? 9 : -9), 0, k.road.len), this.tmp);
+        ped.char.lookAt((ped._lc || (ped._lc = new THREE.Vector3())).set(t.x, 1.0, t.z));
+        if ((k.t <= 0 && this.clearToCross(ped, k.road, !!k.zebra, k.waitT)) || k.waitT > 60) { ped.kerbOk = k.road; ped.kerb = null; ped.state = 'walk'; ped.char.lookAt(null); }
         break;
       }
       case 'enter': {
@@ -528,7 +890,7 @@ export class Peds {
         // round the plaza or the park at an easy pace, a stop here and there
         const t = ped.strollTo;
         ped.strollT -= dt;
-        if (ped.strollT <= 0 || !t) { this.rejoin(ped); ped.state = 'walk'; this.plan(ped); break; }
+        if (ped.strollT <= 0 || !t) { this.rejoin(ped, false); ped.state = 'walk'; this.plan(ped); break; }
         if (Math.hypot(t.x - ped.x, t.z - ped.z) < 0.6) {
           if (ped.goal) ped.strollTo = this.pointNear(ped.goal.x, ped.goal.z, 9);
           ped.state = 'idle'; ped.idleT = 3 + Math.random() * 7; ped.resume = 'stroll';
@@ -539,7 +901,8 @@ export class Peds {
       }
       case 'toBench': {
         const b = ped.bench;
-        if (!b) { ped.state = 'stroll'; break; }
+        if (b && ped.t > 45) { b.used = false; ped.bench = null; } // (could not get to it: never mind)
+        if (!ped.bench) { ped.state = 'stroll'; ped.strollT = ped.strollT || 20; ped.strollTo = ped.strollTo || (ped.goal && this.pointNear(ped.goal.x, ped.goal.z, 9)); break; }
         const fx = Math.sin(b.ang), fz = Math.cos(b.ang), bx = b.x + fx * 0.12, bz = b.z + fz * 0.12;
         if (Math.hypot(bx - ped.x, bz - ped.z) < 0.35) { ped.x = bx; ped.z = bz; ped.heading = b.ang; ped.state = 'sit'; ped.sitT = 50 + Math.random() * 160; ped.char.setBase('sit'); break; }
         this.steerTo(ped, bx, bz, ped.walkSpeed * 0.8, dt);
@@ -548,22 +911,45 @@ export class Peds {
       case 'follow': {
         // walking with someone: at their side, at their pace (and where they go in, in too)
         const L = ped.leader;
-        if (!L || !this.list.includes(L) || L.state === 'dead' || L.state === 'fly' || L.state === 'lie') { ped.leader = null; this.rejoin(ped); ped.state = 'walk'; this.plan(ped); break; }
+        if (!L || !this.list.includes(L) || L.state === 'dead' || L.state === 'fly' || L.state === 'lie') { ped.leader = null; this.rejoin(ped, false); ped.state = 'walk'; this.plan(ped); break; }
         if (L.state === 'flee') { ped.state = 'flee'; ped.fear = 1; ped.threat = L.threat; break; }
         if (L.state === 'enter' && L.goal) { ped.goal = L.goal; ped.state = 'enter'; ped.enterPhase = 0; break; }
         const hx = Math.sin(L.heading), hz = Math.cos(L.heading);
         const moving = L.speed > 0.3;
-        let ox = hz * 0.68, oz = -hx * 0.68; // (at their right)
+        const k = ped.slot || 0;
+        let ix = hz, iz = -hx; // (the inner side: at their right, or away from the road)
         const le = L.edge;
+        let narrow = false;
         if (le && moving && L.state === 'walk') {
           const q = polySample(le.pts, le.cum, clamp(L.s, 0, le.len), this.tmp2 || (this.tmp2 = {}));
-          if (!le.walkOnly && (le.sw || 0) < 1.3) { ox = -hx * 0.9; oz = -hz * 0.9; } // a narrow pavement: one behind the other
-          else if (!le.walkOnly) { ox = -q.dz * L.side * 0.68; oz = q.dx * L.side * 0.68; } // the side away from the road
+          if (!le.walkOnly && (le.sw || 0) < 1.3) narrow = true; // a narrow pavement: one behind the other
+          else if (!le.walkOnly) { ix = -q.dz * L.side; iz = q.dx * L.side; } // the side away from the road (the children too)
         }
-        const tx = L.x + ox * (moving ? 1 : 0.9) - hx * (moving ? 0.1 : -0.55), tz = L.z + oz * (moving ? 1 : 0.9) - hz * (moving ? 0.1 : -0.55);
+        let ox, oz;
+        if (narrow) { ox = -hx * 0.9 * (k + 1); oz = -hz * 0.9 * (k + 1); }
+        else if (k === 0) { ox = ix * (ped.child ? 0.62 : 0.68); oz = iz * (ped.child ? 0.62 : 0.68); }
+        else if (k === 1) { ox = ix * 0.3 - hx * 0.85; oz = iz * 0.3 - hz * 0.85; }
+        else { ox = -ix * 0.4 - hx * 0.85; oz = -iz * 0.4 - hz * 0.85; }
+        const tx = L.x + ox * (moving ? 1 : 0.9) - hx * (moving ? 0.1 : k ? 0 : -0.55), tz = L.z + oz * (moving ? 1 : 0.9) - hz * (moving ? 0.1 : k ? 0 : -0.55);
         const d = Math.hypot(tx - ped.x, tz - ped.z);
         if (d < 0.12 && !moving) { ped.speed = lerp(ped.speed, 0, 1 - Math.exp(-8 * dt)); ped.heading = dampAngle(ped.heading, L.heading + (L.state === 'idle' ? -1.2 : 0), 4, dt); break; }
-        this.steerTo(ped, tx, tz, clamp(L.speed * (1 + (d - 0.15) * 0.8), 0, L.walkSpeed * 1.5), dt);
+        const catchUp = d > 0.7 ? Math.min(ped.child ? 2.8 : 1.9, 0.7 + d * 0.45) : 0; // (a child runs over to them)
+        this.steerTo(ped, tx, tz, Math.max(catchUp, clamp(L.speed * (1 + (d - 0.15) * 0.8), 0, L.walkSpeed * 1.5)), dt);
+        break;
+      }
+      case 'queue': {
+        // in the queue: to my place in it, facing the door; the first one goes in when it is their turn
+        const q = ped.queue;
+        if (!q || !q.list.includes(ped)) { ped.queue = null; ped.state = 'enter'; ped.enterPhase = 0; break; }
+        const i = q.list.indexOf(ped);
+        const t = this.queueSlot(q, i, this.tmp);
+        const d = Math.hypot(t.x - ped.x, t.z - ped.z);
+        if (d > 0.18) this.steerTo(ped, t.x, t.z, Math.min(ped.walkSpeed, 0.4 + d), dt);
+        else { ped.speed = lerp(ped.speed, 0, 1 - Math.exp(-8 * dt)); ped.heading = dampAngle(ped.heading, Math.atan2(q.place.x - ped.x, q.place.z - ped.z), 3, dt); }
+        if (i === 0 && d < 0.6) {
+          ped.qT -= dt;
+          if (ped.qT <= 0) { q.list.splice(0, 1); ped.queue = null; ped.state = 'enter'; ped.enterPhase = 0; ped.t = 0; }
+        }
         break;
       }
       case 'chat': {
@@ -571,7 +957,11 @@ export class Peds {
         ped.speed = lerp(ped.speed, 0, 1 - Math.exp(-8 * dt));
         const o = ped.chatWith;
         if (o) ped.heading = dampAngle(ped.heading, Math.atan2(o.x - ped.x, o.z - ped.z), 5, dt);
-        if (!ped.chat || ped.chat.done) { ped.char.setBase(null); ped.chat = null; ped.chatWith = null; this.rejoin(ped); ped.state = 'walk'; this.plan(ped); }
+        if (!ped.chat || ped.chat.done) {
+          ped.char.setBase(null); ped.chat = null; ped.chatWith = null;
+          if (ped.waitAt) { ped.state = 'idle'; ped.idleT = 1.5 + Math.random() * 4; break; } // (still waiting at the school gate)
+          this.rejoin(ped, false); ped.state = 'walk'; this.plan(ped);
+        }
         break;
       }
       case 'call': {
@@ -613,7 +1003,7 @@ export class Peds {
         ped.speed = 0;
         if (ped.sitT !== undefined && !ped.fixed) {
           ped.sitT -= dt;
-          if (ped.sitT <= 0) { ped.sitT = undefined; if (ped.bench) ped.bench.used = false; ped.bench = null; ped.char.setBase(null); this.rejoin(ped); ped.state = 'walk'; this.plan(ped); break; }
+          if (ped.sitT <= 0) { ped.sitT = undefined; if (ped.bench) ped.bench.used = false; ped.bench = null; ped.char.setBase(null); this.rejoin(ped, false); ped.state = 'walk'; this.plan(ped); break; }
         }
         if (ped.fear > 0.6) { ped.char.setBase(null); ped.char.speaking = false; ped.char.lookAt(null); ped.state = 'flee'; ped.fixed = false; if (ped.bench) ped.bench.used = false; }
         break;
@@ -701,6 +1091,8 @@ export class Peds {
         break;
       }
     }
+    // up from a terrace chair (for whatever reason): the chair is free again
+    if (ped.terrace && ped.state !== 'sit') { ped.terrace.taken = false; ped.terrace.npc = null; ped.terrace = null; }
     // collisions with walls & player; reactions
     // guns pointed at you: hands up
     const W = g.weapons;
@@ -711,7 +1103,7 @@ export class Peds {
     }
     // walls stop everyone on their feet — witnesses running off to phone the police too (they used to go through them)
     const st = ped.state;
-    if (st === 'walk' || st === 'flee' || st === 'idle' || st === 'fight' || st === 'call' || st === 'cross' || st === 'stroll' || st === 'follow' || st === 'window' || st === 'chat' || st === 'toBench') {
+    if (st === 'walk' || st === 'flee' || st === 'idle' || st === 'fight' || st === 'call' || st === 'cross' || st === 'kerb' || st === 'stroll' || st === 'follow' || st === 'window' || st === 'chat' || st === 'toBench' || st === 'queue') {
       const pos = { x: ped.x, z: ped.z };
       g.map.collider.resolveCircle(pos, 0.3);
       ped.x = pos.x; ped.z = pos.z;
@@ -743,8 +1135,10 @@ export class Peds {
         ped.px = ped.x; ped.pz = ped.z;
         if (moved < 0.35) {
           ped.stuckN = (ped.stuckN || 0) + 1;
-          if (ped.stuckN === 2) ped.side = -ped.side;
-          else if (ped.stuckN === 3) ped.dir = -ped.dir;
+          // (a bigger step aside, off the kerb if need be; then back the other way, by another route if they are going
+          // somewhere; never over to the other side without looking)
+          if (ped.stuckN === 2) { ped.way = -ped.side * ped.dir * 1.1; ped.wayT = 1.6; }
+          else if (ped.stuckN === 3) { ped.way = 0; ped.dir = -ped.dir; if (ped.goal && !this.plan(ped, ped.goal)) ped.goal = null; }
           else if (ped.stuckN >= 4) { this.rescue(ped); ped.stuckN = 0; }
         } else ped.stuckN = 0;
       }
@@ -778,26 +1172,62 @@ export class Peds {
   plan(ped, goal = null) {
     const g = this.game;
     if (!this.places || !ped.edge) { ped.goal = null; ped.route = null; return false; }
-    const gl = goal || this.places.choose(ped.persona, g.sky.hour, weekday(g.sky), ped.x, ped.z);
+    const gl = this.onStreet(goal || this.nextPlace(ped) || this.places.choose(ped.persona, g.sky.hour, weekday(g.sky), ped.x, ped.z));
     const r = gl && routeBetween(this.map, { edge: ped.edge, s: clamp(ped.s, 0, ped.edge.len) }, { edge: gl.edge, s: gl.s }, this.walkOk);
     if (!r) { ped.goal = null; ped.route = null; return false; }
     ped.walkSide = ped.walkSide || (ped.side * ped.dir) || 1;
     ped.goal = gl; ped.route = r; ped.ri = 0;
     if (r[0].edge !== ped.edge) { ped.edge = r[0].edge; ped.s = r[0].dir > 0 ? 0.5 : ped.edge.len - 0.5; }
     ped.dir = r[0].dir;
-    ped.side = ped.walkSide * ped.dir;
+    // (turning round, they stay on the pavement they are on: over to the other side only at a corner or a zebra)
+    ped.side = ped.side || ped.walkSide * ped.dir;
+    ped.walkSide = ped.side * ped.dir;
     ped.t = 0;
     if (ped.follower) { ped.walkSpeed = Math.min(ped.walkSpeed, ped.follower.walkSpeed); }
     return true;
+  }
+  // a place given only by a point (a relative's front door, the chairs at a door): the pavement in front of it
+  onStreet(pl) {
+    if (!pl || pl.edge) return pl;
+    if (pl._street !== undefined) return pl._street;
+    const q = this.map.nearestEdge(pl.x, pl.z, 25, this.walkOk);
+    if (!q || q.d > 25) return (pl._street = null);
+    const t = this.map.sample(q.edge, q.s, {}), d = pl.door;
+    const side = (pl.x - t.x) * -t.dz + (pl.z - t.z) * t.dx >= 0 ? 1 : -1;
+    return (pl._street = { ...pl, edge: q.edge, s: q.s, side, fx: d ? d.wx : pl.x, fz: d ? d.wz : pl.z });
+  }
+  // a neighbour's next place, by their day (census.js): where they are going now, or home
+  nextPlace(ped) {
+    const C = this.game.census, r = ped.persona && ped.persona.r;
+    if (!C || !r) return null;
+    const g = this.game, h = g.sky.hour, day = g.sky.day || 0;
+    const w = C.whereNow(r, day, h);
+    if (w && w.phase === 'ida' && w.o.place && !w.o.fuera) return w.o.place;
+    // between outings: the next one if it is close, else home
+    const plan = C.day(r, day);
+    const nx = plan.find((o) => o.t0 > h && o.t0 - h < 0.6 && o.place && !o.fuera && o.kind !== 'fresco');
+    if (nx && Math.random() < 0.6) return nx.place;
+    return this.homePlace(r);
   }
   arrive(ped) {
     const gl = ped.goal;
     ped.route = null;
     if (!gl) { ped.state = 'walk'; return; }
+    // the school gate: wait there for the children (standing about with the other parents)
+    if (gl.kind === 'colegio') {
+      if (ped.kids && ped.kids.length) { this.dropKids(ped); ped.state = 'idle'; ped.idleT = 6 + Math.random() * 10; ped.waitAt = null; return; }
+      const h = this.game.sky.hour;
+      ped.state = 'idle'; ped.idleT = h < 11 ? 6 + Math.random() * 12 : h < 14 ? Math.max(8, (14.05 - h) * 90) + Math.random() * 10 : 4 + Math.random() * 6; ped.waitAt = h > 13 ? gl : null;
+      const m = this.list.find((q) => q !== ped && q.waitAt === gl && !q.chat && q.state === 'idle' && Math.hypot(q.x - ped.x, q.z - ped.z) < 6);
+      if (m && Math.random() < 0.6) this.pairChat(ped, m, 'calle');
+      return;
+    }
+    // the bakery in the morning: the queue at the door
+    if (gl.kind === 'pan' && this.queueUp(ped, gl)) return;
     if (gl.open) {
       // a plaza or a park: a bench for the older ones, a chat if someone is about, a stroll
       const b = ped.persona.age !== 'joven' && Math.random() < 0.55 ? this.freeBench(ped.x, ped.z, 32) : null;
-      if (b && !ped.follower) { b.used = true; ped.bench = b; ped.state = 'toBench'; return; }
+      if (b && !ped.follower) { b.used = true; ped.bench = b; ped.state = 'toBench'; ped.t = 0; return; }
       const gs = (this.groupSpots || []).find((q) => q.used && q.members && q.members.length && q.members.length < 4 && Math.hypot(q.x - ped.x, q.z - ped.z) < 25);
       if (gs && !ped.follower && Math.random() < 0.5) {
         const m0 = gs.members[0];
@@ -814,23 +1244,62 @@ export class Peds {
     if (gl.kind === 'tienda' && Math.random() < 0.55) { ped.state = 'window'; ped.windowT = 5 + Math.random() * 9; return; }
     ped.state = 'enter'; ped.enterPhase = 0; ped.t = 0;
   }
+  // the queue at the bakery door in the morning: one behind the other along the pavement, in turn
+  queueUp(ped, gl) {
+    const h = this.game.sky.hour;
+    if (h < 8 || h > 11.5) return false;
+    const Q = this.queues || (this.queues = new Map());
+    let q = Q.get(gl);
+    if (!q) { q = { place: gl, list: [], dir: hash1(Math.floor(gl.x * 7 + gl.z)) < 0.5 ? 1 : -1, t: 0 }; Q.set(gl, q); }
+    q.list = q.list.filter((m) => this.list.includes(m) && m.state === 'queue');
+    if (q.list.length >= 5) return false;
+    q.list.push(ped);
+    ped.state = 'queue'; ped.queue = q; ped.qT = 7 + Math.random() * 8;
+    if (q.list.length > 1 && Math.random() < 0.6) {
+      const prev = q.list[q.list.length - 2];
+      const C = this.game.census, a = prev.persona && prev.persona.r, b = ped.persona && ped.persona.r;
+      const ac = C && a && b ? C.acquaintance(a, b) : 0;
+      this.say(ped, ac >= 2 ? fillLine(pick(['¿Quién es la última? ¿Tú, @?', '¡Buenos días, @! ¿Eres la última?', '¿Va mucha gente delante, @?']), ped.persona, prev.persona) : pick(['¿Quién es el último?', '¿La última?', 'Buenos días. ¿Quién da la vez?']));
+      this.later.push({ ped: prev, t: 1.2, text: pick(['Yo, yo soy [el último|la última].', 'Detrás de mí.', 'Aquí, conmigo.']) });
+    }
+    return true;
+  }
+  queueSlot(q, i, out) {
+    const gl = q.place;
+    const t = this.sidePoint(gl.edge, clamp(gl.s + q.dir * (0.6 + i * 0.85), 0, gl.edge.len), gl.side, out);
+    // (the first one right by the door)
+    if (i === 0) { t.x += (gl.x - t.x) * 0.6; t.z += (gl.z - t.z) * 0.6; }
+    return t;
+  }
   // somewhere to stand within r of (x, z), out in the open
-  pointNear(x, z, r) {
-    for (let k = 0; k < 10; k++) {
+  // a spot near (x, z) in the open, in a straight line from it (and, for a stroll, off the carriageways)
+  pointNear(x, z, r, offRoad = true) {
+    const map = this.map;
+    for (let k = 0; k < 14; k++) {
       const a = Math.random() * Math.PI * 2, d = Math.random() * r;
       const px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
-      if (!this.map.buildingAt(px, pz) && this.map.collider.raycast(x, z, px, pz, 1, 0.4) > 0.98) return { x: px, z: pz };
+      if (map.buildingAt(px, pz) || map.collider.raycast(x, z, px, pz, 1, 0.4) <= 0.98) continue;
+      if (offRoad) { const a = map.roadAt(px, pz, 0.7), b = map.roadAt((x + px) / 2, (z + pz) / 2, 0.2); if ((a && !a.closed) || (b && !b.closed)) continue; } // (a street closed to traffic is for walking)
+      return { x: px, z: pz };
     }
     return { x, z };
   }
+  // over to the other side: at a zebra crossing if there is one within 40 m (art. 124), else at the corner of the
+  // street (the shortest way across), and only in the middle of a street with nothing better near
   startCross(ped) {
+    const e = ped.edge, T = this.game.traffic;
     ped.state = 'cross';
-    ped.cross = { phase: 'look', t: 0.7 + Math.random() * 0.8, s: ped.s, to: -ped.side };
-    // a zebra crossing a little way along this street: over there, not just anywhere
-    const zs = this.zebrasOf(ped.edge);
+    ped.cross = { phase: 'look', t: 0.7 + Math.random() * 0.8, s: ped.s, to: -ped.side, waitT: 0 };
+    const Z = T && T.zebrasOn ? T.zebrasOn(e) : null;
     let best = null;
-    for (const zs1 of zs) if (Math.abs(zs1 - ped.s) < 35 && (!best || Math.abs(zs1 - ped.s) < Math.abs(best - ped.s))) best = zs1;
-    if (best !== null && Math.abs(best - ped.s) > 1.5) { ped.cross.s = best; ped.cross.phase = 'walkTo'; }
+    if (Z) for (const z of Z) if (Math.abs(z.s - ped.s) < 40 && (!best || Math.abs(z.s - ped.s) < Math.abs(best.s - ped.s))) best = z;
+    if (best) { ped.cross.zebra = best.key; ped.cross.s = best.s; if (Math.abs(best.s - ped.s) > 1.5) ped.cross.phase = 'walkTo'; return; }
+    // the nearest corner (where the street meets another), if it is not far
+    const na = this.map.nodes[e.a], nb = this.map.nodes[e.b];
+    const sa = na && na.degree >= 3 ? Math.min(e.len * 0.45, na.radius + 1.6) : null, sb = nb && nb.degree >= 3 ? Math.max(e.len * 0.55, e.len - nb.radius - 1.6) : null;
+    let cs = null;
+    for (const c of [sa, sb]) if (c !== null && Math.abs(c - ped.s) < 28 && (cs === null || Math.abs(c - ped.s) < Math.abs(cs - ped.s))) cs = c;
+    if (cs !== null) { ped.cross.s = cs; ped.cross.corner = true; if (Math.abs(cs - ped.s) > 1.5) ped.cross.phase = 'walkTo'; }
   }
   // where the zebra crossings are along an edge (the crossing points of the map within 4 m of it)
   zebrasOf(e) {
@@ -849,14 +1318,29 @@ export class Peds {
     this._zebras.set(e.id, a);
     return a;
   }
-  // nothing coming: no car within a few metres, none heading this way along the street
-  clearToCross(ped) {
+  // safe to step out? At a zebra the cars give way: nobody so close or so fast that they could not stop (and a car
+  // already stopped there is waiting for you). Elsewhere: no car that would get here while you are still in the road
+  // (the street's width at a walk, and two seconds to spare)
+  clearToCross(ped, e = ped.edge, zebra = !!(ped.cross && ped.cross.zebra), waitT = ped.cross ? ped.cross.waitT : 0) {
+    const width = (e ? e.w : 6) + 1.2, tCross = width / Math.max(0.9, ped.walkSpeed * 1.15);
+    const patience = clamp(1 - waitT / 40, 0.5, 1); // (after a long wait, a smaller gap will do)
     for (const v of this.game.fleet.vehicles) {
+      if (v.sleeping || v.dead) continue;
       const dx = ped.x - v.x, dz = ped.z - v.z, d = Math.hypot(dx, dz);
-      if (d > 28) continue;
-      const sp = Math.hypot(v.vx || 0, v.vz || 0);
-      if (d < 5 && sp > 0.4) return false;
-      if (sp > 1.5 && (v.vx * dx + v.vz * dz) / (sp * d) > 0.55) return false;
+      if (d > 70) continue;
+      const sp = Math.max(0, v.vel !== undefined ? v.vel : Math.hypot(v.vx || 0, v.vz || 0));
+      if (d < 4.5 && sp > 0.4) return false;
+      if (sp < 0.4) continue;
+      // is it coming this way, and does its path go by here?
+      const fx = Math.sin(v.heading), fz = Math.cos(v.heading);
+      const lf = dx * fx + dz * fz, lr = Math.abs(-dx * fz + dz * fx);
+      if (lf < -2 || lr > width * 0.6 + 2) continue;
+      const tArrive = Math.max(0, lf - v.hl) / sp;
+      if (zebra) {
+        // a driver who can still stop comfortably will (traffic.js gives way at the zebras)
+        const canStop = sp * sp / (2 * 2.6) < Math.max(0, lf - v.hl - 2.5);
+        if (!canStop || (v.driver === 'player' && tArrive < 4)) return false;
+      } else if (tArrive < (tCross + 2) * patience) return false;
     }
     return true;
   }
@@ -904,30 +1388,41 @@ export class Peds {
       if (Math.sin(a.heading) * Math.sin(b.heading) + Math.cos(a.heading) * Math.cos(b.heading) > -0.4) continue; // (they meet, face to face)
       if (a.passed === b || b.passed === a || a.greetedT > now - 25 || b.greetedT > now - 25) continue;
       a.passed = b; b.passed = a;
-      const k = (a.persona.age === 'mayor' || b.persona.age === 'mayor' ? 0.75 : 0.35) * (a.persona.chatty + b.persona.chatty) * 0.6;
+      // do they know each other? (in a town of six thousand, most do by sight; family and friends by name)
+      const C = this.game.census, ra = a.persona.r, rb = b.persona.r;
+      const ac = C && ra && rb ? C.acquaintance(ra, rb) : 1;
+      if (!ac) continue;
+      // (in a crowd — the mercadillo, the evening walk — nobody greets everyone they know by sight: only now and then)
+      const k = (a.persona.age === 'mayor' || b.persona.age === 'mayor' ? 0.75 : 0.35) * (a.persona.chatty + b.persona.chatty) * 0.6 * (ac === 1 ? Math.min(1, 14 / W.length) : 1) + (ac >= 3 ? 0.4 : 0);
       if (Math.random() > k) continue;
-      const L = pick(PASSING[part] || PASSING.tarde);
       a.greetedT = b.greetedT = now;
-      this.say(a, fillLine(L[0], a.persona, b.persona));
-      this.later.push({ ped: b, t: 1.1 + Math.random() * 0.5, text: fillLine(L[1], b.persona, a.persona) });
-      // now and then the two of them stop for a chat
-      if (Math.random() < (a.persona.age === 'mayor' && b.persona.age === 'mayor' ? 0.35 : 0.12) && !a.follower && !b.follower) this.pairChat(a, b, 'calle');
+      if (ac === 1) { // by sight: the town's «¡Adiós!» in passing
+        const pd = part === 'madrugada' ? 'noche' : part;
+        this.say(a, fillLine(pick(BY_SIGHT[pd][a.persona.age] || BY_SIGHT[pd].adulto), a.persona, b.persona));
+        this.later.push({ ped: b, t: 1 + Math.random() * 0.5, text: pick(BY_SIGHT_RE[pd]) });
+        continue;
+      }
+      const L = pick(PASSING[part] || PASSING.tarde);
+      const fam = ac >= 4;
+      this.say(a, fam ? fillLine(pick(['¡Hombre, @! ¿Dónde vas?', '¡@! ¿Qué haces por aquí?', '¡Hola, @! Luego paso por casa.']), a.persona, b.persona) : fillLine(L[0], a.persona, b.persona));
+      this.later.push({ ped: b, t: 1.1 + Math.random() * 0.5, text: fam ? fillLine(pick(['¡Hola! Aquí, a un recao.', 'Pues nada, a dar una vuelta. ¿Y tú?', '¡Vale, vale! Hasta luego.']), b.persona, a.persona) : fillLine(L[1], b.persona, a.persona) });
+      // now and then the two of them stop for a chat (friends and family more often)
+      if (Math.random() < (a.persona.age === 'mayor' && b.persona.age === 'mayor' ? 0.35 : 0.12) + (ac >= 3 ? 0.2 : 0) && !a.follower && !b.follower) this.pairChat(a, b, 'calle');
     }
   }
   // someone to walk with: same age, same plan, side by side, talking
-  companion(L) {
+  companion(L, who = null) {
     if (!L.route) return null;
     const rnd = Math.random;
-    const d = randomDesc(this.rnd);
-    d.elderly = L.char.desc.elderly;
-    if (d.elderly) { d.hair = rnd() < 0.7 ? 6 : 5; d.cane = false; }
+    const d = who ? null : randomDesc(this.rnd);
+    if (d) { d.elderly = L.char.desc.elderly; if (d.elderly) { d.hair = rnd() < 0.7 ? 6 : 5; d.cane = false; } }
     const hx = Math.sin(L.heading), hz = Math.cos(L.heading);
-    const f = this.spawnAt(L.x + hz * 0.7, L.z - hx * 0.7, d);
+    const f = this.spawnAt(L.x + hz * 0.7, L.z - hx * 0.7, d, who);
     f.state = 'follow'; f.leader = L; L.follower = f;
     f.edge = L.edge; f.s = L.s; f.dir = L.dir; f.side = L.side; f.heading = L.heading;
     if (L.persona.age === 'mayor' || f.persona.age === 'mayor') { L.walkSpeed = Math.min(L.walkSpeed, f.walkSpeed, 1.05); }
     else L.walkSpeed = Math.min(L.walkSpeed, f.walkSpeed);
-    f.persona.age = L.persona.age;
+    if (!who) f.persona.age = L.persona.age;
     this.startChat([L, f], 'calle', { loop: true });
     return f;
   }
@@ -983,16 +1478,23 @@ export class Peds {
     const m = massTime(g.sky.hour, weekday(g.sky));
     if (!m || m.phase !== 'salida') { this.churchOut = 0; return; }
     const door = lm.churchDoor, portal = lm.churchPortal || door;
-    if (Math.hypot(door.x - p.x, door.z - p.z) > 160 || this.churchOut >= 12 || Math.random() > 0.18) return;
+    if (Math.hypot(door.x - p.x, door.z - p.z) > 160 || this.churchOut >= (wdOf(g) === 6 ? 40 : 18) || Math.random() > 0.3) return;
     const q = this.map.nearestEdge(door.x, door.z, 20, this.walkOk);
     if (!q || q.d > 20) return;
     this.churchOut++;
-    const d = randomDesc(this.rnd);
-    d.elderly = Math.random() < 0.65; if (d.elderly) { d.hair = 6; d.cane = false; if (d.gender === 'm') { d.accessory = 'boina'; d.accessoryColor = '#2a2a2a'; } }
-    const ped = this.spawnAt(portal.x + (Math.random() - 0.5) * 1.2, portal.z + (Math.random() - 0.5) * 1.2, d);
-    ped.state = 'exit'; ped.exitTo = this.pointNear(door.x, door.z, 3);
-    ped.edge = q.edge; ped.s = q.s; ped.side = 1; ped.dir = Math.random() < 0.5 ? 1 : -1; ped.walkSide = ped.dir;
-    this.plan(ped);
+    // (who was at mass: the padrón's churchgoers coming out now; else an older neighbour)
+    const C = g.census;
+    let who = null;
+    if (C) { const L = C.near(door.x, door.z, 60).filter((e) => e.w.o.kind === 'iglesia' && e.w.phase !== 'ida'); who = L.length ? L[Math.floor(Math.random() * L.length)].r : C.someoneFor(door.x, door.z, { old: Math.random() < 0.65, within: 400 }); }
+    const d = who ? null : randomDesc(this.rnd);
+    if (d) { d.elderly = Math.random() < 0.65; if (d.elderly) { d.hair = 6; d.cane = false; if (d.gender === 'm') { d.accessory = 'boina'; d.accessoryColor = '#2a2a2a'; } } }
+    const ped = this.spawnAt(portal.x + (Math.random() - 0.5) * 1.2, portal.z + (Math.random() - 0.5) * 1.2, d, who);
+    // out of the door onto the pavement of the church's side of the street (not across it), a little to either side
+    const t = this.map.sample(q.edge, q.s, {}), side = (door.x - t.x) * -t.dz + (door.z - t.z) * t.dx >= 0 ? 1 : -1;
+    const s0 = clamp(q.s + (Math.random() - 0.5) * 6, 0, q.edge.len);
+    ped.state = 'exit'; ped.exitTo = this.sidePoint(q.edge, s0, side, {});
+    ped.edge = q.edge; ped.s = s0; ped.side = side; ped.dir = Math.random() < 0.5 ? 1 : -1; ped.walkSide = side * ped.dir;
+    if (!(who && this.plan(ped, this.homePlace(who)))) this.plan(ped);
     // a word at the door with whoever came out before
     const mate = this.list.find((o) => o !== ped && o.state === 'walk' && !o.chat && !o.leader && !o.follower && Math.hypot(o.x - door.x, o.z - door.z) < 8);
     if (mate && Math.random() < 0.45) setTimeout(() => { if (this.list.includes(ped) && this.list.includes(mate) && ped.state === 'walk' && mate.state === 'walk') this.pairChat(ped, mate, 'iglesia'); }, 2500);
@@ -1002,24 +1504,31 @@ export class Peds {
   rescue(ped) {
     const q = this.map.nearestEdge(ped.x, ped.z, 60, (e) => e.walk && !e.blocked && !e.dirt);
     if (!q) return;
-    ped.edge = q.edge; ped.s = q.s;
+    ped.edge = q.edge; ped.s = q.s; ped.ledge = null;
     if (!ped.dir) ped.dir = 1;
+    let put = false;
     for (const side of [ped.side || 1, -(ped.side || 1)]) {
       const pt = this.sidePoint(q.edge, q.s, side, {});
-      if (!this.map.buildingAt(pt.x, pt.z)) { ped.x = pt.x; ped.z = pt.z; ped.side = side; return; }
+      if (!this.map.buildingAt(pt.x, pt.z)) { ped.x = pt.x; ped.z = pt.z; ped.side = side; put = true; break; }
     }
-    const c = this.map.sample(q.edge, q.s, {});
-    ped.x = c.x; ped.z = c.z;
+    if (!put) { const c = this.map.sample(q.edge, q.s, {}); ped.x = c.x; ped.z = c.z; }
+    this.reroute(ped);
+  }
+  // somewhere else than their route thought: the way to where they were going again, from here (or none)
+  reroute(ped) {
+    ped.route = null;
+    if (ped.goal && !this.plan(ped, ped.goal)) ped.goal = null;
   }
   // after fleeing, walk on along whatever street is closest
-  rejoin(ped) {
+  rejoin(ped, reroute = true) {
     const q = this.map.nearestEdge(ped.x, ped.z, 40, (e) => e.walk && !e.blocked && !e.dirt && e.cls !== 'track');
     if (!q) return;
-    ped.edge = q.edge; ped.s = q.s;
+    ped.edge = q.edge; ped.s = q.s; ped.ledge = null;
     const d = this.map.sample(q.edge, q.s, {});
     const lat = (ped.x - d.x) * -d.dz + (ped.z - d.z) * d.dx;
     ped.side = lat >= 0 ? 1 : -1;
     if (!ped.dir) ped.dir = Math.random() < 0.5 ? 1 : -1;
+    if (reroute) this.reroute(ped); else ped.route = null;
   }
 
   steerTo(ped, tx, tz, speed, dt) {
@@ -1058,7 +1567,7 @@ export class Peds {
     if (!opts.length) { ped.dir = -ped.dir; ped.s = clamp(ped.s, 0, e.len); return; }
     const ne = opts[Math.floor(Math.random() * opts.length)];
     this.enterEdge(ped, ne, ne.a === nodeId ? 1 : -1);
-    if (Math.random() < 0.1 && !ne.walkOnly && ne.w > 4) this.startCross(ped); // over to the other side, looking out for cars
+    if (Math.random() < 0.08 && !ne.walkOnly && ne.w > 4) this.startCross(ped); // over to the other side (at the corner they are at), looking out for cars
   }
 
   checkVehicles(ped) {
@@ -1377,8 +1886,10 @@ export class Peds {
     for (let i = this.marks.length - 1; i >= 0; i--) if (this.marks[i].ped === ped) { this.marks[i].el.remove(); this.marks.splice(i, 1); }
   }
 
-  // spawn the ejected driver of a carjacked car
+  // spawn the ejected driver of a carjacked car (the rider of a bike: the very person who was riding it)
   ejectDriver(v) {
+    const R = v.rider, T = this.game.traffic;
+    if (R && T) { const o = R.char.object.position, desc = R.char.desc, who = R.who; T.dropRider(v); const ped = this.spawnAt(o.x, o.z, desc, who); ped.state = 'fly'; ped.t = 0; ped.thud = false; ped.hp = 100; this.fall(ped, { vel: [Math.cos(v.heading) * 2.4, 1.2, -Math.sin(v.heading) * 2.4], up: 0.4, tone: 0.7 }); setTimeout(() => this.say(ped, pick(FRASES.carjack)), 900); return ped; }
     const fx = Math.sin(v.heading), fz = Math.cos(v.heading);
     let lx = fz, lz = -fx;
     // thrown out on the driver's side unless there is a wall there

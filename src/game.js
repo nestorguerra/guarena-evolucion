@@ -18,6 +18,8 @@ import { installHero, loadHero } from './hero.js';
 import { COP_DESC } from './police.js';
 import { Fleet } from './fleet.js';
 import { Traffic } from './traffic.js';
+import { Census } from './census.js';
+import { Charla } from './charla.js';
 import { Peds } from './peds.js';
 import { Police } from './police.js';
 import { Player, CameraRig } from './player.js';
@@ -165,6 +167,10 @@ export class Game {
     try { this.shops.setup(this.activities); } catch (e) { console.warn('shops', e); }
     this.fishing = new Fishing(this);
     try { this.fishing.setupMarket(this.activities); } catch (e) { console.warn('fishing', e); }
+    // the town's padrón (6.665 neighbours: who lives where, what their day is, what they remember of you) and the
+    // conversations with them
+    try { this.census = new Census(this); } catch (e) { console.warn('census', e); this.census = null; }
+    this.charla = new Charla(this);
     this.homeSafe = new HomeSafe(this);
     this.invUI = new InventoryUI(this);
     this.zombieSys = new Zombies(this);
@@ -544,9 +550,9 @@ export class Game {
     this.time = (this.time || 0) + dt;
     const playing = this.state === 'play' || this.state === 'wasted' || this.state === 'busted';
     if (this.state === 'play') {
-      const listOpen = this.homeSafe.menu.open || (this.mercadillo && this.mercadillo.menu); // the D-pad belongs to the list
+      const listOpen = this.homeSafe.menu.open || (this.mercadillo && this.mercadillo.menu) || (this.charla && this.charla.open); // the D-pad belongs to the list
       if (input.phone && this.phone && !listOpen) { this.phone.toggle(); }
-      if (input.pause && !(this.seats && this.seats.menuOpen) && !(this.mercadillo && this.mercadillo.menu) && !(this.phone && this.phone.open) && !this.homeSafe.menu.open && !this.decor.placing) { this.ui.onPause && this.ui.onPause(); input.endFrame(); return; } // Esc closes the order card first
+      if (input.pause && !(this.seats && this.seats.menuOpen) && !(this.mercadillo && this.mercadillo.menu) && !(this.phone && this.phone.open) && !this.homeSafe.menu.open && !this.decor.placing && !(this.charla && this.charla.open)) { this.ui.onPause && this.ui.onPause(); input.endFrame(); return; } // Esc closes the order card (and says goodbye) first
       if (input.inventory && !this.decor.placing && !this.homeSafe.menu.open && !(this.phone && this.phone.open)) { this.invUI.show(); input.endFrame(); return; }
       if (input.map && !this.interior) { this.hud.toggleMap(); this.state = 'map'; input.exitLock(); input.endFrame(); return; }
       if (input.radioNext && this.player.vehicle) { // R: next station (Mayús+R: back)
@@ -629,6 +635,7 @@ export class Game {
         if (!zm) this.police.update(dt);
         this.fleet.update(dt, this.sky.night);
         if (p.vehicle && p.vehicle.spec.twoWheel) p.rideBike(p.vehicle, dt); // the rider sits on the bike where it is now
+        if (!zm) this.traffic.afterPhysics(dt); // (and the neighbours on theirs)
         if (!zm) this.peds.update(dt); else this.peds.updateSpeech(dt);
         if (this.mode === 'normal') this.missions.update(dt);
         this.pickups.update(dt);
@@ -636,6 +643,7 @@ export class Game {
         if (this.mode === 'normal') this.police.updateInside(dt); // hidden in a house: the search goes on outside
         this.peds.updateSpeech(dt);
       }
+      if (this.charla && this.charla.open) this.charla.update(dt);
       this.interiors.update(dt);
       this.shops.update(dt);
       this.fishing.update(dt);

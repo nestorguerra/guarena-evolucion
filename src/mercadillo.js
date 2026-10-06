@@ -1,4 +1,5 @@
-// The mercadillo on the way to the pantano: on Tuesday and Saturday mornings a row of stalls goes up along the road
+// The mercadillo on the way to the pantano: on Wednesday mornings, from nine to two — the day Guareña's real weekly
+// market is held — a row of stalls goes up along the road
 // out of town — fruit and vegetables, churros, clothes, sunglasses and caps, pottery and bits and bobs, and the
 // chamarilero, who buys what you carry in the backpack (better than the pawn shop) or swaps it for something else.
 import * as THREE from 'three';
@@ -86,10 +87,11 @@ export class Mercadillo {
     map.collider.buildCircles();
     const c = map.sample(e, spot.s, {});
     this.center = { x: c.x, z: c.z };
+    this.edge = e;
     this.buildUI();
   }
 
-  get marketDay() { const s = this.game.sky, wd = ((s.day || 0) + 5) % 7; return (wd === 1 || wd === 5) && s.hour >= 8.5 && s.hour < 14.5; }
+  get marketDay() { const s = this.game.sky, wd = ((s.day || 0) + 5) % 7; return wd === 2 && s.hour >= 9 && s.hour < 14; }
 
   update(dt) {
     const g = this.game, p = g.player;
@@ -97,6 +99,8 @@ export class Mercadillo {
     const on = this.marketDay;
     if (on !== this.open) {
       this.open = on; this.root.visible = on;
+      // the road is closed to traffic while the stalls are up (the cars go round; whoever is on it drives out)
+      if (this.edge) this.edge.closed = on;
       if (on) g.hud.setBlip('mercadillo', { x: this.center.x, z: this.center.z, label: 'M', color: '#f2b632', name: 'Mercadillo', edge: false, small: true });
       else { this.clear(); g.hud.removeBlip('mercadillo'); }
     }
@@ -196,7 +200,7 @@ export class Mercadillo {
     if (fx.top || fx.glasses !== undefined || 'accessory' in fx) this.restyle(fx);
     g.audio.sfx('money', { vol: 0.6 });
     g.hud.notify(`${it.name}${it.price ? `: −${String(it.price).replace('.', ',')} €` : ''}${fx.hp ? ` · +${fx.hp} de salud` : ''}`, 'ok', 3);
-    if (s.vendor) g.peds.say(s.vendor, pick(['¡Que lo disfrutes!', 'Gracias, {guapo|guapa}.', '¡Vuelve el martes!']), true);
+    if (s.vendor) g.peds.say(s.vendor, pick(['¡Que lo disfrutes!', 'Gracias, {guapo|guapa}.', '¡Vuelve el miércoles que viene!']), true);
     g.persist();
   }
   // new clothes, sunglasses, a cap: the character is rebuilt with them

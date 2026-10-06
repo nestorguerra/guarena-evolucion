@@ -87,6 +87,8 @@ export class Police {
       return;
     }
     const direct = opts.direct || DIRECT.has(type);
+    const mem = g.census && g.census.memoria;
+    if (mem) { try { const loud0 = type === 'disparo' || type === 'explosion' || type === 'breakin'; mem.event(type, x, z, [opts.victim, ...g.peds.witnesses({ loud: loud0, victim: opts.victim })].filter(Boolean)); } catch (e) { /* (the town remembers what it can) */ } }
     if (direct || this.observe(true)) { this.report(type, x, z, null, true); return; }
     const loud = type === 'disparo' || type === 'explosion' || type === 'breakin';
     const ws = g.peds.witnesses({ loud, victim: opts.victim });
