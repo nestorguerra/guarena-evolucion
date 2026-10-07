@@ -18,6 +18,8 @@ import { clayRepaint } from './plastilina.js';
 import { buildLandmarks } from './landmarks.js';
 import { Reservoir } from './pantano.js';
 import { buildTrafficSigns } from './signs.js';
+import { resolveMeasured, buildMeasuredDetails, measuredLamps } from './fachadas.js';
+import { MALFEITOS } from './malfeitos.js';
 import { mulberry32, hash1, pointInRing, ringArea, ringBounds, polySample, polyNearest, clamp } from './util.js';
 
 export class World {
@@ -79,7 +81,10 @@ export class World {
     const near3d = q.facade3d || 0;
     const annie = PLAYER_PRESETS.find((pp) => pp.id === 'annie');
     const facade = { holes: near3d > 0, forcedDoors: annie && annie.start ? [{ x: annie.start.x, z: annie.start.z }] : [], openings: near3d > 0 ? [] : null, runs: [], ground: [] };
-    const bb = buildBuildings(map, { skipPart, onBuilding: (b) => !this.landmarks.claimsBuilding(b), overrides: this.landmarks.overrides, facade });
+    // the houses modelled from photographs, front by front (fachadas.js; calle Malfeitos: malfeitos.js)
+    this.measured = resolveMeasured(map, MALFEITOS);
+    if (this.measured.warn.length) console.warn('[fachadas]', this.measured.warn.join('; '));
+    const bb = buildBuildings(map, { skipPart, onBuilding: (b) => !this.landmarks.claimsBuilding(b), overrides: this.landmarks.overrides, facade, measured: this.measured });
     for (const g of bb.geometries) {
       const m = new THREE.Mesh(g, this.bMat);
       m.castShadow = true; m.receiveShadow = true;
@@ -98,11 +103,12 @@ export class World {
     for (const o of facade.ground) {
       if (o.type !== CT.DOOR) continue;
       const old = o.style === 'trad_verde' || o.style === 'trad_ocre' || o.style === 'piedra';
-      this.facadeDoors.push({ x: o.x + o.nx * 0.75, z: o.z + o.nz * 0.75, wx: o.x, wz: o.z, nx: o.nx, nz: o.nz, bid: o.bid, old });
+      this.facadeDoors.push({ x: o.x + o.nx * 0.75, z: o.z + o.nz * 0.75, wx: o.x, wz: o.z, nx: o.nx, nz: o.nz, bid: o.bid, old, measured: !!o.measured });
     }
     // streamed chunks of 3D facade details, also used for every static street prop (so it exists on low quality too)
     this.trimMat = makeTrimMaterial();
     this.facades = new FacadeDetails(facade.openings || [], near3d > 0 ? facade.runs : [], this.root, this.trimMat, { near: near3d || 90, shadowDist: q.shadows > 1 ? 70 : q.shadows ? 45 : 0 });
+    for (const M of this.measured.fronts) this.facades.addBuild(M.ax + (M.tx * M.L) / 2, M.az + (M.tz * M.L) / 2, M.L / 2 + 2, (G, F, P) => buildMeasuredDetails(G, F, P, M));
     if (facade.openings) {
       shared.uNearDist.value = near3d;
       this.stats.openings = facade.openings.length;
@@ -345,6 +351,7 @@ void main(){
       if (e.dirt) continue;
       const inTown = map.inTown(e.pts[0], e.pts[1]) || map.inTown(e.pts[e.pts.length - 2], e.pts[e.pts.length - 1]);
       if (!inTown && e.cls !== 'primary') continue;
+      if (this.measured && this.measured.lampEdges.has(e.name)) continue; // (a measured street: its own lanterns, below)
       const spacing = (e.facade && e.facade < 14 ? 24 : 30) * (STYLE.plastilina ? 0.65 : 1); // (claymation: a lantern every few houses, as in the user's pictures)
       let side = hash1(e.id) < 0.5 ? 1 : -1;
       for (let s = 8; s < e.len - 4; s += spacing) {
@@ -372,6 +379,12 @@ void main(){
           this.lampLog.post++;
         }
       }
+    }
+    // the lanterns of the measured fronts, where they hang in the photographs
+    if (this.measured) for (const L of measuredLamps(this.measured)) {
+      lampsWall.add(L.x, L.y, L.z, L.ang); lampsWallL.add(L.x, L.y, L.z, L.ang);
+      lampPts.push(L.x + L.nx * 0.62, L.y - 0.36, L.z + L.nz * 0.62);
+      this.lampLog.wall++;
     }
     // containers in sets of 3-4, as in Guareña: in the parking lane against the kerb (the side where cars park, the
     // parked cars leave that space free), a little away from the junction — never in a narrow street's carriageway

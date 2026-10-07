@@ -145,7 +145,7 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
   #endif
   float camD = length(vWPos.xz - cameraPosition.xz);
   bool fillQ = kind < 0.5 && vTex.w > 1.5;
-  bool nearFill = fillQ && camD < uNearDist;
+  bool nearFill = fillQ && (camD < uNearDist || vTex.w > 2.5); // (3: a measured opening, glass or a dark hall at any distance)
   bool glassy = lt < 0.5 || (lt > 2.5 && lt < 4.5) || lt > 6.5;
   // fills sample strictly inside their hole: filtering across the rectangle edge mixed in wall texels whose
   // in-between alpha read as a lit pane (a white outline around the windows at night)
@@ -375,7 +375,7 @@ totalEmissiveRadiance += gGlass * gLit * uNight * mix(vec3(1.0, 0.68, 0.38), vec
 if (uNight > 0.02) totalEmissiveRadiance += diffuseColor.rgb * lampLight(vWPos, normalize(vWNrm)) * uNight;`);
     sh.fragmentShader = sh.fragmentShader.replace('float(ROOF_BASE)', `${ROOF_BASE_VALUE}.0`);
   };
-  m.customProgramCacheKey = () => 'bldg5';
+  m.customProgramCacheKey = () => 'bldg6';
   return m;
 }
 
@@ -435,6 +435,26 @@ gH = 0.0; gRgh = -1.0;
     } else if (pid == 7) {     // wood grain
       float n = gNoise(vec2(q.x * 42.0, q.y * 1.3)) * 0.7 + gNoise(vec2(q.x * 150.0, q.y * 4.0)) * 0.3;
       f = 0.8 + 0.34 * n; gRgh = 0.6;
+    } else if (pid == 10) {    // brick in running bond (24 x 7 cm with their joints), each brick its own tone
+      float ty = q.y / 0.07, row = floor(ty), fy = fract(ty);
+      float tx = q.x / 0.245 + mod(row, 2.0) * 0.5, cl = floor(tx), fx = fract(tx);
+      float wx = fwidth(tx) + 0.035, wy = fwidth(ty) + 0.11;
+      float brick = smoothstep(0.0, wx, fx) * (1.0 - smoothstep(1.0 - wx, 1.0, fx)) * smoothstep(0.0, wy, fy) * (1.0 - smoothstep(1.0 - wy, 1.0, fy));
+      float h = gHash2(vec2(cl, row));
+      diffuseColor.rgb = mix(vec3(0.5, 0.48, 0.45), diffuseColor.rgb * (0.8 + 0.34 * h), brick);
+      gH = brick * 0.004; gRgh = 0.9;
+    } else if (pid == 11) {    // stone slabs (granite cladding): the polished grain and a fine joint every 60 x 40 cm
+      float n = gNoise(q * 46.0) * 0.6 + gNoise(q * 130.0) * 0.4;
+      float sp = step(0.84, gHash2(floor(q * 170.0)));
+      float jx = fract(q.x / 0.6), jy = fract(q.y / 0.4), w2 = fwidth(q.x / 0.6) + 0.01, w3 = fwidth(q.y / 0.4) + 0.012;
+      float joint = 1.0 - smoothstep(0.0, w2, jx) * (1.0 - smoothstep(1.0 - w2, 1.0, jx)) * smoothstep(0.0, w3, jy) * (1.0 - smoothstep(1.0 - w3, 1.0, jy));
+      f = (0.86 + 0.24 * n) * (1.0 - sp * 0.4) * (1.0 - joint * 0.35); gRgh = 0.42;
+    } else if (pid == 12) {    // a reed screen (cañizo): canes of 1.4 cm side by side, each its own straw tone, gaps between
+      float t = q.x / 0.014, s = fract(t), w = fwidth(t) + 0.06, id = floor(t);
+      float cane = smoothstep(0.0, w, s) * (1.0 - smoothstep(1.0 - w, 1.0, s));
+      float h = gHash2(vec2(id, 5.0)), knot = step(0.92, fract(q.y / (0.25 + h * 0.2) + h));
+      diffuseColor.rgb = mix(diffuseColor.rgb * 0.35, diffuseColor.rgb * (0.78 + 0.36 * h) * (1.0 - knot * 0.25), cane);
+      gH = cane * sin(s * 3.1416) * 0.003; gRgh = 0.8;
     } else if (pid == 9) {     // strip curtain: 4.5 cm plastic strips in three colours
       float t = q.x / 0.045, s = fract(t), w = fwidth(t);
       float id = floor(t);
@@ -462,7 +482,7 @@ if (gH != 0.0) {
   if (abs(det) > 1e-12 && dot(nb, nb) > 1e-24) normal = normalize(nb);
 }`);
   };
-  m.customProgramCacheKey = () => 'trim2';
+  m.customProgramCacheKey = () => 'trim4';
   return m;
 }
 

@@ -58,7 +58,7 @@ export function planPart(part, info, runs, H, forcedDoors) {
   let bestRun = null;
   for (const r of runs) {
     r.cells = new Map();
-    if (!r.exposed || r.uTot < 1 || nF < 1) continue;
+    if (!r.exposed || r.mf || r.uTot < 1 || nF < 1) continue; // (measured walls: their own openings, fachadas.js)
     const u0 = r.uTot * r.t0, u1 = r.uTot * r.t1;
     r.b0 = Math.ceil(u0 - 1e-4); r.b1 = Math.floor(u1 + 1e-4);
     const len = (r.b1 - r.b0) * (r.L / r.uTot);
@@ -131,7 +131,7 @@ const ICO = (() => {
   return { v, f };
 })();
 
-export const PAT = { NONE: 0, SLATS: 1, RIBS: 2, LOUVER: 3, STRIPES: 4, SHUTTER: 5, GRANITE: 6, WOOD: 7, TILEEND: 8, STRIPS: 9 };
+export const PAT = { NONE: 0, SLATS: 1, RIBS: 2, LOUVER: 3, STRIPES: 4, SHUTTER: 5, GRANITE: 6, WOOD: 7, TILEEND: 8, STRIPS: 9, BRICK: 10, SLABS: 11, REEDS: 12 };
 const ALL = 63, NOBACK = 31;
 
 class Geo {
@@ -295,10 +295,10 @@ class Geo {
 }
 
 // ------------------------------------------------------------------ palettes
-const hexC = (h, k = 1) => { const v = parseInt(h.slice(1), 16); return [clamp(Math.round(((v >> 16) & 255) * k), 0, 255), clamp(Math.round(((v >> 8) & 255) * k), 0, 255), clamp(Math.round((v & 255) * k), 0, 255)]; };
+export const hexC = (h, k = 1) => { const v = parseInt(h.slice(1), 16); return [clamp(Math.round(((v >> 16) & 255) * k), 0, 255), clamp(Math.round(((v >> 8) & 255) * k), 0, 255), clamp(Math.round((v & 255) * k), 0, 255)]; };
 const mul = (c, k) => [clamp(Math.round(c[0] * k), 0, 255), clamp(Math.round(c[1] * k), 0, 255), clamp(Math.round(c[2] * k), 0, 255)];
 const pickR = (rnd, a) => a[Math.floor(rnd() * a.length) % a.length];
-const C = {
+export const C = {
   iron: hexC('#1c1c1e'), ironGreen: hexC('#2f3b30'), ironWhite: hexC('#eeede7'), ironBrown: hexC('#4d3322'),
   alu: hexC('#b9bbb8'), aluWhite: hexC('#eeeeea'), aluBronze: hexC('#5a4636'), anth: hexC('#2c2e31'),
   marble: hexC('#ece6da'), terracotta: hexC('#b36a45'), granite: hexC('#cfc6b4'), graniteDk: hexC('#9e978a'), step: hexC('#d9d2c2'),
@@ -366,7 +366,7 @@ function buildingStyle(o) {
 }
 
 // ------------------------------------------------------------------ element builders
-function frameRect(G, x0, y0, x1, y1, zb, zf, fw, col, mullion = false, bottomW = fw) {
+export function frameRect(G, x0, y0, x1, y1, zb, zf, fw, col, mullion = false, bottomW = fw) {
   G.box(x0, y0, zb, x0 + fw, y1, zf, col);
   G.box(x1 - fw, y0, zb, x1, y1, zf, col);
   G.box(x0 + fw, y1 - fw, zb, x1 - fw, y1, zf, col);
@@ -374,7 +374,7 @@ function frameRect(G, x0, y0, x1, y1, zb, zf, fw, col, mullion = false, bottomW 
   if (mullion) { const m = (x0 + x1) / 2; G.box(m - fw * 0.55, y0 + bottomW, zb, m + fw * 0.55, y1 - fw, zf - 0.008, col); }
 }
 
-function persiana(G, x0, y0, x1, y1, z, level, col, guideCol) {
+export function persiana(G, x0, y0, x1, y1, z, level, col, guideCol) {
   const yb = y1 - (y1 - y0) * level;
   if (level > 0.02) G.quad([x0, yb, z], [x1, yb, z], [x1, y1, z], [x0, y1, z], 0, 0, 1, col, PAT.SLATS);
   const yr = Math.min(yb, y1 - 0.03);
@@ -391,12 +391,12 @@ function persianaLevel(rnd) {
 // the plants' cards of the chunk being built (see FacadeDetails.build); the pots go into the solid geometry
 let CUR_P = null;
 // a clay pot: tapered, with its rolled rim and the soil inside
-function potBody(G, x, y, z, r, h, col) {
+export function potBody(G, x, y, z, r, h, col) {
   G.cyl(x, z, y, y + h, r * 0.74, r, 9, col);
   G.cyl(x, z, y + h - r * 0.24, y + h + r * 0.04, r * 1.1, r * 1.1, 9, mul(col, 0.9));
   G.cyl(x, z, y + h - r * 0.1, y + h - r * 0.1, r * 1.0, r * 1.0, 9, C.soil, true);
 }
-function flowerPot(G, x, y, z, r, rnd, hanging = false) {
+export function flowerPot(G, x, y, z, r, rnd, hanging = false) {
   const pr = rnd();
   const pc = pr < 0.72 ? C.pot : pr < 0.86 ? C.potBlue : pr < 0.95 ? C.potWhite : C.potGreen;
   if (CUR_P) { // geraniums above all, trailing ivy geraniums on the railings, a spider plant, an aspidistra
@@ -447,7 +447,7 @@ function reja(G, x0, y0, x1, y1, z, col, buche, rnd) {
   }
 }
 
-function awning(G, x0, x1, yTop, zTop, drop, out, col, withArms = true) {
+export function awning(G, x0, x1, yTop, zTop, drop, out, col, withArms = true) {
   const yF = yTop - drop, zF = zTop + out;
   const L = Math.hypot(drop, out);
   const ny = out / L, nz = drop / L;
@@ -460,7 +460,7 @@ function awning(G, x0, x1, yTop, zTop, drop, out, col, withArms = true) {
   if (withArms) for (const x of [x0 + 0.06, x1 - 0.06]) G.bar([x, yTop - drop * 0.7, 0.02], [x, yF + 0.01, zF - 0.02], 0.02, C.metalDk);
 }
 
-function laundry(G, x0, x1, yTop, z, rnd) {
+export function laundry(G, x0, x1, yTop, z, rnd) {
   let x = x0 + 0.05;
   while (x < x1 - 0.35) {
     const w = 0.3 + rnd() * 0.45;
@@ -474,7 +474,7 @@ function laundry(G, x0, x1, yTop, z, rnd) {
   }
 }
 
-function acUnit(G, x0, y0, rnd) {
+export function acUnit(G, x0, y0, rnd) {
   const w = 0.78, h = 0.52, d = 0.27;
   G.box(x0, y0, 0.03, x0 + w, y0 + h, 0.03 + d, C.ac);
   // fan grille (dark disc) and side vents
@@ -676,7 +676,7 @@ function buildShop(G, F, o, bs, rnd) {
 // per-run extras: downpipes at the corners, cornice moulding under the eaves
 function buildRun(G, r, bs, rnd) {
   const dx = r.bx - r.ax, dz = r.bz - r.az, L = Math.hypot(dx, dz);
-  if (L < 1.5) return;
+  if (L < 1.5 || r.measured) return; // (a measured front has its own downpipes and cornices)
   const tx = dx / L, tz = dz / L;
   G.frame(r.ax, 0, r.az, tx, tz, r.nx, r.nz);
   const H = r.H;

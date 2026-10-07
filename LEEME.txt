@@ -43,6 +43,7 @@ CARPETAS
                    census.js (el padrón: los 6.665 vecinos), charla.js (conversaciones),
                    npcmind.js (planes y charlas de la gente)
                    weather.js (el tiempo real de Guareña, Open-Meteo), rain.js (lluvia y nieve)
+                   fachadas.js (fachadas medidas casa por casa), malfeitos.js (la calle Malfeitos)
                    weapons.js, gunmodels.js, gunrig.js, viewmodel.js
                    missions.js, activities.js, interiors.js (casas, casa de Annie),
                    horror.js, zombies.js, hud.js, audio.js, input.js...
@@ -52,7 +53,8 @@ CARPETAS
   tools/         Empaquetado, servidor local, generación del mapa y herramientas de
                  prueba (playtest.js, charlab.js, snap.js, guntest.js, sheet.py,
                  townlab.js: la gente, el civismo, el tráfico y las charlas del pueblo;
-                 weatherlab.js: el tiempo real, cada cielo forzado y fotografiado, la red caída).
+                 weatherlab.js: el tiempo real, cada cielo forzado y fotografiado, la red caída;
+                 malfeitoslab.js y fachadas/: medir una calle a partir de fotos y comparar).
   dist/          Juego empaquetado listo para jugar.
   .snaps/        Capturas de las pruebas de desarrollo (se pueden borrar).
   debug.html     Visor libre del mapa (src/debug.js).

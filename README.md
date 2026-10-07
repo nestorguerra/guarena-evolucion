@@ -111,6 +111,14 @@ sin y con el esculpido de muñeco.
 - No funciona en la página publicada en claude.ai, que no deja consultar otras webs; sí en GitHub Pages y en la
   versión del ordenador.
 
+**La calle Malfeitos, casa por casa** (en [docs/malfeitos.md](docs/malfeitos.md)):
+- Las 24 fachadas de sus dos aceras modeladas a mano con las medidas sacadas de 21 fotos de la calle (Street View, mayo
+  de 2024), que solo sirvieron de referencia: en el juego no hay ni un píxel de ellas.
+- Cada puerta, ventana, balcón, cochera y escaparate en su sitio y de su tamaño; los colores de cada pintura, zócalo y
+  recercado; las alturas; rejas, persianas, toldos, cañizos, números, buzones, farolas y cables. En las dos estéticas.
+- Donde el Catastro deja un hueco y las fotos tienen casa, el juego la levanta.
+- `src/fachadas.js` hace las fachadas medidas; los datos de la calle están en `src/malfeitos.js`.
+
 ![Guareña desde el aire: la Iglesia de Santa María y la Plaza de España con el Ayuntamiento](docs/portada.jpg)
 
 ## Jugar

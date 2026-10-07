@@ -387,6 +387,7 @@ export function buildStreetLife(world, map, q) {
       }
       if (ok && seats.length >= 2) { frescoSpots.push({ x: d.x, z: d.z, seats, kind: r() < 0.55 ? 'sillaPlastico' : r() < 0.6 ? 'sillaEnea' : 'sillaEneaVerde', seed: h, used: false }); stats.fresco++; continue; }
     }
+    if (d.measured) continue; // (a house modelled from photographs: its doorstep as it is — fachadas.js)
     // pots on the ground beside the door (claymation: on most doorsteps, as in the user's pictures)
     if (r() < (STYLE.plastilina ? 0.86 : 0.42)) {
       const n = 1 + Math.floor(r() * 3);

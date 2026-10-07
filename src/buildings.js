@@ -6,6 +6,7 @@ import { PolyIndex } from './collision.js';
 // (the look — plastilina / real — as LOOK: STYLE here is the façade styles' layers)
 import { STYLE as LOOK } from './style.js';
 import { planPart, holeRect, recessDepth, styleHasHoles, CT } from './facades.js';
+import { matchRun, emitMeasuredRun, lin } from './fachadas.js';
 
 const STYLE = Object.fromEntries(FACADE_STYLES.map((s, i) => [s, i * FACADE_LAYERS_PER_STYLE]));
 const ROOF = { teja: ROOF_BASE + 0, azotea: ROOF_BASE + 1, chapa: ROOF_BASE + 2, uralita: ROOF_BASE + 3 };
@@ -199,7 +200,8 @@ function triangulate(ring, holes) {
 }
 
 // facade: { holes: bool, forcedDoors: [{x, z}], openings: [], runs: [] } — real openings + records for the 3D details
-export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuilding = null, overrides = null, facade = null } = {}) {
+// measured: the houses modelled from photographs (fachadas.js resolveMeasured): their fronts, part heights and roofs
+export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuilding = null, overrides = null, facade = null, measured = null } = {}) {
   const chunks = new Map();
   const chunkOf = (x, z) => {
     const k = Math.floor(x / chunkSize) + ':' + Math.floor(z / chunkSize);
@@ -225,6 +227,9 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
     const info = { style, tint, roofTint, seed: rnd(), shop: b.use === 4 ? 1 : 0, rnd, pitch: 0.42 + rnd() * 0.16, minFloors: 0 };
     const ov = overrides && overrides.get(b.id);
     if (ov) Object.assign(info, ov);
+    // a measured house: its walls take the paint of its front (sides and back too)
+    const ms = measured && measured.byB.get(b.id);
+    if (ms) { info.measured = ms; info.style = 'color'; info.tint = lin(ms[0].spec.side || ms[0].spec.wall); info.noShop = true; info.shop = 0; }
     return info;
   });
   for (const p of shopPoi) {
@@ -242,7 +247,10 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
       const big = Math.sqrt(p.area);
       H = Math.max(H, 4.2 + Math.min(4, big * 0.12) + (hash1(p.id) - 0.5));
     }
+    const mp = measured && measured.parts.get(p.id); // (a measured part: its real height and roof)
+    if (mp && mp.H) H = mp.H;
     const part = { ...p, H, info: bi || { style: 'renovada', tint: [1, 1, 1], roofTint: [1, 1, 1], seed: hash1(p.id), shop: 0, rnd: mulberry32(p.id), pitch: 0.5 } };
+    if (mp) part.roofSpec = mp;
     part.pi = partIndex.add(p.ring, part);
     parts.push(part);
   }
@@ -335,6 +343,8 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
             run.nrmAt = at;
           }
           if (run.exposed) { run.street = streetFacing(run); run.exposed = run.street; run.back = !run.street; }
+          // a wall measured from the photographs: its own holes and paint (fachadas.js)
+          if (info.measured && ri === 0) { run.mf = matchRun(info.measured, run); if (run.mf) { run.exposed = true; run.street = true; run.back = false; } }
           runs.push(run);
           if (cy === 0 && ri === 0 && (t1 - t0) * L > 1) ao.push(ax + dx * t0, az + dz * t0, ax + dx * t1, az + dz * t1, nx, nz);
         };
@@ -358,7 +368,7 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
         facade.runs.push({
           ax: run.ax + run.dx * run.t0, az: run.az + run.dz * run.t0, bx: run.ax + run.dx * run.t1, bz: run.az + run.dz * run.t1,
           nx: run.nx, nz: run.nz, H, pitched: p.roofKind === 'hip' || p.roofKind === 'lip', shopEnds,
-          style: info.style, tint: info.tint, bid: p.b, pid: p.id, seed: info.seed,
+          style: info.style, tint: info.tint, bid: p.b, pid: p.id, seed: info.seed, measured: !!run.mf,
         });
       }
     }
@@ -374,6 +384,7 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
 // One wall run: party walls are a single blank quad; street facades are split in cells (bay x floor) with the layer
 // chosen by planPart. Cells holding a door, window, balcony, garage or shop get a real hole when facade.holes is on.
 function emitRun(c, run, p, info, H, facade) {
+  if (run.mf) return emitMeasuredRun(c, run, p, info, H, facade);
   const { ax, az, dx, dz, nx, nz, uTot, t0, t1, cy } = run;
   const sBase = STYLE[info.style];
   if (!run.exposed) {
@@ -495,7 +506,8 @@ function buildRoof(c, p, info, H) {
   const area = p.area;
   const ob = orientedRect(r);
   const fill = ob ? area / (4 * ob.hw * ob.hd) : 0;
-  const flatTop = (p.floors >= 3 && info.style !== 'color' && rnd() < 0.8) || (p.holes && p.holes.length);
+  const rs = p.roofSpec && p.roofSpec.roof; // (measured: 'flat' with its parapet, or 'tile')
+  const flatTop = rs ? rs === 'flat' : (p.floors >= 3 && info.style !== 'color' && rnd() < 0.8) || (p.holes && p.holes.length);
   const tint = info.roofTint;
   let tris = 0;
   if (!flatTop && ob && fill > (nave ? 0.9 : 0.92) && Math.min(ob.hw, ob.hd) > 1.0 && Math.max(ob.hw, ob.hd) < 40 && r.length / 2 <= 10) {
@@ -602,7 +614,7 @@ function buildRoof(c, p, info, H) {
   }
   // flat roof with parapet
   p.roofKind = 'flat';
-  const parH = nave ? 0.35 : 0.8;
+  const parH = p.roofSpec && p.roofSpec.parapet != null ? p.roofSpec.parapet : nave ? 0.35 : 0.8;
   const tp = [STYLE[info.style], 2, info.seed, 0];
   const rings = [r].concat(p.holes || []);
   for (const rr of rings) {
