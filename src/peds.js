@@ -12,6 +12,8 @@ import { polySample, polyNearest, clamp, lerp, dampAngle, wrapAngle, mulberry32,
 import { Dogs } from './dogs.js';
 import { Places, routeBetween, personaOf, Chat, greetLine, errandLine, PASSING, BY_SIGHT, BY_SIGHT_RE, BUSY, ANNOYED, ANNOYED_SAT, WARY, AFTER_DARK, FOLLOWED, CLOSE, BYE, partOfDay, weekday, massTime, fillLine, KID_TALKS } from './npcmind.js';
 import { noticias } from './charla.js';
+import { STYLE } from './style.js';
+import { SM } from './plastilina.js';
 
 export const FRASES = {
   bump: ['¡Chacho, ten cuidao!', '¡Mira por dónde vas!', '¡Coile, qué susto!', '¡Ay, madre!', '¡Que me escachas!', '¡Acho, que no estás {solo|sola}!'],
@@ -162,7 +164,7 @@ export class Peds {
     for (let i = this.chats.length - 1; i >= 0; i--) { const c = this.chats[i]; c.update(dt, near); if (c.done) this.chats.splice(i, 1); }
     for (let i = this.later.length - 1; i >= 0; i--) { const l = this.later[i]; l.t -= dt; if (l.t <= 0) { this.later.splice(i, 1); if (this.list.includes(l.ped) && l.ped.state !== 'flee' && l.ped.state !== 'dead') this.say(l.ped, l.text); } }
     this.passing(dt, p);
-    const cam = this.game.camera.position;
+    const cam = this.game.camera.position, posing = !STYLE.plastilina || SM.tick;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const ped = this.list[i];
       const d = Math.hypot(ped.x - p.x, ped.z - p.z);
@@ -172,11 +174,12 @@ export class Peds {
       this.updatePed(ped, dt, d);
       if (ped.gone) { if (d < 12) g.audio.sfx('door_close', { x: ped.x, z: ped.z, vol: 0.25 }); this.despawn(ped, i); continue; } // in at their door
       this.glance(ped, dt, d);
-      // animation LOD: far peds update less often
+      // animation LOD: far peds update less often (claymation: only at the poses that are drawn, SM — 12 a second near,
+      // 6 far off)
       const cd = Math.hypot(ped.x - cam.x, ped.z - cam.z);
       ped.char.object.visible = cd < 130;
       ped.animAcc += dt;
-      if (cd < 45 || ped.animAcc > 0.1) { ped.char.update(ped.animAcc, ped.speed, { turn: ped.turn || 0, fidget: !ped.chat && !ped.fixed }); ped.animAcc = 0; }
+      if ((cd < 45 || ped.animAcc > 0.1) && (posing || ped.char.rag)) { ped.char.update(ped.animAcc, ped.speed, { turn: ped.turn || 0, fidget: !ped.chat && !ped.fixed }); ped.animAcc = 0; }
       const o = ped.char.object;
       if (!ped.char.rag) { o.position.set(ped.x, ped.y, ped.z); o.rotation.set(0, ped.heading, 0); } // (a ragdoll places itself)
       if (ped.group && ped.state === 'idle') ped.speed = 0;

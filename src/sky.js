@@ -354,6 +354,10 @@ export class SkySystem {
     this.sunDir = new THREE.Vector3();
     // IBL: the same sky rendered into a PMREM environment map
     this.pmrem = new THREE.PMREMGenerator(renderer);
+    // (redrawn into the same target every time: a new one every 3 s was a new texture for the environment, and every
+    // material in town worked its shader's parameters out again for it — a hitch every 3 s — besides the GPU making
+    // and freeing the target)
+    { const alloc = this.pmrem._allocateTargets.bind(this.pmrem); this.pmrem._allocateTargets = () => this.envRT || alloc(); }
     this.envScene = new THREE.Scene();
     this.envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), skyMaterial()));
     this.envGround = new THREE.Mesh(new THREE.CircleGeometry(90, 24), new THREE.MeshBasicMaterial({ color: 0x8a7e6c }));
@@ -525,9 +529,7 @@ export class SkySystem {
         this.envHaze.material.opacity = 0.62 * day;
       }
       const rt = this.pmrem.fromScene(this.envScene, 0, 0.1, 400);
-      if (this.envRT) this.envRT.dispose();
-      this.envRT = rt;
-      this.scene.environment = rt.texture;
+      if (rt !== this.envRT) { if (this.envRT) this.envRT.dispose(); this.envRT = rt; this.scene.environment = rt.texture; }
     }
     this.scene.environmentIntensity = STYLE.plastilina ? lerp(0.45, 0.6, day) : lerp(0.4, 0.55, day);
     return this.night;

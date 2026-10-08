@@ -1594,6 +1594,20 @@ const MOVABLE = ['hips', 'browL', 'browR', 'mouthL', 'mouthR'];
 const COMBO = ['jab', 'cross', 'hookL', 'upper'];
 
 // ---------------------------------------------------------------- character
+// A skeleton is some thirty bones a person, a hundred people in town: the renderer walked all of them twice a frame
+// (the view and the sun's shadow) looking for something to draw among them, and there is nothing — the skinned meshes
+// hang from the person's group, not from the bones. So the bones are hidden from those walks (a hidden bone still
+// moves its skin: skinning reads its matrices, which are worked out all the same). Anything held in a hand — the
+// fishing rod, a weapon — brings its skeleton back into the walks (Bone.add below), so it is drawn.
+function hideBones(root) { for (const c of root.children) if (c.isBone) c.visible = false; }
+{
+  const add = THREE.Bone.prototype.add;
+  THREE.Bone.prototype.add = function (...objs) {
+    const r = add.apply(this, objs);
+    if (objs.some((o) => o && !o.isBone)) { let b = this; while (b.parent && b.parent.isBone) b = b.parent; b.visible = true; }
+    return r;
+  };
+}
 const _v = new THREE.Vector3(), _q = new THREE.Quaternion();
 const _ikA = new THREE.Vector3(), _ikB = new THREE.Vector3(), _ikC = new THREE.Vector3(), _ikM = new THREE.Matrix4();
 const _ikX = new THREE.Vector3(), _ikY = new THREE.Vector3(), _ikZ = new THREE.Vector3(), _ikQ = new THREE.Quaternion();
@@ -1630,7 +1644,7 @@ export class Character {
     this.spec = this.makeSpec ? this.makeSpec(desc, factory) : factory.spec(desc); // (a subclass may build its own: the hero)
     this.key = this.spec.key;
     this.object = new THREE.Group();
-    if (STYLE.plastilina && !statue) SM.add(this.object); // (claymation: a puppet, posed 12 times a second)
+    if (STYLE.plastilina && !statue) SM.add(this.object, this); // (claymation: a puppet, posed 12 times a second)
     const byName = {}, list = [];
     for (const b of this.rigBones ? this.rigBones() : factory.B.rig(this.spec)) {
       const o = new THREE.Bone();
@@ -1640,6 +1654,8 @@ export class Character {
       byName[b.name] = o;
       list.push(o);
     }
+    hideBones(this.object);
+    this.poseN = 0; // (counts the times the bones are posed: the stop motion knows a puppet whose bones have not moved)
     this.bones = byName;
     this.boneList = list;
     this.rest = Object.fromEntries(list.map((b) => [b.name, b.position.clone()]));
@@ -1672,11 +1688,12 @@ export class Character {
     this.gaze = [0, 0]; this.gazeT = 0; this.gazeGoal = [0, 0];
     this.lookTarget = null;
     this.talkAmt = 0;
-    factory.request(this.spec, (shape) => this.attach(shape), statue ? 1 : 5);
+    factory.request(this.spec, (shape) => this.attach(shape), statue ? 1 : desc.hero ? 10 : 5); // (the hero, the player's, first)
   }
   attach(shape) {
     if (this.disposed) return;
     this.shape = shape;
+    this.poseN++;
     // the bones' rest offsets as the shape was built (a MakeHuman head puts the eyes, lids and brows over its own eyeballs)
     for (const b of shape.bones) { const o = this.bones[b.name]; if (o) { o.position.fromArray(b.off); if (this.rest[b.name]) this.rest[b.name].copy(o.position); } }
     this.skeleton = new THREE.Skeleton(this.boneList, shape.inverses);
@@ -1775,7 +1792,7 @@ export class Character {
     from.get('hips').premultiply(turn);
     const c = Math.cos(-heading), sn = Math.sin(-heading), ox = pel.x - x, oz = pel.z - z;
     const fromP = new THREE.Vector3(ox * c + oz * sn, pel.y - fy, -ox * sn + oz * c);
-    this.rag = null;
+    this.rag = null; this.poseN++;
     this.gu = { t: 0, K, from, fromP, up };
     this.object.position.set(x, fy, z); this.object.rotation.set(0, heading, 0);
     return { x, z, heading };
@@ -1819,7 +1836,7 @@ export class Character {
       put('thigh' + sd, qt); put('shin' + sd, qs); put('foot' + sd, qf);
     }
   }
-  endRagdoll() { this.rag = null; for (const b of this.boneList) b.quaternion.identity(); for (const n in this.rest) this.bones[n].position.copy(this.rest[n]); }
+  endRagdoll() { this.rag = null; this.poseN++; for (const b of this.boneList) b.quaternion.identity(); for (const n in this.rest) this.bones[n].position.copy(this.rest[n]); }
   // the rest of the body while the ragdoll has it: eyes shut (or half shut, dazed), the mouth fallen open, hands loose
   ragPose() {
     const B = this.bones, rag = this.rag;
@@ -1848,6 +1865,12 @@ export class Character {
   // opts: grounded, vy (vertical speed), turn (turn rate), crouch, fidget (idle fidgets allowed), lookYaw, talking,
   // moveDir (direction of travel relative to facing: 0 ahead, ±π/2 sideways, π backwards), forceFidget
   update(dt, speed, opts = {}) {
+    // claymation: a puppet is only seen at the stop motion's poses (12 a second, SM): between two of them its time is
+    // kept and the pose worked out once, at the next — the same pose, a fifth of the work. (Not its first one, nor a
+    // ragdoll, whose fall is worked out step by step)
+    if (STYLE.plastilina && !SM.tick && this._posed && !this.rag && SM.items.has(this.object)) { this._smDt = (this._smDt || 0) + dt; return; }
+    if (this._smDt) { dt += this._smDt; this._smDt = 0; }
+    this._posed = true; this.poseN++;
     this.t += dt;
     const B = this.bones;
     if (this.rag) { this.rag.step(dt); this.ragPose(); return; }

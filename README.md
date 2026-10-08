@@ -48,7 +48,8 @@ La **Plastilina** es Guareña como una película de stop motion de plastilina (c
   - rejas negras gordas, geranios y cipresitos en macetas al pie de las ventanas;
   - nubes de algodón delante de un cielo pintado.
 - Pelo de plastilina con surcos de palillo y ropa modelada (sin el tejido de la ropa de verdad); un contraluz cálido de
-  estudio separa a los muñecos del decorado. En calidad alta, a la resolución completa de la pantalla.
+  estudio separa a los muñecos del decorado. En calidad alta, a 1,5× en las pantallas de alta densidad (Retina), con la
+  oclusión de contacto a media resolución; la resolución dinámica baja de ahí solo si la GPU no llega.
 
 Todo está en `src/plastilina.js` (también la oclusión de contacto, `STUDIO_AO`, y la gradación final, `ClayGrade`) y en
 las ramas `STYLE.plastilina` de casas, fachadas, árboles, personajes, coches y cielo (las cabezas de muñeco, en
@@ -140,6 +141,24 @@ sin y con el esculpido de muñeco.
 - El 94,6 % de cada lado de calle tiene acera para andar (antes, el 76,6 %); no queda ninguna tira ni casa sobre el
   bordillo. Los peatones van por la acera en el 98,8 % de su camino (antes, el 13,8 % dentro de una pared).
 
+**Fluido** (en [docs/fluidez.md](docs/fluidez.md), con el análisis, la estrategia y las medidas):
+- Medido antes y después en el bucle del propio juego (un Chrome con la GPU, pantalla Retina de 1440 × 900, calidad
+  alta), conduciendo pasa de 21 a 51 fotogramas por segundo (+138 %), andando de 23 a 51 (+126 %) y en la plaza
+  llena de 22 a 45 (+106 %); los fotogramas de más de 50 ms, de 171 a ninguno en 40 s conduciendo.
+- Sin los tirones de antes:
+  - la textura de la plastilina ya no sube otra vez a la GPU cada vez que aparece algo nuevo (eran parones de medio
+    segundo a dos segundos);
+  - las fachadas de cada calle se construyen poco a poco y antes de llegar, y se guardan hechas;
+  - el cielo y los árboles ya no lo rehacen todo cada pocos segundos.
+- Más fotogramas:
+  - en la GPU, la Plastilina a 1,5× en pantallas Retina y la oclusión de contacto a media resolución;
+  - en la CPU, cada pose de la gente se calcula una vez, cuando el *stop motion* la va a enseñar, y el renderizador ya
+    no recorre los huesos.
+- La resolución dinámica solo baja la nitidez si es la GPU la que no llega; la carga ya no espera hasta 7 s a un cuerpo
+  que Álex no usa.
+- `tools/perf/` repite las medidas (un Chrome sin ventana, antes y después por turnos) y `tools/perflab.js` las hace
+  en la página.
+
 ![Guareña desde el aire: la Iglesia de Santa María y la Plaza de España con el Ayuntamiento](docs/portada.jpg)
 
 ## Jugar
@@ -206,8 +225,9 @@ python3 tools/aceras/medir.py       # mide los bordillos en ellas; final.py escr
 - `tools/` — empaquetado, servidor local, mapa y pruebas automáticas: `audit.js` recorre todas las calles a pie
   y en coche, `missionbot.js` juega las misiones, `playtest.js` conduce, pelea, hace de taxista… `faces.js`
   retrata a los personajes de cerca, `runlab.js` graba y mide carreras (pies, cámara, temblor), `mocaplab.js`
-  adapta la captura de movimiento (`appendDB` añade tomas sin tocar las que ya hay) y `townlab.js` mide la vida del
-  pueblo (gente, civismo, tráfico, conversaciones) en siete escenas
+  adapta la captura de movimiento (`appendDB` añade tomas sin tocar las que ya hay), `townlab.js` mide la vida del
+  pueblo (gente, civismo, tráfico, conversaciones) en siete escenas y `perflab.js` la fluidez (fotogramas, tirones,
+  qué cuesta cada parte del dibujo); `tools/perf/` la mide en un Chrome sin ventana, antes y después de un cambio
 - `multijugador/` — el servidor de la sala · `.github/workflows/pages.yml` — publica el juego en GitHub Pages
 
 Si defines la variable de repositorio `GUARENA_MP_URL` con la dirección de un servidor propio, las copias que no

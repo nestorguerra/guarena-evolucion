@@ -38,6 +38,11 @@ Hace falta Python 3.
       y guarda los bordillos puestos a mano (data/bordillos.json, desde
       tools/aceras/revision_final.txt). Ver docs/aceras.md.
 
+  python3 tools/perf/ab.py --rounds 3, absum.py, profile.py
+      La fluidez, medida en un Chrome sin ventana con la GPU: antes y después de un cambio
+      por turnos (sh tools/perf/antes.sh COMMIT prepara la versión de antes), las medianas,
+      y adónde va el tiempo de la CPU. En la página, tools/perflab.js. Ver docs/fluidez.md.
+
 CARPETAS
 --------
   index.html     Página del juego (pantallas, HUD, estilos).

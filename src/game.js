@@ -89,9 +89,10 @@ export class Game {
   async init(progress) {
     const q = this.q;
     const r = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: !q.bloom, powerPreference: 'high-performance', stencil: false });
-    // (the claymation's thumbprints want the screen's own resolution on high quality — a film is sharp; dynamic
-    // resolution backs off if needed)
-    r.setPixelRatio(Math.min(devicePixelRatio || 1, STYLE.plastilina && this.qKey === 'alta' ? 2 : q.pr));
+    // (the claymation drew at the screen's own resolution on high quality — 2× on a laptop's retina screen: the GPU
+    // took 50 ms a frame there, 16 fps. At 1.5× the clay's thumbprints still read, the lens softens the background
+    // anyway, and there are 44 % fewer pixels to shade; the dynamic resolution backs off from there if the GPU is short)
+    r.setPixelRatio(Math.min(devicePixelRatio || 1, q.pr));
     r.setSize(innerWidth, innerHeight, false);
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
@@ -105,8 +106,9 @@ export class Game {
     this.chars = new CharacterFactory(this.qKey === 'baja' ? { q: 1.3, lodNear: 7 } : this.qKey === 'media' ? { lodNear: 10 } : STYLE.plastilina ? { q: 0.8 } : {}); // (claymation: the puppets modelled finer, smoother clay)
     installHero(this.chars); this.heroLoad = loadHero(); // (the protagonist's body and motion capture, unzipped meanwhile)
     const firstDesc = this.save.custom || PLAYER_PRESETS[0];
-    this.chars.prebuild([firstDesc], 10);
-    this.chars.prebuild(PLAYER_PRESETS, 8);
+    // (the protagonist, Álex, is the hero — hero.js —, with its own body: the sculpted one of its preset is never seen)
+    if (!firstDesc.hero) this.chars.prebuild([firstDesc], 10);
+    this.chars.prebuild(PLAYER_PRESETS.filter((d) => !d.hero), 8);
     this.chars.prebuild(pedShapes(), 6);
     this.chars.prebuild(Object.values(COP_DESC), 5);
     await tick();
@@ -207,11 +209,17 @@ export class Game {
       this.composer.addPass(rp);
       if (this.qKey !== 'baja') {
         // the AO reads the depth the scene pass has just drawn (normals from that depth): no second drawing of the whole
-        // town for a normal buffer (twice the draw calls), and no sprites without normals (they came out as black squares)
+        // town for a normal buffer (twice the draw calls), and no sprites without normals (they came out as black squares).
+        // It is worked out at half the resolution (a quarter of the pixels: it was the dearest thing on the GPU, a third
+        // of the frame), a soft contact shadow that does not need more, and laid on the picture by the grade below —
+        // not copied over the whole picture and then blended onto it again, two full-screen passes less
         this.gtao = new GTAOPass(this.scene, this.camera, innerWidth, innerHeight);
         this.gtao.setGBuffer(rt.depthTexture); // (after construction: r170's constructor trips over a given depth texture)
         this.gtao.updateGtaoMaterial(STUDIO_AO.ao); this.gtao.updatePdMaterial(STUDIO_AO.denoise);
         this.gtao.blendIntensity = STUDIO_AO.blend;
+        this.gtao.output = GTAOPass.OUTPUT.Off; this.gtao.needsSwap = false;
+        const gtaoSize = this.gtao.setSize.bind(this.gtao);
+        this.gtao.setSize = (w, h) => gtaoSize(Math.max(1, Math.ceil(w / 2)), Math.max(1, Math.ceil(h / 2)));
         const gtaoRender = this.gtao.render.bind(this.gtao);
         this.gtao.render = (renderer, wb, rb, dt, mask) => { // (the composer's two buffers take turns: the one just drawn)
           this.gtao.gtaoMaterial.uniforms.tDepth.value = this.sceneDepth; this.gtao.pdMaterial.uniforms.tDepth.value = this.sceneDepth;
@@ -220,6 +228,7 @@ export class Game {
         this.composer.addPass(this.gtao);
       }
       this.grade = new ShaderPass(ClayGrade);
+      if (this.gtao) { this.grade.uniforms.tAO.value = this.gtao.gtaoMap; this.grade.uniforms.uAO.value = STUDIO_AO.blend; }
       this.grade.material.depthTest = this.grade.material.depthWrite = false; // (full-screen passes never touch depth)
       this.composer.addPass(this.grade);
       { // (pure clay colours, the studio's fill in the shadows, a touch of lens)
@@ -259,7 +268,10 @@ export class Game {
     this.render();
     this.hourPrev = Math.floor(this.sky.hour * 4);
     progress('Vistiendo a los vecinos…', 0.99);
-    await Promise.race([this.chars.whenReady(firstDesc), new Promise((res) => setTimeout(res, 7000))]);
+    // (the player's own character, whichever it is: it used to wait — up to 7 s on a first visit — for the sculpted body
+    // of the hero's preset, which the hero does not wear, queued behind the neighbours')
+    const pc = this.player.char;
+    await Promise.race([new Promise((res) => { const c = () => (pc.ready || pc.disposed ? res() : setTimeout(c, 50)); c(); }), new Promise((res) => setTimeout(res, 7000))]);
     progress('¡Listo!', 1);
   }
 
@@ -548,6 +560,7 @@ export class Game {
 
   // ------------------------------------------------------------ main loop
   frame(dtReal) {
+    const tWork = performance.now(); // (how long this frame's own work takes: see adaptResolution)
     const input = this.input;
     if (STYLE.plastilina) SM.advance(dtReal); // (stop motion: is this frame a new pose?)
     input.poll();
@@ -689,6 +702,7 @@ export class Game {
     this.chars.updateLods(this.camera.position, this.q.shadows > 0, wv ? wv.eye : null);
     this.render();
     input.endFrame();
+    this.workMs = performance.now() - tWork;
   }
 
   // dynamic resolution, gently: only a sustained slowdown (not a hiccup while the town streams in) lowers the internal
@@ -702,14 +716,18 @@ export class Game {
     pf.grace -= dtReal;
     if (pf.grace > 0) return; // the first seconds after starting / entering somewhere: everything is loading
     pf.avg = pf.avg * 0.97 + dtReal * 0.03;
+    pf.work = (pf.work ?? dtReal) * 0.97 + Math.min(0.1, (this.workMs || 0) / 1000) * 0.03;
     pf.t += dtReal;
     pf.lock -= dtReal;
     if (pf.t < 1) return;
     pf.t = 0;
     // (fluid first: under ~50 fps for two seconds running, a little less resolution; back up once the frames are
-    // coming at ~60 again for three)
-    pf.slow = pf.avg > 1 / 50 ? pf.slow + 1 : 0;   // under ~50 fps
-    pf.fast = pf.avg < 1 / 57 ? pf.fast + 1 : 0;   // at ~60 fps
+    // coming at ~60 again for three. Fewer pixels only help a GPU that is short: a frame whose own work — the game's
+    // code and the drawing's calls — takes up most of it is short of CPU, and dropping the resolution would only blur
+    // the picture for nothing: then it stays, or goes back up. In between, it holds)
+    const busy = pf.work / pf.avg;
+    pf.slow = pf.avg > 1 / 50 && busy < 0.65 ? pf.slow + 1 : 0;   // under ~50 fps, the GPU short
+    pf.fast = pf.avg < 1 / 57 || busy > 0.8 ? pf.fast + 1 : 0;    // at ~60 fps (or the CPU the one short)
     const floor = Math.max(0.75, pf.base * 0.6);
     let pr = pf.pr;
     if (pf.slow >= 2 && pr > floor) { pr = Math.max(floor, pr - 0.1); pf.lock = 4; pf.slow = 0; }       // 2 s in a row
@@ -791,6 +809,7 @@ export class Game {
     // a hair
     if (STYLE.plastilina) {
       if (this.grade && SM.tick) this.grade.uniforms.uGain.value = 1 + (Math.random() - 0.5) * PLASTILINA.flicker;
+      if (this.grade && this.gtao) this.grade.uniforms.uAO.value = this.gtao.enabled ? STUDIO_AO.blend : 0; // (the contact shadows, laid on by the grade)
       SM.hold();
     }
     const wv = this.interior && this.windowView && this.windowView.render(); // the street, drawn for the windows

@@ -730,6 +730,7 @@ export function groundPot(G, P, kind, x, y, z, s, rnd) {
 
 // ------------------------------------------------------------------ streaming manager
 const CHUNK = 56;
+const MAX_BUILT = 150; // (chunks kept built at most)
 export class FacadeDetails {
   constructor(openings, runs, root, material, { near = 110, fine = 55, shadowDist = 60 } = {}) {
     this.root = root; this.mat = material; this.near = near; this.fine = fine; this.shadowDist = shadowDist;
@@ -784,46 +785,83 @@ export class FacadeDetails {
     if (this.chunks.size !== n0) this.list.push(c);
     this.nProps++;
   }
+  // Streamed a little every frame. A chunk used to be built all at once when the camera came within 30 m of where it
+  // shows — 15 to 80 ms, a stutter each time a street came into view —, and every chunk within 60 m in the same frame;
+  // and it was thrown away 90 m past that, to be built again on the way back. Now the chunks are started 60 m ahead,
+  // nearest first, and built a few openings at a time (a generator: steps()) within a few milliseconds a frame — more
+  // only for one already in view (a teleport, a respawn) —; a chunk half built is taken up again where it was left.
+  // Built ones are kept until they are 220 m past (and only the farthest go when there are very many): coming back
+  // down a street finds it ready.
   update(cx, cz, budgetMs = 2.5) {
     const t0 = performance.now();
-    const need = [];
-    const near = this.near;
+    const near = this.near, ahead = near + 60, keep = near + 220;
+    let best = null, built = 0;
     for (const ch of this.list) {
       const dx = Math.max(ch.x0 - cx, 0, cx - ch.x1), dz = Math.max(ch.z0 - cz, 0, cz - ch.z1);
       const d = Math.hypot(dx, dz);
       ch.d = d;
       if (ch.built) {
+        built++;
         if (ch.mesh) { ch.mesh.visible = d < near + 6; ch.mesh.castShadow = d < this.shadowDist; }
         if (ch.fineMesh) { ch.fineMesh.visible = d < this.fine; ch.fineMesh.castShadow = d < this.shadowDist * 0.6; }
         if (ch.plantMesh) { ch.plantMesh.visible = d < this.fine * 1.25; ch.plantMesh.castShadow = d < this.shadowDist * 0.5; }
-        if (d > near + 90) this.drop(ch);
-      } else if (d < near + 30) need.push(ch);
+        if (d > keep) { this.drop(ch); built--; }
+      } else if (d < ahead && (!best || d < best.d)) best = ch;
     }
-    need.sort((a, b) => a.d - b.d);
-    for (const ch of need) {
-      this.build(ch);
-      if (performance.now() - t0 > budgetMs && ch.d > near * 0.5) break;
+    if (built > MAX_BUILT) { // (a long drive round town: the farthest let go)
+      const far = this.list.filter((ch) => ch.built && ch.d > ahead).sort((a, b) => b.d - a.d);
+      for (let k = 0; k < far.length && built > MAX_BUILT; k++, built--) this.drop(far[k]);
+    }
+    if (!best) return;
+    const budget = best.d < near * 0.3 ? 10 : best.d < near ? 5 : budgetMs;
+    while (best) {
+      const gen = best.gen || (best.gen = this.steps(best));
+      while (!gen.next().done) if (performance.now() - t0 > budget) return;
+      best.gen = null;
+      if (performance.now() - t0 > budget) return;
+      best = null; // (the next nearest, if there is time left)
+      for (const ch of this.list) if (!ch.built && ch.d < ahead && (!best || ch.d < best.d)) best = ch;
     }
   }
-  build(ch) {
+  build(ch) { const gen = ch.gen || this.steps(ch); while (!gen.next().done); ch.gen = null; }
+  // the chunk's building, step by step (each a few openings, runs or props): yields between them, done when its
+  // meshes are in the scene. (CUR_P, the plants' geometry of the opening being built, is this chunk's while it runs)
+  *steps(ch) {
     const G = new Geo(), F = new Geo(), P = this.plantMat ? new CardGeo() : null;
+    const STEP = 8;
     CUR_P = P;
-    for (const o of ch.ops) buildOpening(G, F, o);
-    if (ch.fns) { G.frame(0, 0, 0, 1, 0, 0, 1); F.frame(0, 0, 0, 1, 0, 0, 1); if (P) P.world(); for (const fn of ch.fns) fn(G, F, P); }
+    for (let k = 0; k < ch.ops.length; k++) {
+      buildOpening(G, F, ch.ops[k]);
+      if (k % STEP === STEP - 1) { CUR_P = null; yield; CUR_P = P; }
+    }
+    if (ch.fns) { G.frame(0, 0, 0, 1, 0, 0, 1); F.frame(0, 0, 0, 1, 0, 0, 1); if (P) P.world(); for (const fn of ch.fns) { fn(G, F, P); CUR_P = null; yield; CUR_P = P; } }
     if (ch.plants && P) {
       P.world();
       const pl = ch.plants;
-      for (let k = 0; k < pl.length; k += 6) groundPlant(P, GROUND_KINDS[pl[k]], pl[k + 1], pl[k + 2], pl[k + 3], pl[k + 4], mulberry32(pl[k + 5]));
+      for (let k = 0; k < pl.length; k += 6) {
+        groundPlant(P, GROUND_KINDS[pl[k]], pl[k + 1], pl[k + 2], pl[k + 3], pl[k + 4], mulberry32(pl[k + 5]));
+        if ((k / 6) % STEP === STEP - 1) { CUR_P = null; yield; CUR_P = P; }
+      }
     }
     CUR_P = null;
-    for (const r of ch.runs) buildRun(G, r, buildingStyle(r), mulberry32(((r.pid + 11) * 2246822519 + Math.round(r.ax * 10)) >>> 0));
+    for (let k = 0; k < ch.runs.length; k++) {
+      const r = ch.runs[k];
+      buildRun(G, r, buildingStyle(r), mulberry32(((r.pid + 11) * 2246822519 + Math.round(r.ax * 10)) >>> 0));
+      if (k % STEP === STEP - 1) yield;
+    }
     if (ch.props) {
       const pr = ch.props;
-      for (let k = 0; k < pr.length; k += 9) (pr[k + 8] ? F : G).prop(pr[k], pr[k + 1], pr[k + 2], pr[k + 3], pr[k + 4], pr[k + 5], pr[k + 6], pr[k + 7]);
+      for (let k = 0; k < pr.length; k += 9) {
+        (pr[k + 8] ? F : G).prop(pr[k], pr[k + 1], pr[k + 2], pr[k + 3], pr[k + 4], pr[k + 5], pr[k + 6], pr[k + 7]);
+        if ((k / 9) % (STEP * 2) === STEP * 2 - 1) yield;
+      }
     }
+    yield;
+    const mesh = G.build(this.mat); yield; // (the geometries made one by one too: a big chunk's take a few ms each)
+    const fine = F.build(this.mat); yield;
     ch.built = true;
-    ch.mesh = G.build(this.mat);
-    ch.fineMesh = F.build(this.mat);
+    ch.mesh = mesh;
+    ch.fineMesh = fine;
     ch.plantMesh = P ? P.build(this.plantMat, this.plantDepth) : null;
     if (ch.mesh) { ch.mesh.visible = ch.d < this.near + 6; ch.mesh.castShadow = ch.d < this.shadowDist; this.root.add(ch.mesh); }
     if (ch.fineMesh) { ch.fineMesh.visible = ch.d < this.fine; this.root.add(ch.fineMesh); }
@@ -838,6 +876,7 @@ export class FacadeDetails {
       ch[k] = null;
     }
     ch.built = false;
+    ch.gen = null;
   }
   stats() {
     let meshes = 0, tris = 0, fine = 0;

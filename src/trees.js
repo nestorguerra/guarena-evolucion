@@ -1235,9 +1235,13 @@ export class TreeField {
     }
     this.update(0, 0, true);
   }
-  // which chunks are near, and within them which level each tree is drawn at
+  // which chunks are near, and within them which level each tree is drawn at. (Four times a second this sent every
+  // tree's matrix to the GPU again — some 3 MB, the whole of each buffer whatever was in use —: now only when the camera
+  // has moved a few metres, and only the part in use)
   update(cx, cz, force = false) {
     if (!this.chunks) return;
+    if (!force && this._at && Math.hypot(cx - this._at[0], cz - this._at[1]) < 4) return;
+    this._at = [cx, cz];
     const C = this.chunk, near = this.near;
     const nearItems = [];
     for (const ch of this.chunks.values()) {
@@ -1268,7 +1272,11 @@ export class TreeField {
     }
     for (const b of this.byVar.values()) for (const ms of b) for (const im of ms) if (im) {
       im.visible = im.count > 0;
-      if (im.count) { im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true; }
+      if (im.count) {
+        const M = im.instanceMatrix, K = im.instanceColor;
+        M.clearUpdateRanges(); M.addUpdateRange(0, im.count * 16); M.needsUpdate = true;
+        K.clearUpdateRanges(); K.addUpdateRange(0, im.count * 3); K.needsUpdate = true;
+      }
     }
   }
 }

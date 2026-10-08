@@ -257,13 +257,16 @@ export class Hud {
     const g = this.game;
     const p = g.player;
     const ui = this.ui;
+    // (what the HUD shows is written to the page only when it changes: a text or a width written every frame, the same
+    // as before or not, made the browser work out the HUD's styles and layout again every frame)
+    const put = (el, k, v) => { if (el && el['_' + k] !== v) { el['_' + k] = v; if (k === 'w') el.style.width = v; else el.textContent = v; } };
     // money
     const m = p.money;
     if (Math.abs(this.moneyShown - m) > 0.5) this.moneyShown = lerp(this.moneyShown, m, 1 - Math.exp(-6 * dt));
     else this.moneyShown = m;
-    ui.money.textContent = fmtMoney(Math.round(this.moneyShown));
+    put(ui.money, 't', fmtMoney(Math.round(this.moneyShown)));
     const wd = (((g.sky.day || 0) + 5) % 7);
-    ui.clock.textContent = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][wd] + ' ' + g.sky.timeString;
+    put(ui.clock, 't', ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][wd] + ' ' + g.sky.timeString);
     // the real weather of the town, under the clock (weather.js): what it is, and from when and where the reading is
     this.wxT = (this.wxT || 0) - Math.max(dt, 0.016);
     if (ui.wx && this.wxT <= 0) {
@@ -287,8 +290,8 @@ export class Hud {
       }
     }
     // health & armour
-    ui.hp.style.width = `${p.health}%`;
-    ui.hp.classList.toggle('low', p.health < 30);
+    put(ui.hp, 'w', `${p.health}%`);
+    if (ui.hp._low !== (p.health < 30)) { ui.hp._low = p.health < 30; ui.hp.classList.toggle('low', ui.hp._low); }
     if (ui.ar) {
       const a = Math.round(p.armor || 0);
       if (a !== this._ar) { this._ar = a; ui.ar.style.width = `${a}%`; ui.ar.parentElement.style.display = a > 0 ? '' : 'none'; }
@@ -304,12 +307,12 @@ export class Hud {
     }
     // vehicle
     if (p.vehicle) {
-      ui.veh.hidden = false;
+      if (ui.veh.hidden) ui.veh.hidden = false;
       const kmh = Math.round(Math.abs(p.vehicle.speed) * 3.6);
-      ui.speed.textContent = kmh;
-      ui.vehName.textContent = p.vehicle.spec.name;
-      ui.vehHp.style.width = `${clamp(p.vehicle.health / 10, 0, 100)}%`;
-    } else ui.veh.hidden = true;
+      put(ui.speed, 't', String(kmh));
+      put(ui.vehName, 't', p.vehicle.spec.name);
+      put(ui.vehHp, 'w', `${clamp(p.vehicle.health / 10, 0, 100)}%`);
+    } else if (!ui.veh.hidden) ui.veh.hidden = true;
     // street name (on change)
     this.streetT -= dt;
     if (this.streetT <= 0) {

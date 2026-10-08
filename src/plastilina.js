@@ -38,13 +38,18 @@ export const STUDIO_AO = {
 // the film's last grade, in linear light before the tone curve (its values: PLASTILINA.grade): the studio lamps (uGain,
 // a hair brighter or dimmer at each pose) and their gels (uTint), purer colour, a warm white balance, a touch of
 // contrast round the middle greys, the studio's fill in the shadows, the lens's darker corners
+// The contact shadows (STUDIO_AO, worked out at half the resolution) are laid on here first, as the AO pass's own
+// blend did: the picture times the occlusion (tAO, sampled smoothly between its texels; uAO its strength, 0 without
+// it). (Brought up following the depth instead — a bilateral upsampling — the edges of cars and kerbs came out stepped
+// at the AO's coarser pixels: the plain blend reads cleaner)
 export const ClayGrade = {
-  uniforms: { tDiffuse: { value: null }, uSat: { value: 1 }, uWarm: { value: 0 }, uContrast: { value: 1 }, uLift: { value: 0 }, uVignette: { value: 0 }, uGain: { value: 1 }, uTint: { value: { x: 1, y: 1, z: 1 } } },
+  uniforms: { tDiffuse: { value: null }, tAO: { value: null }, uAO: { value: 0 }, uSat: { value: 1 }, uWarm: { value: 0 }, uContrast: { value: 1 }, uLift: { value: 0 }, uVignette: { value: 0 }, uGain: { value: 1 }, uTint: { value: { x: 1, y: 1, z: 1 } } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uSat, uWarm, uContrast, uLift, uVignette, uGain; uniform vec3 uTint; varying vec2 vUv;
+    uniform sampler2D tDiffuse, tAO; uniform float uAO, uSat, uWarm, uContrast, uLift, uVignette, uGain; uniform vec3 uTint; varying vec2 vUv;
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
+      if (uAO > 0.0) c.rgb *= mix(1.0, texture2D(tAO, vUv).r, uAO);
       vec3 col = max(c.rgb, 0.0) * uGain * uTint;
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = mix(vec3(l), col, uSat);
@@ -186,12 +191,15 @@ function makeClayDetail(S = 1024) {
 
 // ---------------------------------------------------------------- the clay
 // One plain object shared by every material (three.js copies uniform values that are plain objects by reference),
-// so moving it once moves the boil of every puppet. (The detail texture is cloned per material, but every clone shares
-// its one upload: same source.)
+// so moving it once moves the boil of every puppet. The detail texture, though, three.js clones for every material it
+// compiles (the ShaderLib's uniforms are copied), and a texture's clone marks their shared source as changed: the
+// 1024² texture went up to the GPU again each time a material was first drawn — a car, a neighbour, a prop coming
+// into view —, stalling the frame for half a second to two seconds. Its clones are itself: one texture, one upload.
 export function installClayChunks() {
   const C = THREE.ShaderChunk;
   const boil = { value: { x: 0, y: 0 } };
   const detail = makeClayDetail(1024);
+  detail.clone = () => detail;
   PLASTILINA.detail = detail;
   for (const lib of ['standard', 'physical']) { THREE.ShaderLib[lib].uniforms.uClayBoil = boil; THREE.ShaderLib[lib].uniforms.uClayTex = { value: detail }; }
   PLASTILINA.boil = boil.value;
@@ -419,7 +427,7 @@ function pillow(g) {
 // anything nearer stay sharp (no band, no blurred foreground: the game must read as clearly as ever). Two passes
 // (across, then down); the pixels round a sharp thing do not take its colour.
 export const ClayLens = {
-  defines: { TAPS: 8, LENS_FROM: PLASTILINA.lens.from.toFixed(2), LENS_TO: PLASTILINA.lens.to.toFixed(2) },
+  defines: { TAPS: 5, LENS_FROM: PLASTILINA.lens.from.toFixed(2), LENS_TO: PLASTILINA.lens.to.toFixed(2) },
   uniforms: {
     tDiffuse: { value: null }, tDepth: { value: null }, uDir: { value: new THREE.Vector2(1, 0) }, uRes: { value: new THREE.Vector2(1280, 720) },
     uNear: { value: 0.25 }, uFar: { value: 4200 }, uFocus: { value: 6 }, uFocusUV: { value: new THREE.Vector2(0.5, 0.5) }, uMaxR: { value: 4 },
@@ -461,10 +469,11 @@ export class StopMotion {
     this.dt = 1 / fps;
     this.acc = 0;
     this.tick = true;
-    this.items = new Map(); // root -> { nodes, held, live, jit, n }
+    this.items = new Map(); // root -> { nodes, held, live, jit, n, char, heldN }
     this.ticks = 0;
   }
-  add(root) { this.items.set(root, { nodes: null, held: null, live: null, jit: null, n: -1 }); }
+  // (char: a person — characters.js —, whose poseN counts the times its bones were posed)
+  add(root, char = null) { this.items.set(root, { nodes: null, held: null, live: null, jit: null, n: -1, char, heldN: -1 }); }
   // (the protagonist is taken off: it is posed every frame and drawn where it is, as fluid as the camera that follows it)
   remove(root) { this.items.delete(root); }
   // once a frame, with the frame's real time: is this frame a new pose?
@@ -480,14 +489,14 @@ export class StopMotion {
   }
   // the time the shaders see (trees in the wind, water, clouds): it too moves pose by pose
   time(t) { return Math.floor(t / this.dt) * this.dt; }
-  nodesOf(root) {
+  nodesOf(root, skels) {
     const list = [];
-    root.traverse((o) => { if (o.matrixAutoUpdate !== false) list.push(o); });
+    root.traverse((o) => { if (o.matrixAutoUpdate !== false) list.push(o); if (o.isSkinnedMesh && o.skeleton && !skels.includes(o.skeleton)) skels.push(o.skeleton); });
     return list;
   }
-  static capture(nodes, arr) {
-    const a = arr && arr.length === nodes.length * 10 ? arr : new Float32Array(nodes.length * 10);
-    for (let i = 0; i < nodes.length; i++) {
+  static capture(nodes, arr, n = nodes.length) {
+    const a = arr && arr.length === n * 10 ? arr : new Float32Array(n * 10);
+    for (let i = 0; i < n; i++) {
       const o = nodes[i], k = i * 10;
       a[k] = o.position.x; a[k + 1] = o.position.y; a[k + 2] = o.position.z;
       a[k + 3] = o.quaternion.x; a[k + 4] = o.quaternion.y; a[k + 5] = o.quaternion.z; a[k + 6] = o.quaternion.w;
@@ -495,16 +504,24 @@ export class StopMotion {
     }
     return a;
   }
-  static apply(nodes, a) {
-    for (let i = 0; i < nodes.length; i++) {
-      const o = nodes[i], k = i * 10;
+  // (the quaternions written straight into their fields: through set() each one would also work its Euler angles out
+  // again — two matrices per bone, twice a frame, for every puppet in town. Nothing reads the angles while the picture
+  // is drawn, and release() puts the live quaternions back exactly as they were, so the angles still match them)
+  static apply(nodes, a, n = nodes.length) {
+    for (let i = 0; i < n; i++) {
+      const o = nodes[i], k = i * 10, q = o.quaternion;
       o.position.set(a[k], a[k + 1], a[k + 2]);
-      o.quaternion.set(a[k + 3], a[k + 4], a[k + 5], a[k + 6]);
+      q._x = a[k + 3]; q._y = a[k + 4]; q._z = a[k + 5]; q._w = a[k + 6];
       o.scale.set(a[k + 7], a[k + 8], a[k + 9]);
     }
   }
   // before drawing: the puppets not due a new pose go back to their last one — and every puppet sits where the
-  // animator's hand put it this pose: a few millimetres and a fraction of a degree off (PLASTILINA.jitter)
+  // animator's hand put it this pose: a few millimetres and a fraction of a degree off (PLASTILINA.jitter).
+  // A puppet held on its last pose has the same bones as when that pose was drawn: its skeleton is not worked out and
+  // sent to the GPU again (Skeleton.update below), only at its new poses — 12 times a second, not 60
+  // A person is only posed at the poses (Character.update): between two of them their bones are those of the pose
+  // held, and only their place differs — the game moves them on every frame. Then only the root is swapped, not the
+  // thirty bones (rootOnly); everything else (a ragdoll, a dog, a person posed in between) is swapped whole.
   hold() {
     this.swapped = false;
     const J = PLASTILINA.jitter;
@@ -512,26 +529,49 @@ export class StopMotion {
       if (!root.parent || !root.visible) { it.held = null; continue; }
       // (the node list is gathered again when the tree changes: a hat put on, a level of detail swapped)
       let count = 0; root.traverse(() => count++);
-      if (!it.nodes || count !== it.n) { it.nodes = this.nodesOf(root); it.n = count; it.held = null; }
-      const newPose = this.tick || !it.held;
+      if (!it.nodes || count !== it.n) { it.skels = []; it.nodes = this.nodesOf(root, it.skels); it.n = count; it.held = null; }
+      const newPose = this.tick || !it.held, ch = it.char;
       if (newPose) {
         it.held = StopMotion.capture(it.nodes, it.held);
+        it.heldN = ch ? ch.poseN : -1;
         it.jit = [(Math.random() - 0.5) * 2 * J.pos, (Math.random() - 0.5) * 2 * J.pos, (Math.random() - 0.5) * 2 * J.yaw];
+        it.pose = (it.pose || 0) + 1;
       }
-      it.live = StopMotion.capture(it.nodes, it.live);
-      if (!newPose) StopMotion.apply(it.nodes, it.held);
+      it.rootOnly = it.nodes[0] === root && (newPose || (ch && !ch.rag && ch.poseN === it.heldN));
+      if (it.rootOnly) {
+        it.liveRoot = StopMotion.capture(it.nodes, it.liveRoot, 1);
+        if (!newPose) StopMotion.apply(it.nodes, it.held, 1);
+      } else {
+        it.live = StopMotion.capture(it.nodes, it.live);
+        if (!newPose) StopMotion.apply(it.nodes, it.held);
+      }
+      for (const s of it.skels) { s._smPose = it.pose; s._smHeld = true; }
       if (it.jit && it.nodes[0] === root) { root.position.x += it.jit[0]; root.position.z += it.jit[1]; root.rotateY(it.jit[2]); } // (put back after the picture: release)
       it.swapped = true; this.swapped = true;
     }
   }
-  // after drawing: the live state again, for the game to carry on from
+  // after drawing: the live state again, for the game to carry on from (the root's angles too: the jitter turned it)
   release() {
     if (!this.swapped) return;
-    for (const it of this.items.values()) if (it.swapped) { StopMotion.apply(it.nodes, it.live); it.swapped = false; }
+    for (const [root, it] of this.items) if (it.swapped) {
+      if (it.rootOnly) StopMotion.apply(it.nodes, it.liveRoot, 1); else StopMotion.apply(it.nodes, it.live);
+      if (it.nodes[0] === root) root.rotation.setFromQuaternion(root.quaternion, undefined, false);
+      for (const s of it.skels) s._smHeld = false;
+      it.swapped = false;
+    }
     this.swapped = false;
   }
 }
 
 export const SM = new StopMotion();
+// (a held puppet's skeleton: its bones as they were when this pose was last worked out — the bone texture keeps them)
+{
+  const update = THREE.Skeleton.prototype.update;
+  THREE.Skeleton.prototype.update = function () {
+    if (this._smHeld && this._smDone === this._smPose) return;
+    update.call(this);
+    if (this._smHeld) this._smDone = this._smPose;
+  };
+}
 // the protagonist's clay does not boil: its own, still copy of the boil uniform (characters.js / hero.js)
 export const STEADY_BOIL = { value: { x: 0, y: 0 } };
