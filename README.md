@@ -119,6 +119,27 @@ sin y con el esculpido de muñeco.
 - Donde el Catastro deja un hueco y las fotos tienen casa, el juego la levanta.
 - `src/fachadas.js` hace las fachadas medidas; los datos de la calle están en `src/malfeitos.js`.
 
+**Muros sólidos y una cámara que no los atraviesa** (en [docs/solidez.md](docs/solidez.md)):
+- Las casas del Catastro, soldadas en hileras: las esquinas vecinas se unen, las que tocan una pared se apoyan en ella,
+  y cada grieta de hasta 1,3 m entre dos paredes, medida cada 25 cm, se cierra con un trozo de muro de pared a pared
+  (`src/solidez.js`). Ya no se ve a través de las juntas: los metros de pared frente a una grieta de menos de 10 cm
+  pasan de 39.900 a 0, y no queda ninguna de menos de 1,2 m en todo el pueblo.
+- Cada pared se esconde solo donde de verdad tiene una vecina detrás, y los muros chocan hasta la cumbrera.
+- La cámara es una bola de 45 cm que se para al tocar un muro o un tejado, sin distancia mínima, y comprueba las
+  esquinas de su encuadre. Girada del todo junto a 300 fachadas a tres alturas, en las dos estéticas (88.830
+  fotogramas): nunca dentro de una casa (antes, en el 29 % de los fotogramas).
+
+**Las aceras, medidas en las ortofotos del PNOA** (en [docs/aceras.md](docs/aceras.md)):
+- Los bordillos medidos en las fotos aéreas del IGN de 2025, 2022, 2019 y 2016 (`tools/aceras/`, `data/aceras.json`).
+- El juego tiende cada bordillo metro a metro a lo largo de las casas (`src/kerbs.js`): una acera de un metro para andar
+  donde la calzada tiene sitio, una sola acera en las calles estrechas, plataforma única en las más estrechas. Asfalto,
+  carriles, aparcamientos, mobiliario y peatones salen de ese bordillo.
+- Revisadas todas las calles sobre las fotos (584, 104 hojas): 277 bordillos de 157 calles puestos a mano donde no caían
+  en su sitio (`data/bordillos.json`), y tres calles cerradas, con la línea de OpenStreetMap bajo las casas, llevadas
+  a su sitio y abiertas.
+- El 94,6 % de cada lado de calle tiene acera para andar (antes, el 76,6 %); no queda ninguna tira ni casa sobre el
+  bordillo. Los peatones van por la acera en el 98,8 % de su camino (antes, el 13,8 % dentro de una pared).
+
 ![Guareña desde el aire: la Iglesia de Santa María y la Plaza de España con el Ayuntamiento](docs/portada.jpg)
 
 ## Jugar
@@ -174,7 +195,9 @@ Para montarlo en tu cuenta: [Desplegar en Render](https://dashboard.render.com/b
 ```bash
 python3 tools/devserver.py 8918     # http://localhost:8918/index.html · el código fuente, sin empaquetar
 python3 tools/build.py              # dist/guarena-evolucion.html: el juego en un solo archivo
-python3 tools/build_map.py          # regenera data/map.json desde OpenStreetMap y el Catastro
+python3 tools/build_map.py          # regenera data/map.json desde OpenStreetMap, el Catastro y data/aceras.json
+python3 tools/aceras/pnoa.py        # descarga las ortofotos del PNOA (a .cache/pnoa, fuera del repositorio)
+python3 tools/aceras/medir.py       # mide los bordillos en ellas; final.py escribe data/aceras.json
 ```
 
 - `index.html` — pantallas, HUD y estilos · `src/` — el juego (módulos ES, three.js) · `assets/` — texturas y sonidos
@@ -195,6 +218,10 @@ pueden jugar online (navegadores sin WebRTC) enlazan con él desde la pantalla *
 - Callejero © colaboradores de [OpenStreetMap](https://www.openstreetmap.org/copyright), bajo la licencia
   ODbL: `data/map.json` y `data/guarena.osm` contienen esos datos y se comparten con la misma licencia.
 - Edificios: Dirección General del Catastro (servicio INSPIRE), reutilizables citando la fuente.
+- Las aceras se han medido en las ortofotos del Plan Nacional de Ortofotografía Aérea: *PNOA cedido por © Instituto
+  Geográfico Nacional* ([scne.es](https://www.scne.es), licencia
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). En el juego no hay ninguna imagen: solo las medidas
+  (`data/aceras.json`).
 - Texturas fotográficas: [Poly Haven](https://polyhaven.com) (CC0). Sonidos de zombis:
   [OpenGameArt](https://opengameart.org) (CC0).
 - Caras, ojos, cejas, pestañas y peinados: [MakeHuman](http://www.makehumancommunity.org) (CC0: la malla base,

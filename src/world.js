@@ -18,7 +18,9 @@ import { clayRepaint } from './plastilina.js';
 import { buildLandmarks } from './landmarks.js';
 import { Reservoir } from './pantano.js';
 import { buildTrafficSigns } from './signs.js';
-import { resolveMeasured, buildMeasuredDetails, measuredLamps } from './fachadas.js';
+import { measuredGaps, resolveMeasured, buildMeasuredDetails, measuredLamps } from './fachadas.js';
+import { weldParts, fillCracks } from './solidez.js';
+import { layKerbs } from './kerbs.js';
 import { MALFEITOS } from './malfeitos.js';
 import { mulberry32, hash1, pointInRing, ringArea, ringBounds, polySample, polyNearest, clamp } from './util.js';
 
@@ -39,8 +41,10 @@ export class World {
     const map = this.map;
     const q = this.q;
     let tPrev = performance.now(), lPrev = 'start';
+    this.timings = {};
     const step = async (label, frac) => {
       const t = performance.now();
+      this.timings[lPrev] = Math.round(t - tPrev);
       if (typeof location !== 'undefined' && /[?&]debug\b/.test(location.search)) console.log(`[world] ${lPrev}: ${(t - tPrev).toFixed(0)} ms`);
       tPrev = t; lPrev = label;
       progress && progress(label, frac);
@@ -63,8 +67,20 @@ export class World {
     this.landmarks = buildLandmarks(this, map);
     const skipPart = (p) => this.landmarks.claims(p.c[0], p.c[1]);
     // the street fronts the Catastro leaves open where the town has houses (src/infill.js)
+    // (the houses the photographs show where the Catastro has none — calle Malfeitos, fachadas.js — before the town's
+    // own filling, which then leaves those gaps alone)
+    const gaps = measuredGaps(map, MALFEITOS);
     this.infill = infillGaps(map, { claims: (x, z) => this.landmarks.claims(x, z) });
     this.streetShops = placeStreetShops(map, { claims: (x, z) => this.landmarks.claims(x, z) });
+    // a solid town (solidez.js): the houses welded into rows — no crack between two neighbours, their party walls one —
+    // and every crack left, up to 1.3 m wide, closed with a piece of wall from one house's wall to the other's; the
+    // landmarks' outlines stay as they are
+    const madeUp = (o, kind) => (kind === 'b' ? o.infill : o.b >= 0 && map.buildings[o.b].infill);
+    const keep = (o, kind) => (kind === 'b' ? this.landmarks.claimsBuilding(o) : this.landmarks.claims(o.c[0], o.c[1]) || (o.b >= 0 && this.landmarks.claimsBuilding(map.buildings[o.b])));
+    const timed = (k, f) => { const t0 = performance.now(), r = f(); this.timings[k] = Math.round(performance.now() - t0); return r; };
+    const dbg = typeof location !== 'undefined' && /[?&]debug\b/.test(location.search);
+    this.weld = timed('soldar', () => weldParts(map, { tol: 0.35, wideTol: 0.5, fixed: keep, wide: madeUp }));
+    this.cracks = timed('grietas', () => fillCracks(map, { claims: (x, z) => this.landmarks.claims(x, z), skip: skipPart, why: dbg ? (this.crackWhy = []) : null }));
 
     // ---------------- buildings
     await step('Colocando tejas árabes…', 0.34);
@@ -82,7 +98,7 @@ export class World {
     const annie = PLAYER_PRESETS.find((pp) => pp.id === 'annie');
     const facade = { holes: near3d > 0, forcedDoors: annie && annie.start ? [{ x: annie.start.x, z: annie.start.z }] : [], openings: near3d > 0 ? [] : null, runs: [], ground: [] };
     // the houses modelled from photographs, front by front (fachadas.js; calle Malfeitos: malfeitos.js)
-    this.measured = resolveMeasured(map, MALFEITOS);
+    this.measured = resolveMeasured(map, MALFEITOS, gaps);
     if (this.measured.warn.length) console.warn('[fachadas]', this.measured.warn.join('; '));
     const bb = buildBuildings(map, { skipPart, onBuilding: (b) => !this.landmarks.claimsBuilding(b), overrides: this.landmarks.overrides, facade, measured: this.measured });
     for (const g of bb.geometries) {
@@ -142,11 +158,11 @@ void main(){
     ao.renderOrder = 2;
     ao.matrixAutoUpdate = false;
     this.root.add(ao);
-    // the joints between houses built side by side (no crack showing the void behind them)
-    this.buildGapFillers(map);
     // collider for landmarks; wall grid is final from here on (circles are added later)
     this.landmarks.addColliders(map);
     map.collider.buildSegments();
+    // the kerbs along the houses as they stand: a pavement to walk on wherever the street has room (kerbs.js)
+    this.kerbs = timed('bordillos', () => layKerbs(map));
 
     // ---------------- ground
     await step('Arando los campos de las Vegas…', 0.5);
@@ -358,7 +374,7 @@ void main(){
         polySample(e.pts, e.cum, s, tmp);
         side = -side;
         const nx = -tmp.dz * side, nz = tmp.dx * side;
-        const hw = e.w / 2;
+        const hw = map.kerbAt(e, s, side); // (the kerb as laid along the houses, kerbs.js)
         const w = inTown ? wallAt(tmp.x + nx * hw, tmp.z + nz * hw, nx, nz) : null;
         if (w) {
           const r = w.r, ang = Math.atan2(r.nx, r.nz); // lantern arm along the wall normal, out over the pavement
@@ -398,8 +414,9 @@ void main(){
       const s = fromA ? n.radius + 12 : e.len - n.radius - 12;
       polySample(e.pts, e.cum, s, tmp);
       const side = e.w >= 10.2 ? 1 : e.oneway ? -1 : hash1(e.id) < 0.5 ? 1 : -1; // same rule as the parked cars
+      if (e.kerb && (e.kerb.regime === 2 || (e.kerb.regime === 1 && e.kerb.side !== side))) continue; // (no kerb to stand them against)
       const nx = -tmp.dz * side, nz = tmp.dx * side;
-      const d = e.w / 2 - 0.82;
+      const d = map.kerbAt(e, s, side) - 0.82;
       const ang = Math.atan2(tmp.dx, tmp.dz);
       const kinds = ['v', 'a', 'z', 'm'];
       if (doorsNear(tmp.x + nx * d, tmp.z + nz * d)) continue;
@@ -423,6 +440,10 @@ void main(){
         const x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0);
         if (!pointInRing(x, z, a.ring) || map.buildingAt(x, z) || map.roadAt(x, z, 1.2)) continue; // a street crossing the square
         if ((this.landmarks.reserved || []).some(([rx, rz, rr]) => Math.hypot(x - rx, z - rz) < rr)) continue; // (round a fountain)
+        // (somewhere one can walk to: in sight of a street or a path — not in a courtyard closed by the houses round it,
+        // which a square drawn over the block takes in)
+        const sq = map.nearestEdge(x, z, 30, (o) => o.walk && !o.blocked);
+        if (!sq || sq.d > 28 || col.raycast(x, z, sq.x, sq.z, 1, 1) < 0.98) continue;
         const ang = rnd() * Math.PI * 2;
         benches.add(x, 0, z, ang);
         col.addCircle(x, z, 0.55, 1, -4);
@@ -456,7 +477,7 @@ void main(){
       const side = (p.x - q.x) * -tp.dz + (p.z - q.z) * tp.dx >= 0 ? 1 : -1;
       let moved = false;
       for (const sd of [side, -side]) {
-        const d = e.w / 2 + 0.45, x = q.x - tp.dz * d * sd, z = q.z + tp.dx * d * sd;
+        const d = map.kerbAt(e, q.s, sd) + 0.45, x = q.x - tp.dz * d * sd, z = q.z + tp.dx * d * sd;
         if (map.buildingAt(x, z) || map.roadAt(x, z, 0.3)) continue;
         for (const l of map.lines) {
           if (!l.kind.startsWith('power:')) continue;
@@ -481,69 +502,6 @@ void main(){
     buildStreetLife(this, map, this.q);
     // and the weeds, grass and scrub invading pavements, kerbs, tree pits and yards (groundfx.js)
     placeGroundLife(this, map, this.groundField, (this.groundRelief && this.groundRelief.weedSpots) || []);
-  }
-
-  // Catastro footprints of neighbouring houses leave slivers of 6 cm – 1.2 m between them. Round a corner and you could
-  // see straight through to nothing. A party wall (medianera) now stands in every such joint, set half the gap back
-  // from the street, as tall as the lower of the two houses, and it blocks the way too.
-  buildGapFillers(map) {
-    const cell = 8, grid = new Map(), edges = [];
-    for (const b of map.buildings) {
-      if (!b.height || !map.inTown(b.c[0], b.c[1])) continue;
-      const r = b.ring, n = r.length / 2;
-      for (let i = 0; i < n; i++) {
-        const j = (i + 1) % n;
-        const ax = r[i * 2], az = r[i * 2 + 1], bx = r[j * 2], bz = r[j * 2 + 1], L = Math.hypot(bx - ax, bz - az);
-        if (L < 1) continue;
-        const ei = edges.length;
-        edges.push({ b, ax, az, bx, bz, L, ux: (bx - ax) / L, uz: (bz - az) / L });
-        for (let gx = Math.floor(Math.min(ax, bx) / cell); gx <= Math.floor(Math.max(ax, bx) / cell); gx++)
-          for (let gz = Math.floor(Math.min(az, bz) / cell); gz <= Math.floor(Math.max(az, bz) / cell); gz++) {
-            const k = gx * 73856093 ^ gz * 19349663;
-            let l = grid.get(k); if (!l) grid.set(k, (l = [])); l.push(ei);
-          }
-      }
-    }
-    const segDist = (px, pz, e) => { const t = clamp((px - e.ax) * e.ux + (pz - e.az) * e.uz, 0, e.L); return Math.hypot(e.ax + e.ux * t - px, e.az + e.uz * t - pz); };
-    const pos = [], uv = [];
-    for (let ei = 0; ei < edges.length; ei++) {
-      const A = edges[ei];
-      const cands = new Set();
-      for (let gx = Math.floor(Math.min(A.ax, A.bx) / cell) - 1; gx <= Math.floor(Math.max(A.ax, A.bx) / cell) + 1; gx++)
-        for (let gz = Math.floor(Math.min(A.az, A.bz) / cell) - 1; gz <= Math.floor(Math.max(A.az, A.bz) / cell) + 1; gz++)
-          for (const ej of grid.get(gx * 73856093 ^ gz * 19349663) || []) if (ej > ei) cands.add(ej);
-      for (const ej of cands) {
-        const Bq = edges[ej];
-        if (Bq.b === A.b || Math.abs(A.ux * Bq.ux + A.uz * Bq.uz) < 0.97) continue;
-        const g = Math.min(segDist(Bq.ax, Bq.az, A), segDist(Bq.bx, Bq.bz, A), segDist(A.ax, A.az, Bq), segDist(A.bx, A.bz, Bq));
-        if (g < 0.05 || g > 1.25) continue;
-        const t1 = (Bq.ax - A.ax) * A.ux + (Bq.az - A.az) * A.uz, t2 = (Bq.bx - A.ax) * A.ux + (Bq.bz - A.az) * A.uz;
-        const o0 = Math.max(0, Math.min(t1, t2)), o1 = Math.min(A.L, Math.max(t1, t2));
-        if (o1 - o0 < 0.8) continue;
-        // the midline between the two walls, over the stretch where they face each other
-        const side = (Bq.ax + Bq.bx) / 2 - A.ax, sideZ = (Bq.az + Bq.bz) / 2 - A.az;
-        const nx = -A.uz, nz = A.ux, sgn = side * nx + sideZ * nz >= 0 ? 1 : -1;
-        const off = (g / 2) * sgn;
-        const x0 = A.ax + A.ux * o0 + nx * off, z0 = A.az + A.uz * o0 + nz * off;
-        const x1 = A.ax + A.ux * o1 + nx * off, z1 = A.az + A.uz * o1 + nz * off;
-        const h = Math.max(2.4, Math.min(A.b.height, Bq.b.height) - 0.05);
-        pos.push(x0, 0, z0, x1, 0, z1, x1, h, z1, x0, 0, z0, x1, h, z1, x0, h, z0);
-        const L = o1 - o0;
-        uv.push(0, 0, L / 2, 0, L / 2, h / 2, 0, 0, L / 2, h / 2, 0, h / 2);
-        map.collider.addSegment(x0, z0, x1, z1, h);
-        (this.gapList || (this.gapList = [])).push({ x: (x0 + x1) / 2, z: (z0 + z1) / 2, g, L, nx: nx * sgn, nz: nz * sgn });
-      }
-    }
-    this.gapCount = pos.length / 18;
-    if (!pos.length) return;
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    g.computeVertexNormals();
-    const mat = new THREE.MeshStandardMaterial({ map: loadTexture('white_rough_plaster', '_d'), color: 0xd9d2c4, roughness: 0.95, side: THREE.DoubleSide });
-    const m = new THREE.Mesh(g, mat);
-    m.castShadow = true; m.receiveShadow = true; m.matrixAutoUpdate = false;
-    this.root.add(m);
   }
 
   buildLampGlows() {

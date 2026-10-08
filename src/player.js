@@ -814,10 +814,11 @@ export class CameraRig {
       const lead = aim || p.knock ? 0 : 0.2, hl = aim ? 0.04 : 0.11;
       // (the shoulder and the lead never put the point inside a wall — running along a façade they would, and every
       // ray from in there is blocked: the camera would dive onto the back of your head)
+      // (nor near one: the point is a ball 0.32 m round, as the player is — the camera behind it needs that room)
       const outOfWalls = (x, z) => {
-        const t = col.raycast(p.pos.x, p.pos.z, x, z, ty, ty);
+        const t = col.sweepCircle(p.pos.x, p.pos.z, x, z, ty, ty, 0.32);
         if (t >= 1) return [x, z];
-        const L = Math.hypot(x - p.pos.x, z - p.pos.z) || 1, k = Math.max(0, t - 0.25 / L);
+        const k = Math.max(0, t - 0.01);
         return [p.pos.x + (x - p.pos.x) * k, p.pos.z + (z - p.pos.z) * k];
       };
       const [gx, gz] = outOfWalls(tx + clamp(p.vel.x * lead, -1.3, 1.3), tz + clamp(p.vel.z * lead, -1.3, 1.3));
@@ -834,15 +835,13 @@ export class CameraRig {
     const inn = g.interior;
     cy = Math.max((inn && inn.floorY ? inn.floorY(tx, tz, p.pos.y) : 0) + 0.35, cy);
     if (inn && inn.ceilY) cy = Math.min(cy, inn.ceilY(tx, tz, p.pos.y) - 0.18);
-    // collision. Whether the view is blocked is judged by three rays a hand apart (the middle one of them): a lamp post
-    // or a sign across one ray is not a wall, and the camera does not dive in for a frame. Running along a façade, the
-    // camera first slides sideways, off the wall (as a camera operator would step aside), gliding there; only what
-    // that cannot clear pulls it in — at once (never through a wall), and back out softly.
-    const probe = (px, pz, py) => {
-      const ox = pz - tz, oz = -(px - tx), ol = Math.hypot(ox, oz) || 1, w = 0.32 / ol;
-      const t0 = col.raycast(tx, tz, px, pz, ty, py), t1 = col.raycast(tx + ox * w, tz + oz * w, px + ox * w, pz + oz * w, ty, py), t2 = col.raycast(tx - ox * w, tz - oz * w, px - ox * w, pz - oz * w, ty, py);
-      return Math.max(Math.min(t0, t1), Math.min(Math.max(t0, t1), t2)); // (the middle of the three)
-    };
+    // collision. The camera is a ball 0.45 m round, pushed out from the point it looks at: it stops where it would
+    // touch a wall (or a roof: the walls stand as high as the ridges), so neither the camera nor the edge of its view —
+    // the near plane, 0.43 m from it at most — is ever inside a house. Running along a façade, the camera first slides
+    // sideways, off the wall (as a camera operator would step aside), gliding there; only what that cannot clear pulls
+    // it in — at once (never through a wall), and back out softly.
+    const ROOM = 0.45;
+    const probe = (px, pz, py) => col.sweepCircle(tx, tz, px, pz, ty, py, ROOM);
     const lx = Math.cos(this.yaw), lz = -Math.sin(this.yaw); // (sideways, across the view)
     let shiftGoal = 0;
     if (!inV && probe(cx, cz, cy) < 0.98) {
@@ -857,9 +856,22 @@ export class CameraRig {
     springDamper(ss, shiftGoal, shiftGoal ? 0.16 : 0.45, dt);
     if (Math.abs(ss.x) > 1e-3) { cx += lx * ss.x; cz += lz * ss.x; }
     const t = probe(cx, cz, cy);
-    const kT = t < 1 ? Math.max(0.12, t - 0.06) : 1, ks = this.pullS || (this.pullS = { x: 1, v: 0 });
+    // (never quite onto the point looked at: the camera keeps its direction — with the head against a wall it looks
+    // away from the wall, from just behind the eyes)
+    const kMin = 0.12 / Math.max(0.5, Math.hypot(cx - tx, cy - ty, cz - tz)); // (12 cm: the point is 0.3 m off any wall)
+    const kT = t < 1 ? Math.max(kMin, t - 0.01) : 1, ks = this.pullS || (this.pullS = { x: 1, v: 0 });
     if (kT < ks.x) { ks.x = kT; ks.v = 0; } else springDamper(ks, kT, 0.32, dt);
     if (ks.x < 0.999) { const k = ks.x; cx = tx + (cx - tx) * k; cz = tz + (cz - tz) * k; cy = ty + (cy - ty) * k; }
+    // and the corners of the view: with the player's head against a wall the ball may stand nearer that wall than its
+    // own size — never so near that the picture's edge looks into the house
+    for (let k = 0; k < 8 && Math.hypot(cx - tx, cz - tz) > 0.12 && !this.nearClear(col, tx, ty, tz, cx, cy, cz); k++) { cx = tx + (cx - tx) * 0.8; cz = tz + (cz - tz) * 0.8; cy = ty + (cy - ty) * 0.8; }
+    // so close that the camera is in the player's head (backed into a corner): the body is not drawn meanwhile
+    const close = Math.hypot(cx - tx, cy - ty, cz - tz), ch = p.char;
+    if (ch && !this.fp && !inV && p.mode !== 'dead') {
+      if (!this.hidClose && close < 0.5) this.hidClose = true;
+      else if (this.hidClose && close > 0.7) { this.hidClose = false; ch.object.visible = true; }
+      if (this.hidClose) ch.object.visible = false; // (every frame: the characters' own update shows it again)
+    } else if (this.hidClose) { this.hidClose = false; if (ch && !this.fp && !inV) ch.object.visible = true; }
     this.target.set(tx, ty, tz);
     this.pos.set(cx, cy, cz);
     // shake
@@ -871,6 +883,22 @@ export class CameraRig {
     this.camera.position.copy(this.pos);
     this.camera.lookAt(this.target);
     if (Math.abs(this.camera.fov - this.fov) > 0.05) { this.camera.fov = this.fov; this.camera.updateProjectionMatrix(); }
+  }
+  // the near plane's four corners, seen from the point looked at: none of them past a wall
+  nearClear(col, tx, ty, tz, cx, cy, cz) {
+    const c = this.camera, n = c.near, hh = n * Math.tan((this.fov * Math.PI) / 360), hw = hh * (c.aspect || 1.6);
+    let fx = tx - cx, fy = ty - cy, fz = tz - cz;
+    const fl = Math.hypot(fx, fy, fz);
+    if (fl < 1e-3) return true;
+    fx /= fl; fy /= fl; fz /= fl;
+    let rx = -fz, rz = fx; // (right: forward × up)
+    const rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl;
+    const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy; // (up: right × forward)
+    for (let a = -1; a <= 1; a += 2) for (let b = -1; b <= 1; b += 2) {
+      const qx = cx + fx * n + rx * hw * a + ux * hh * b, qy = cy + fy * n + uy * hh * b, qz = cz + fz * n + rz * hw * a;
+      if (col.raycast(tx, tz, qx, qz, ty, qy) < 1) return false;
+    }
+    return true;
   }
   updateFirstPerson(dt, ldx, ldy, s) {
     const p = this.game.player;

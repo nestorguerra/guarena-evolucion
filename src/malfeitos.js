@@ -595,10 +595,16 @@ const W_HUECO_B = { // between the house of the arched windows and the house of 
 
 export const MALFEITOS = {
   name: 'Calle Malfeitos',
-  // (the parts of the building put in the gap the Catastro leaves, d0..d1 metres back from its front, with their
-  // heights; the other gap, 103.5-109.2, the town already fills — infill.js — and its house is laid on it)
+  // (where its metres start: the end at the Calle Nueva as it was when the street was measured — the street's line
+  // moves when the town's pavements are measured again, its houses do not)
+  origin: [106.5, -222.1],
+  // (the parts of the building put in the gaps the Catastro leaves, d0..d1 metres back from its front, with their
+  // heights)
   gaps: [
     { side: 'W', s0: 56.9, s1: 61.0, parts: [{ d0: 0, d1: 2.2, H: 3.45 }, { d0: 2.2, d1: 9, H: 6.6 }] },
+    // (the town's own filling of the other gap — infill.js, which looks for gaps of 6 m or more by the metre — missed
+    // this one, 5.7 m, once the street's line was measured again: it is given here, the tall wall's house)
+    { side: 'W', s0: 103.5, s1: 109.2, parts: [{ d0: 0, d1: 9, H: 6.2, roof: 'tile' }] },
   ],
   houses: [
     W_HUECO_A, W_HUECO_B,

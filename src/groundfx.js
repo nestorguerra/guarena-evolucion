@@ -280,7 +280,8 @@ export function buildGroundRelief(world, map, field) {
       const px = run.ax + (dx / L) * a + run.nx * 0.18, pz = run.az + (dz / L) * a + run.nz * 0.18;
       const q = map.nearestEdge(px, pz, 12, (e) => e.drive && e.sw > 0.3);
       if (!q) continue;
-      const len = q.d - q.edge.w / 2 - 0.3;
+      const tq = polySample(q.edge.pts, q.edge.cum, q.s, {}), sq = (px - tq.x) * -tq.dz + (pz - tq.z) * tq.dx >= 0 ? 1 : -1;
+      const len = q.d - map.kerbAt(q.edge, q.s, sq) - 0.3; // (to the kerb as laid, kerbs.js)
       if (len < 0.4 || len > 3.5) continue;
       // keep clear of tree pits and of the lifted tiles
       let blocked = false;
@@ -308,7 +309,12 @@ export function buildGroundRelief(world, map, field) {
       const age = field.age(tmp.x, tmp.z);
       if (r() > 0.05 + age * 0.22) continue;
       const side = r() < 0.5 ? 1 : -1;
-      const off = band.a + r() * (band.b - band.a);
+      // (on the pavement as laid along the houses, kerbs.js: from its kerb to the wall)
+      const kb = map.kerbAt(e, s, side), pv = map.pavementAt(e, s, side), u = r();
+      if (pv != null && pv < 0.7) continue;
+      const a = kb + 0.32, b = pv != null ? kb + pv - 0.05 : kb + band.b - band.a + 0.32;
+      if (b - a < 0.3) continue;
+      const off = a + u * (b - a);
       const x = tmp.x - tmp.dz * off * side, z = tmp.z + tmp.dx * off * side;
       const i = Math.floor(x / 0.3), j = Math.floor(z / 0.3);
       if (tilesUsed.has(key(i, j)) || !onPavement(i * 0.3 + 0.15, j * 0.3 + 0.15)) continue;
@@ -413,10 +419,12 @@ export function placeGroundLife(world, map, field, weedSpots) {
       const zf = zone(tmp.x, tmp.z);
       if (rnd() > (kerb ? 0.02 : 0.035) * zf) continue;
       const side = rnd() < 0.5 ? 1 : -1;
-      const off = kerb ? hw + 0.3 + rnd() * 0.04 : hw - 0.04 - rnd() * 0.08;
+      const kh = map.kerbAt(e, s, side), kp = map.pavementAt(e, s, side); // (the kerb as laid, kerbs.js: none where no pavement)
+      const kk = kerb && !(e.kerb && kp != null && kp < 0.15) && !(e.kerb && (e.kerb.regime === 2 || (e.kerb.regime === 1 && e.kerb.side !== side)));
+      const off = kk ? kh + 0.3 + rnd() * 0.04 : kh - 0.04 - rnd() * 0.08;
       const x = tmp.x - tmp.dz * off * side, z = tmp.z + tmp.dx * off * side;
       if (map.buildingAt(x, z)) continue;
-      put(kerb ? pick('kerb', x, z) : pick(rnd() < 0.5 ? 'kerb' : 'wall', x, z), x, z, 0.6 + rnd() * 0.45);
+      put(kk ? pick('kerb', x, z) : pick(rnd() < 0.5 ? 'kerb' : 'wall', x, z), x, z, 0.6 + rnd() * 0.45);
     }
   }
   // 3) tree pits and broken tiles

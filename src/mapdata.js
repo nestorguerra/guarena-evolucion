@@ -1,10 +1,12 @@
 // Decodes the compact map (OSM + Catastro) into runtime structures: road graph, building data, areas, POIs.
 import { polyCum, polySample, polyNearest, ringArea, ringCentroid, clamp } from './util.js';
 import { StaticCollider, PolyIndex } from './collision.js';
+import { kerbAt } from './kerbs.js';
 
 const DRIVE_CLASSES = new Set(['primary', 'primary_link', 'secondary', 'tertiary', 'tertiary_link', 'unclassified', 'residential', 'living_street', 'service', 'track']);
 const WALK_ONLY = new Set(['pedestrian', 'footway', 'path', 'steps', 'cycleway']);
 
+const NONE = -99; // (no wall within reach)
 const dec = (arr) => {
   const f = new Float32Array(arr.length);
   for (let i = 0; i < arr.length; i++) f[i] = arr[i] / 10;
@@ -40,6 +42,11 @@ export class MapData {
       const ed = {
         id: i, a: e.a, b: e.b, pts, cum, len: cum[cum.length - 1], cls,
         w: e.w / 10, sw: e.sw / 10, oneway: e.o, name: e.n >= 0 ? this.names[e.n] : '', dirt: !!e.d, facade: e.f / 10,
+        // (measured on the orthophotos, tools/aceras: the pavement on each side — + to the left of a → b as the game's
+        // side +1, − the other — or null where a side has no houses)
+        measured: !!e.m, swP: e.sp !== undefined ? e.sp / 10 : null, swM: e.sm !== undefined ? e.sm / 10 : null,
+        // (and its kerbs where the review of the photographs placed them, point by point: data/bordillos.json)
+        kerbPts: e.kb ? { p: e.kb.p ? dec(e.kb.p) : null, m: e.kb.m ? dec(e.kb.m) : null } : null,
         drive: DRIVE_CLASSES.has(cls), walk: true, walkOnly: WALK_ONLY.has(cls),
       };
       ed.speed = { primary: 12.5, secondary: 12, tertiary: 11, primary_link: 8.5, tertiary_link: 8.5, unclassified: 9, residential: 7.5, living_street: 5, service: 5, track: 7 }[cls] || 6; // (town speeds: 30–45 km/h)
@@ -113,8 +120,14 @@ export class MapData {
     for (const id of this.edgesNear(x, z, 0)) {
       const e = this.edges[id];
       if (!e.drive || e.blocked || e === except || e.len < 0.5) continue;
-      const half = e.w / 2 - (core && e.w >= 7 && !e.dirt ? 2.2 : 0) + pad;
-      const d = polyNearest(e.pts, e.cum, x, z).d - half;
+      const q = polyNearest(e.pts, e.cum, x, z);
+      let hw = e.w / 2;
+      if (e.kerb) { // (the kerb on that side, where it is)
+        const t = polySample(e.pts, e.cum, q.s, this._rt || (this._rt = {}));
+        hw = kerbAt(e, q.s, (x - t.x) * -t.dz + (z - t.z) * t.dx >= 0 ? 1 : -1);
+      }
+      const half = hw - (core && e.w >= 7 && !e.dirt ? 2.2 : 0) + pad;
+      const d = q.d - half;
       if (d < bd) { bd = d; best = e; }
     }
     return best;
@@ -297,6 +310,47 @@ export class MapData {
     return out;
   }
 
+  // ---------------------------------------------------------------- pavements
+  // The kerb at s along a street, on one side (+1: to the left of a → b): its offset from the street's line — laid along
+  // the houses (kerbs.js), or half the carriageway where it was not.
+  kerbAt(e, s, side) { return kerbAt(e, s, side); }
+  // The pavement at s along a street, on one side: metres from its kerb to the first wall (0: none — a street with its
+  // pavement on the other side, or a single platform; negative: a house over the kerb), or null where there is no wall
+  // within 9 m (a square, a park, the edge of town). From the kerbs laid along the houses (kerbs.js); elsewhere sampled
+  // every metre against the walls the first time a street is asked about (once the town is built: the colliders are
+  // its walls).
+  pavementAt(e, s, side) {
+    const kb = e.kerb;
+    if (kb) {
+      const F = side > 0 ? kb.fp : kb.fm, K = side > 0 ? kb.p : kb.m;
+      const x = clamp(s / kb.st, 0, kb.n - 1), i = Math.floor(x), j = Math.min(kb.n - 1, i + 1);
+      const a = F[i] === F[i] ? F[i] - K[i] : null, b = F[j] === F[j] ? F[j] - K[j] : null;
+      if (a == null) return b;
+      if (b == null) return a;
+      return Math.min(a, b);
+    }
+    if (!this.collider || !this.collider.segs) return side > 0 ? e.swP ?? e.sw : e.swM ?? e.sw;
+    const P = e._pav || (e._pav = this.pavementProfile(e));
+    const k = clamp(s / P.step, 0, P.n - 1), i = Math.floor(k), a = side > 0 ? P.p : P.m;
+    const v0 = a[i], v1 = a[Math.min(P.n - 1, i + 1)];
+    if (v0 === NONE && v1 === NONE) return null;
+    if (v0 === NONE) return v1;
+    if (v1 === NONE) return v0;
+    return Math.min(v0, v1); // (the narrower of the two: a house jutting out between them is not walked into)
+  }
+  pavementProfile(e) {
+    const step = 1, n = Math.max(2, Math.ceil(e.len / step) + 1), p = new Float32Array(n), m = new Float32Array(n), t = {}, hw = e.w / 2, R = 9;
+    for (let i = 0; i < n; i++) {
+      polySample(e.pts, e.cum, Math.min(e.len, i * step), t);
+      for (const [arr, side] of [[p, 1], [m, -1]]) {
+        const nx = -t.dz * side, nz = t.dx * side, a = hw - 0.4;
+        const k = this.collider.raycast(t.x + nx * a, t.z + nz * a, t.x + nx * (hw + R), t.z + nz * (hw + R), 1.2, 1.2);
+        arr[i] = k >= 1 ? NONE : a + k * (R + 0.4) - hw;
+      }
+    }
+    return { n, p, m, step };
+  }
+
   // ---------------------------------------------------------------- buildings
   decodeBuildings() {
     const raw = this.raw;
@@ -314,6 +368,12 @@ export class MapData {
     for (const b of this.buildings) this.bIndex.add(b.ring, b);
   }
   buildingAt(x, z) { const p = this.bIndex.find(x, z); return p ? p.data : null; }
+  // the outlines changed (solidez.js welds them): the index again
+  reindexBuildings() {
+    const { x0, z0, x1, z1 } = this.bounds;
+    this.bIndex = new PolyIndex(x0 - 400, z0 - 400, x1 + 400, z1 + 400, 16);
+    for (const b of this.buildings) this.bIndex.add(b.ring, b);
+  }
   // once the town is built, "inside a building" means inside what is drawn of it (its parts), not its whole outline
   useDrawnParts(parts) {
     const { x0, z0, x1, z1 } = this.bounds;

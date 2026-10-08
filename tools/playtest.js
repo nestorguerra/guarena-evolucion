@@ -82,7 +82,9 @@ export function check() {
   }
   for (const ped of G.peds.list) {
     if (bad(ped.x) || bad(ped.z)) { issue('ped_nan', ped.state); continue; }
-    if (map.buildingAt(ped.x, ped.z) && ped.state !== 'fly') issue('ped_in_building', `${ped.state} ${ped.x.toFixed(1)},${ped.z.toFixed(1)}`);
+    // (going in at a door or a shop front is no fault: they step over the threshold and are gone)
+    const atDoor = () => ped.state === 'enter' && (G.world.facadeGround || []).some((o) => Math.abs(o.x - ped.x) < 2.5 && Math.abs(o.z - ped.z) < 2.5 && Math.hypot(o.x - ped.x, o.z - ped.z) < Math.max(1.2, o.r || 0) + 0.6);
+    if (map.buildingAt(ped.x, ped.z) && ped.state !== 'fly' && !atDoor()) issue('ped_in_building', `${ped.state} ${ped.x.toFixed(1)},${ped.z.toFixed(1)}`);
     if (ped.state === 'walk') {
       const key = ped.__id || (ped.__id = 'p' + Math.random().toString(36).slice(2));
       const moved = Math.hypot(ped.x - (ped._lx ?? ped.x + 1), ped.z - (ped._lz ?? ped.z + 1)) > 0.2;

@@ -279,6 +279,50 @@ export class StaticCollider {
     });
     return hit;
   }
+  // A ball of radius r moved (x0, z0, y0) → (x1, z1, y1): the share of the way it goes before it touches a wall it is
+  // lower than (1: all of it) — the camera's room, so that neither it nor its near plane ever enters a wall. A wall the
+  // ball already touches where it sets off (the player's head beside a façade) only keeps it from coming any closer to
+  // that wall than it started.
+  sweepCircle(x0, z0, x1, z1, y0, y1, r) {
+    const S = this.segs;
+    if (!S) return 1;
+    let best = 1;
+    const dx = x1 - x0, dz = z1 - z0;
+    if (dx * dx + dz * dz < 1e-10) return 1;
+    const lower = (t, h) => y0 + (y1 - y0) * t < h;
+    this.forSegs(Math.min(x0, x1) - r, Math.min(z0, z1) - r, Math.max(x0, x1) + r, Math.max(z0, z1) + r, (i, o) => {
+      const h = S[o + 4];
+      if (h < 0.3) return false;
+      const ax = S[o], az = S[o + 1], sx = S[o + 2] - ax, sz = S[o + 3] - az, sl2 = sx * sx + sz * sz;
+      if (sl2 < 1e-10) return false;
+      let u0 = ((x0 - ax) * sx + (z0 - az) * sz) / sl2; u0 = u0 < 0 ? 0 : u0 > 1 ? 1 : u0;
+      const d0 = Math.hypot(x0 - ax - sx * u0, z0 - az - sz * u0);
+      const R = d0 > r ? r : d0 * 0.97; // (already touching: no closer than it is)
+      if (R < 1e-4) return false;
+      // the band along the wall's middle
+      const sl = Math.sqrt(sl2), nx = -sz / sl, nz = sx / sl;
+      const s0 = (x0 - ax) * nx + (z0 - az) * nz, sd = dx * nx + dz * nz;
+      if (Math.abs(sd) > 1e-9 && Math.abs(s0) >= R && sd * s0 < 0) { // (coming at it from outside the band)
+        const side = s0 >= 0 ? 1 : -1, t = (side * R - s0) / sd;
+        if (t >= 0 && t < best) {
+          const px = x0 + dx * t, pz = z0 + dz * t, u = ((px - ax) * sx + (pz - az) * sz) / sl2;
+          if (u >= 0 && u <= 1 && lower(t, h)) best = t;
+        }
+      }
+      // the wall's two ends
+      for (let e = 0; e < 2; e++) {
+        const ex = e ? ax + sx : ax, ez = e ? az + sz : az, fx = x0 - ex, fz = z0 - ez;
+        const A = dx * dx + dz * dz, B = 2 * (fx * dx + fz * dz), C = fx * fx + fz * fz - R * R;
+        if (C < 0) continue; // (starts inside: the band test holds it)
+        const disc = B * B - 4 * A * C;
+        if (disc < 0) continue;
+        const t = (-B - Math.sqrt(disc)) / (2 * A);
+        if (t >= 0 && t < best && lower(t, h)) best = t;
+      }
+      return false;
+    });
+    return best;
+  }
   raycast(x0, z0, x1, z1, y0 = 1, y1 = 1, useCircles = false) {
     const S = this.segs;
     let best = 1;
@@ -350,6 +394,25 @@ export class PolyIndex {
       if (pip(x, z, p.ring)) return p;
     }
     return null;
+  }
+  // every polygon whose bounds meet the box (each once)
+  query(x0, z0, x1, z1, out = []) {
+    const cx0 = Math.floor((x0 - this.x0) / this.cell), cx1 = Math.floor((x1 - this.x0) / this.cell);
+    const cz0 = Math.floor((z0 - this.z0) / this.cell), cz1 = Math.floor((z1 - this.z0) / this.cell);
+    const seen = this._seen || (this._seen = new Map());
+    const stamp = (this._stamp = (this._stamp || 0) + 1);
+    for (let cz = cz0; cz <= cz1; cz++) for (let cx = cx0; cx <= cx1; cx++) {
+      const a = this.cells.get(cz * 100000 + cx);
+      if (!a) continue;
+      for (const i of a) {
+        if (seen.get(i) === stamp) continue;
+        seen.set(i, stamp);
+        const p = this.polys[i];
+        if (p.x1 < x0 || p.x0 > x1 || p.z1 < z0 || p.z0 > z1) continue;
+        out.push(p);
+      }
+    }
+    return out;
   }
 }
 function pip(x, z, r) {

@@ -28,8 +28,15 @@ Hace falta Python 3.
       dist/guarena-evolucion.html (el juego) y dist/test.html.
 
   python3 tools/build_map.py
-      Regenera data/map.json a partir de OpenStreetMap (data/guarena.osm) y del
-      Catastro (data/cat/). tools/fetch_catastro.py descarga de nuevo los edificios.
+      Regenera data/map.json a partir de OpenStreetMap (data/guarena.osm), del
+      Catastro (data/cat/) y de las aceras medidas (data/aceras.json).
+      tools/fetch_catastro.py descarga de nuevo los edificios.
+
+  python3 tools/aceras/pnoa.py, medir.py, final.py, revisar3.py, puntos.py
+      Las aceras: descarga las ortofotos del PNOA (a .cache/pnoa), mide los bordillos
+      de cada calle (data/aceras.json), hace las hojas de revisión de todas las calles
+      y guarda los bordillos puestos a mano (data/bordillos.json, desde
+      tools/aceras/revision_final.txt). Ver docs/aceras.md.
 
 CARPETAS
 --------
@@ -44,6 +51,8 @@ CARPETAS
                    npcmind.js (planes y charlas de la gente)
                    weather.js (el tiempo real de Guareña, Open-Meteo), rain.js (lluvia y nieve)
                    fachadas.js (fachadas medidas casa por casa), malfeitos.js (la calle Malfeitos)
+                   solidez.js (las casas soldadas en hileras, las grietas tapadas, la medida de las grietas)
+                   kerbs.js (los bordillos tendidos metro a metro a lo largo de las casas)
                    weapons.js, gunmodels.js, gunrig.js, viewmodel.js
                    missions.js, activities.js, interiors.js (casas, casa de Annie),
                    horror.js, zombies.js, hud.js, audio.js, input.js...
@@ -54,7 +63,9 @@ CARPETAS
                  prueba (playtest.js, charlab.js, snap.js, guntest.js, sheet.py,
                  townlab.js: la gente, el civismo, el tráfico y las charlas del pueblo;
                  weatherlab.js: el tiempo real, cada cielo forzado y fotografiado, la red caída;
-                 malfeitoslab.js y fachadas/: medir una calle a partir de fotos y comparar).
+                 malfeitoslab.js y fachadas/: medir una calle a partir de fotos y comparar;
+                 solidezlab.js: la cámara junto a las fachadas, las grietas, las aceras;
+                 aceras/: los bordillos medidos en las ortofotos del PNOA).
   dist/          Juego empaquetado listo para jugar.
   .snaps/        Capturas de las pruebas de desarrollo (se pueden borrar).
   debug.html     Visor libre del mapa (src/debug.js).
@@ -64,7 +75,9 @@ CARPETAS
 CRÉDITOS
 --------
 Callejero © colaboradores de OpenStreetMap (ODbL). Edificios: Dirección General del
-Catastro (INSPIRE). Texturas: Poly Haven (CC0). Sonidos: OpenGameArt (CC0).
+Catastro (INSPIRE). Aceras medidas en las ortofotos: PNOA cedido por © Instituto
+Geográfico Nacional (CC BY 4.0; en el juego solo van las medidas, ninguna imagen).
+Texturas: Poly Haven (CC0). Sonidos: OpenGameArt (CC0).
 Tiempo en directo: Weather data by Open-Meteo.com (CC BY 4.0).
 Personajes, vehículos, historias y misiones son ficticios; los vecinos del padrón
 también (del INE solo vienen el número de habitantes y la pirámide de edades).

@@ -466,7 +466,8 @@ export function buildStreetLife(world, map, q) {
       polySample(e.pts, e.cum, s, tmp);
       const side = r() < 0.5 ? 1 : -1;
       const byWall = r() < 0.45;
-      const off = byWall ? e.w / 2 + (e.sw > 0.5 ? e.sw - 0.15 : 0.45) : e.w / 2 - 0.25;
+      const pav = map.pavementAt(e, s, side), kb = map.kerbAt(e, s, side); // (against the wall where it is, the pavement as wide as it is there)
+      const off = byWall ? kb + (pav != null ? Math.max(0.12, pav - 0.15) : e.sw > 0.5 ? e.sw - 0.15 : 0.45) : kb - 0.25;
       const x = tmp.x - tmp.dz * off * side, z = tmp.z + tmp.dx * off * side;
       litter(x, z, 0.25);
       stats.litter++;
@@ -570,7 +571,8 @@ export function buildStreetLife(world, map, q) {
       polySample(e.pts, e.cum, s, tmp);
       const side = r() < 0.5 ? 1 : -1;
       // in the parking lane of wide streets; in narrow ones up on a wide pavement (in the road it blocked the traffic)
-      const off = e.w >= 7 ? e.w / 2 - 0.45 : (e.sw || 0) >= 1.4 ? e.w / 2 + 0.5 : -1;
+      const kb = map.kerbAt(e, s, side), noKerb = e.kerb && (e.kerb.regime === 2 || (e.kerb.regime === 1 && e.kerb.side !== side));
+      const off = noKerb ? -1 : e.w >= 7 && kb >= e.w / 2 - 0.3 ? kb - 0.45 : (map.pavementAt(e, s, side) ?? e.sw ?? 0) >= 1.6 ? kb + 0.5 : -1;
       if (off < 0) continue;
       const x = tmp.x - tmp.dz * off * side, z = tmp.z + tmp.dx * off * side;
       if (!free(x, z, 0.4) || nearOpening(x, z, 1.2) || map.roadAt(x, z, 0.3, true)) continue;
@@ -656,7 +658,7 @@ function buildStreetPlates(world, map) {
       for (const side of [1, -1]) {
         if (hash1(e.id * 4 + end * 2 + (side > 0 ? 1 : 0)) > 0.6) continue;
         const nx = -tmp.dz * side, nz = tmp.dx * side;
-        const hw = e.w / 2;
+        const hw = map.kerbAt(e, s, side);
         const t = map.collider.raycast(tmp.x + nx * hw, tmp.z + nz * hw, tmp.x + nx * (hw + 7), tmp.z + nz * (hw + 7), 3.2, 3.2);
         if (t >= 1) continue;
         const d = hw + 7 * t - 0.03;

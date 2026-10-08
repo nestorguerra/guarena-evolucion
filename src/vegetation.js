@@ -62,10 +62,13 @@ export function plantTown(world, G, F, q) {
     if (!['primary', 'tertiary', 'residential', 'unclassified', 'secondary'].includes(e.cls)) continue;
     const sp = streetSpecies(e), step = sp === 'naranjo' ? 6.5 : sp === 'morera' ? 7.5 : 9;
     const size = (sp === 'platano' ? (e.cls === 'primary' ? 0.85 : 0.7) : 0.9) * (0.92 + hash1(e.id * 1.7) * 0.16); // (the street's trees are all of an age)
-    const off = e.w / 2 + Math.max(0.9, e.sw * 0.55);
     const stint = tintOf(mulberry32(e.id + 7), 0.6);
     for (let s = step * 0.6; s < e.len - step * 0.6; s += step) {
       for (const side of [1, -1]) {
+        // (a tree in its pit only where the pavement there leaves room to walk past it: 1.8 m or more)
+        const pav = map.pavementAt(e, s, side);
+        if (pav != null && pav < 1.8) continue;
+        const off = map.kerbAt(e, s, side) + (pav != null ? Math.min(1.1, Math.max(0.7, pav * 0.38)) : Math.max(0.9, e.sw * 0.55)); // (from the kerb as laid, kerbs.js)
         const p = polySample(e.pts, e.cum, s, {});
         const x = p.x - p.dz * off * side, z = p.z + p.dx * off * side;
         if (!free(x, z, 0.6) || nearDoor(x, z, 1.2)) continue;

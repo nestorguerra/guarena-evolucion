@@ -73,8 +73,8 @@ function extentOf(o, acc = [Infinity, -Infinity]) {
 }
 const centreX = (q) => (typeof q.x === 'number' ? q.x : typeof q.x0 === 'number' && typeof q.x1 === 'number' ? (q.x0 + q.x1) / 2 : q.pts ? q.pts.reduce((a, p) => a + p[0], 0) / q.pts.length : null);
 
-export function resolveMeasured(map, street) {
-  const warn = [];
+// the street's centreline (its edges chained from its first node) and its walls: where(x, z) → s along it, distance, side
+function frameOf(map, street) {
   // ---- the street's centreline, its edges chained from its first node
   const E = map.edges.filter((e) => e.name === street.name && e.len > 0.5);
   const byNode = new Map();
@@ -93,14 +93,29 @@ export function resolveMeasured(map, street) {
   }
   const cum = [0];
   for (let i = 2; i < pts.length; i += 2) cum.push(cum[cum.length - 1] + Math.hypot(pts[i] - pts[i - 2], pts[i + 1] - pts[i - 1]));
-  const total = cum[cum.length - 1];
+  // (the street's metres from its origin, if it has one: the start as it was when it was measured)
+  let s0 = 0;
+  if (street.origin && pts.length >= 4) {
+    const [ox, oz] = street.origin, dx = pts[2] - pts[0], dz = pts[3] - pts[1], L = Math.hypot(dx, dz) || 1;
+    const t = ((ox - pts[0]) * dx + (oz - pts[1]) * dz) / L;
+    s0 = t < L ? t : 0;
+    if (t >= L) { // (further along than the first piece: the nearest point on the line)
+      let best = Infinity;
+      for (let i = 0; i + 3 < pts.length; i += 2) {
+        const ax = pts[i], az = pts[i + 1], ex = pts[i + 2] - ax, ez = pts[i + 3] - az, M = Math.hypot(ex, ez) || 1;
+        const u = clamp(((ox - ax) * ex + (oz - az) * ez) / (M * M), 0, 1), d = Math.hypot(ox - ax - ex * u, oz - az - ez * u);
+        if (d < best) { best = d; s0 = cum[i / 2] + u * M; }
+      }
+    }
+  }
+  const total = cum[cum.length - 1] - s0;
   const where = (x, z) => { // s along the street, distance from it, side (E: right of the way it runs)
     let best = null;
     for (let i = 0; i + 3 < pts.length; i += 2) {
       const ax = pts[i], az = pts[i + 1], dx = pts[i + 2] - ax, dz = pts[i + 3] - az, L = Math.hypot(dx, dz) || 1;
       const t = clamp(((x - ax) * dx + (z - az) * dz) / (L * L), 0, 1), px = ax + dx * t, pz = az + dz * t;
       const d = Math.hypot(x - px, z - pz);
-      if (!best || d < best.d) best = { d, s: cum[i / 2] + t * L, lat: ((x - px) * dz - (z - pz) * dx) / L, tx: dx / L, tz: dz / L, px, pz };
+      if (!best || d < best.d) best = { d, s: cum[i / 2] + t * L - s0, lat: ((x - px) * dz - (z - pz) * dx) / L, tx: dx / L, tz: dz / L, px, pz };
     }
     return best;
   };
@@ -133,11 +148,18 @@ export function resolveMeasured(map, street) {
   // the frontmost: a wall mostly behind a nearer one (by more than 0.8 m) is not a street front
   return walls.filter((w) => !walls.some((o) => o !== w && o.side === w.side && o.d < w.d - 0.8 && Math.min(o.smax, w.smax) - Math.max(o.smin, w.smin) > 0.5 * (w.smax - w.smin)));
   };
-  let front = findWalls();
-  // ---- the gaps the Catastro leaves where the pictures show a house (a parcel recorded empty): a building is put there,
-  // its front on the line between the two neighbours' corners, its parts one behind the other as given (d0..d1 metres
-  // back from the front, each with its height), never deeper than the plot (the next building behind)
-  const parts = new Map();
+  return { where, findWalls, total };
+}
+
+// ---- the gaps the Catastro leaves where the pictures show a house (a parcel recorded empty): a building is put there,
+// its front on the line between the two neighbours' corners, its parts one behind the other as given (d0..d1 metres
+// back from the front, each with its height), never deeper than the plot (the next building behind). Done before the
+// town's outlines are welded together (solidez.js), so the new house is welded to its neighbours like any other.
+export function measuredGaps(map, street) {
+  const warn = [], parts = new Map();
+  if (!street.gaps || !street.gaps.length) return { parts, warn, gapBuildings: [] };
+  const { where, findWalls } = frameOf(map, street);
+  const front = findWalls(), gapBuildings = [];
   for (const g of street.gaps || []) {
     const near = (s0, end) => { // the corner of a front wall of that side at s (end: the wall ends there, or starts)
       let best = null;
@@ -157,10 +179,16 @@ export function resolveMeasured(map, street) {
     const mid = where((A.x + B.x) / 2, (A.z + B.z) / 2);
     let ix = -fz / fl, iz = fx / fl;
     if (ix * (mid.px - (A.x + B.x) / 2) + iz * (mid.pz - (A.z + B.z) / 2) > 0) { ix = -ix; iz = -iz; }
+    // (already filled — by the town's infill, infill.js —: nothing more to put there)
+    if (map.buildingAt((A.x + B.x) / 2 + ix * 1.0, (A.z + B.z) / 2 + iz * 1.0)) continue;
     let dmax = Math.max(...g.parts.map((q) => q.d1));
-    for (let d = 0.6; d <= dmax; d += 0.3) { // (as deep as the plot: stop before the next building)
+    for (let d = 0.6; d <= dmax; d += 0.3) { // (as deep as the plot: up to the next building, to the centimetre)
       const x = (A.x + B.x) / 2 + ix * d, z = (A.z + B.z) / 2 + iz * d;
-      if (map.buildingAt(x, z)) { dmax = d - 0.3; break; }
+      if (map.buildingAt(x, z)) {
+        let a = d - 0.3, b = d;
+        for (let it = 0; it < 6; it++) { const m = (a + b) / 2; if (map.buildingAt((A.x + B.x) / 2 + ix * m, (A.z + B.z) / 2 + iz * m)) b = m; else a = m; }
+        dmax = a - 0.01; break;
+      }
     }
     const quad = (d0, d1) => {
       const r = [A.x + ix * d0, A.z + iz * d0, B.x + ix * d0, B.z + iz * d0, B.x + ix * d1, B.z + iz * d1, A.x + ix * d1, A.z + iz * d1];
@@ -171,6 +199,7 @@ export function resolveMeasured(map, street) {
     const b = { id: map.buildings.length, ring, holes: null, use: 0, year: 1970, floors, area: Math.abs(ringArea(ring)), c: ringCentroid(ring), height: 0, infill: true, measuredGap: true };
     map.buildings.push(b);
     map.bIndex.add(ring, b);
+    gapBuildings.push(b);
     for (const q of g.parts) {
       const d0 = Math.min(q.d0, dmax - 0.5), d1 = Math.min(q.d1, dmax);
       if (d1 - d0 < 0.5) continue;
@@ -179,7 +208,14 @@ export function resolveMeasured(map, street) {
       parts.set(id, { H: q.H || 3.1, roof: q.roof || 'flat', parapet: q.parapet ?? 0 });
     }
   }
-  if (street.gaps && street.gaps.length) front = findWalls();
+  return { parts, warn, gapBuildings };
+}
+
+// pre: measuredGaps(map, street), when the gaps were made earlier (before the welding)
+export function resolveMeasured(map, street, pre = measuredGaps(map, street)) {
+  const warn = [...pre.warn], parts = new Map(pre.parts);
+  const { where, findWalls } = frameOf(map, street);
+  const front = findWalls();
   // ---- the houses laid on them: per wall, one front's data in its own metres (u from its a)
   // (the street's own lanterns replace the town's only once its houses carry them)
   const fronts = [], byB = new Map(), lampEdges = new Set(street.houses.some((h) => (h.extra || []).some((e) => e.k === 'lamp')) ? [street.name] : []);

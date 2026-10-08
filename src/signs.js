@@ -7,7 +7,7 @@
 // stickered, rusty, tagged, leaning or twisted on the post.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mulberry32, hash1, polySample } from './util.js';
+import { mulberry32, hash1, polySample, polyNearest } from './util.js';
 
 const CELL = 256, COLS = 8, ROWS = 8;
 const RED = '#c4151c', BLUE = '#0b4ea2', WHITE = '#f7f7f4', BLACK = '#111111', BROWN = '#6b3d1e';
@@ -335,11 +335,15 @@ export function buildTrafficSigns(world, map) {
   // a sign on the right-hand side of a road, facing drivers travelling (fx, fz) at point (px, pz)
   function roadside(e, px, pz, fx, fz, plates, opts = {}) {
     const rx = -fz, rz = fx; // driver's right
-    const hw = e.w / 2;
+    // (the pavement there, as wide as it is at that point: a post only where it leaves room to walk past; from the
+    // kerb as laid along the houses, kerbs.js)
+    const nq = polyNearest(e.pts, e.cum, px, pz), tq = polySample(e.pts, e.cum, nq.s, {}), sd = rx * -tq.dz + rz * tq.dx >= 0 ? 1 : -1;
+    const pq = map.pavementAt ? map.pavementAt(e, nq.s, sd) : null;
+    const hw = map.kerbAt ? map.kerbAt(e, nq.s, sd) : e.w / 2;
     // a facade close to the kerb: hang it from the wall instead
     const kerbX = px + rx * (hw + 0.3), kerbZ = pz + rz * (hw + 0.3);
     const walls = runsNear(kerbX, kerbZ, 1.8).filter((w) => w.nx * -rx + w.nz * -rz > 0.7);
-    if (!opts.noWall && walls.length && (e.sw || 0) < 1.2) {
+    if (!opts.noWall && walls.length && (pq ?? e.sw ?? 0) < 1.2) {
       const w = walls[0];
       const dx = w.bx - w.ax, dz = w.bz - w.az, L2 = dx * dx + dz * dz;
       const t = Math.max(0.05, Math.min(0.95, ((kerbX - w.ax) * dx + (kerbZ - w.az) * dz) / L2));

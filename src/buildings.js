@@ -109,7 +109,7 @@ function insetRing(r, d) {
     const k = d / cosH;
     out[i * 2] = bx + mx * k; out[i * 2 + 1] = bz + mz * k;
   }
-  // validity: same orientation, all inside, edges not flipped
+  // validity: same orientation, all inside, edges not flipped, not crossing each other
   if (ringArea(out) <= 0.5) return null;
   for (let i = 0; i < n; i++) {
     if (!pointInRing(out[i * 2], out[i * 2 + 1], r)) return null;
@@ -118,7 +118,47 @@ function insetRing(r, d) {
     const ix = out[q * 2] - out[i * 2], iz = out[q * 2 + 1] - out[i * 2 + 1];
     if (ox * ix + oz * iz <= 0) return null;
   }
+  if (selfCrossing(out)) return null;
   return out;
+}
+
+// does the outline cross itself?
+function selfCrossing(r) {
+  const n = r.length / 2;
+  for (let i = 0; i < n; i++) {
+    const ax = r[i * 2], az = r[i * 2 + 1], bx = r[((i + 1) % n) * 2], bz = r[((i + 1) % n) * 2 + 1];
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      const cx = r[j * 2], cz = r[j * 2 + 1], dx = r[((j + 1) % n) * 2], dz = r[((j + 1) % n) * 2 + 1];
+      const d1 = (bx - ax) * (cz - az) - (bz - az) * (cx - ax), d2 = (bx - ax) * (dz - az) - (bz - az) * (dx - ax);
+      const d3 = (dx - cx) * (az - cz) - (dz - cz) * (ax - cx), d4 = (dx - cx) * (bz - cz) - (dz - cz) * (bx - cx);
+      if (d1 * d2 < 0 && d3 * d4 < 0) return true;
+    }
+  }
+  return false;
+}
+// the outline without the corners that are not corners: those on a straight wall (where a neighbour's party wall meets
+// it, solidez.js), within 3 cm of the line through the two either side — for the roof, which looks at its true shape
+function cleanRing(r, tol = 0.03) {
+  let pts = [];
+  for (let i = 0; i < r.length; i += 2) pts.push(r[i], r[i + 1]);
+  for (let guard = 0; guard < 400; guard++) {
+    const n = pts.length / 2;
+    if (n <= 3) break;
+    let drop = -1;
+    for (let i = 0; i < n; i++) {
+      const h = (i - 1 + n) % n, j = (i + 1) % n;
+      const ax = pts[h * 2], az = pts[h * 2 + 1], bx = pts[j * 2], bz = pts[j * 2 + 1], px = pts[i * 2], pz = pts[i * 2 + 1];
+      const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz);
+      if (L < 1e-6) { drop = i; break; }
+      const t = ((px - ax) * dx + (pz - az) * dz) / (L * L);
+      if (t <= 0 || t >= 1) continue;
+      if (Math.abs((px - ax) * dz - (pz - az) * dx) / L < tol) { drop = i; break; }
+    }
+    if (drop < 0) break;
+    pts.splice(drop * 2, 2);
+  }
+  return pts.length >= 6 && ringArea(pts) > 0 ? pts : r;
 }
 
 // drop near-duplicate and nearly collinear vertices (cadastral outlines are full of them)
@@ -168,7 +208,8 @@ function outsetRing(r, d) {
 // claymation: an outline with its convex corners rounded — each replaced by a short arc (a quadratic curve with the
 // corner as its control point), ~0.32 m round; nrm: the curve's own outward normal at its points (NaN elsewhere), so
 // the bend shades smooth and meets the straight walls with their own normal
-function roundRing(r, R = 0.32, seg = 6) {
+// sharp(x, z): a corner another house shares (the end of a party wall): kept square, or a notch would open between them
+function roundRing(r, sharp = null, R = 0.32, seg = 6) {
   const n = r.length / 2, pts = [], nrm = [];
   for (let i = 0; i < n; i++) {
     const h = (i - 1 + n) % n, j = (i + 1) % n;
@@ -176,7 +217,7 @@ function roundRing(r, R = 0.32, seg = 6) {
     const ax = r[h * 2] - px, az = r[h * 2 + 1] - pz, bx = r[j * 2] - px, bz = r[j * 2 + 1] - pz;
     const la = Math.hypot(ax, az), lb = Math.hypot(bx, bz);
     const cr = la > 1e-6 && lb > 1e-6 ? (-ax * bz + az * bx) / (la * lb) : 0; // (> 0: a convex corner)
-    if (la < 0.5 || lb < 0.5 || cr < 0.35) { pts.push(px, pz); nrm.push(NaN, NaN); continue; }
+    if (la < 0.5 || lb < 0.5 || cr < 0.35 || (sharp && sharp(px, pz))) { pts.push(px, pz); nrm.push(NaN, NaN); continue; }
     const theta = Math.acos(Math.max(-1, Math.min(1, (ax * bx + az * bz) / (la * lb))));
     const t = Math.min(R / Math.tan(theta / 2), la * 0.35, lb * 0.35);
     const p0x = px + (ax / la) * t, p0z = pz + (az / la) * t, p1x = px + (bx / lb) * t, p1z = pz + (bz / lb) * t;
@@ -188,6 +229,76 @@ function roundRing(r, R = 0.32, seg = 6) {
     }
   }
   return { pts, nrm };
+}
+
+// The pieces of a wall (from a, along d, outward n) and how high the parts behind it hide each: [t0, t1, cy] in order,
+// cy 0 where nothing stands behind it, H where a part as tall stands there. A part stands behind the wall where the line
+// 0.2 mm outside it runs inside that part's outline (not in its courtyards); its ends found exactly, where the line
+// crosses the part's walls — so a wall is hidden exactly as far as its neighbour reaches, never a hand's breadth more
+// (the old half-metre samples hid a notch of wall beside every house a little shorter than its plot). Two walls the
+// welding made one (solidez.js) hide each other; two that are a crack apart are both drawn, and the crack shows a wall,
+// never the void behind it.
+export const COVER_OFF = 0.0002;
+const _cands = [];
+function coverOf(partIndex, p, ax, az, dx, dz, nx, nz, L, H) {
+  const ox = ax + nx * COVER_OFF, oz = az + nz * COVER_OFF, ex = ox + dx, ez = oz + dz;
+  _cands.length = 0;
+  partIndex.query(Math.min(ox, ex) - 0.01, Math.min(oz, ez) - 0.01, Math.max(ox, ex) + 0.01, Math.max(oz, ez) + 0.01, _cands);
+  const spans = []; // [t0, t1, h]
+  for (const q of _cands) {
+    const d = q.data;
+    if (d === p) continue;
+    const ts = [0, 1];
+    const cut = (r) => {
+      const n = r.length / 2;
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n, cx = r[i * 2], cz = r[i * 2 + 1], fx = r[j * 2] - cx, fz = r[j * 2 + 1] - cz;
+        const den = dx * fz - dz * fx;
+        if (Math.abs(den) < 1e-12) continue;
+        const t = ((cx - ox) * fz - (cz - oz) * fx) / den, u = ((cx - ox) * dz - (cz - oz) * dx) / den;
+        if (t > 1e-6 && t < 1 - 1e-6 && u >= -1e-9 && u <= 1 + 1e-9) ts.push(t);
+      }
+    };
+    cut(d.ring);
+    if (d.holes) for (const h of d.holes) cut(h);
+    ts.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < ts.length; k++) {
+      const t0 = ts[k], t1 = ts[k + 1];
+      if (t1 - t0 < 1e-7) continue;
+      const tm = (t0 + t1) / 2, x = ox + dx * tm, z = oz + dz * tm;
+      if (!pointInRing(x, z, d.ring) || (d.holes && d.holes.some((h) => pointInRing(x, z, h)))) continue;
+      spans.push([t0, t1, d.H]);
+    }
+  }
+  if (!spans.length) return [[0, 1, 0]];
+  // the height behind each stretch: the tallest part there
+  const cuts = [0, 1];
+  for (const s of spans) cuts.push(s[0], s[1]);
+  cuts.sort((a, b) => a - b);
+  const out = [];
+  for (let k = 0; k + 1 < cuts.length; k++) {
+    const t0 = cuts[k], t1 = cuts[k + 1];
+    if (t1 - t0 < 1e-7) continue;
+    const tm = (t0 + t1) / 2;
+    let h = 0;
+    for (const s of spans) if (tm > s[0] && tm < s[1] && s[2] > h) h = s[2];
+    const cy = h >= H - 0.05 ? H : Math.round(h * 10) / 10;
+    const last = out[out.length - 1];
+    if (last && Math.abs(last[2] - cy) <= 0.05) last[1] = t1;
+    else out.push([t0, t1, cy]);
+  }
+  // slivers under 2 cm join their neighbour, the wall drawn where in doubt (the lower of the two hides less)
+  for (let k = 0; k < out.length && out.length > 1; k++) {
+    const s = out[k];
+    if ((s[1] - s[0]) * L >= 0.02) continue;
+    const prev = out[k - 1], next = out[k + 1];
+    const into = !prev ? next : !next ? prev : prev[2] <= next[2] ? prev : next;
+    into[2] = Math.min(into[2], s[2]);
+    if (into === prev) prev[1] = s[1]; else next[0] = s[0];
+    out.splice(k, 1); k = -1;
+  }
+  for (let k = 1; k < out.length; k++) if (Math.abs(out[k][2] - out[k - 1][2]) <= 0.05) { out[k - 1][1] = out[k][1]; out.splice(k, 1); k--; }
+  return out;
 }
 
 function triangulate(ring, holes) {
@@ -251,8 +362,17 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
     if (mp && mp.H) H = mp.H;
     const part = { ...p, H, info: bi || { style: 'renovada', tint: [1, 1, 1], roofTint: [1, 1, 1], seed: hash1(p.id), shop: 0, rnd: mulberry32(p.id), pitch: 0.5 } };
     if (mp) part.roofSpec = mp;
+    if (p.filler) part.roofSpec = { roof: 'flat', parapet: 0 };
     part.pi = partIndex.add(p.ring, part);
     parts.push(part);
+  }
+  // the pieces of wall that close a crack between two houses (solidez.js fillCracks): as tall as the lower of the two
+  // (twice over: a piece may stand between a house and another piece)
+  const byId = new Map(parts.map((q) => [q.id, q]));
+  for (let it = 0; it < 2; it++) for (const q of parts) {
+    if (!q.filler) continue;
+    const hs = q.between.map((id) => byId.get(id)).filter(Boolean).map((o) => o.H);
+    if (hs.length) q.H = Math.max(2.4, Math.min(...hs));
   }
   // collisions: what stands is what is drawn — each part to its own height. A building's Catastro outline can be larger
   // than its parts (a petrol station's canopy, a porch, a yard registered with it): walls nobody can see stop nobody
@@ -264,11 +384,8 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
     kept[b.id] = 1;
     b.height = bH[b.id] || b.floors * FLOOR_H;
   }
-  for (const p of parts) {
-    if (p.b >= 0 && !kept[p.b]) continue;
-    map.collider.addRing(p.ring, p.H + 1.5, p.b);
-    if (p.holes) for (const h of p.holes) map.collider.addRing(h, p.H + 1.5, p.b);
-  }
+  // (the walls themselves go in once each roof is built: they stand as high as its ridge, so the camera, a bullet or a
+  // thrown thing never ends up inside a roof)
   map.useDrawnParts(parts.filter((p) => p.b < 0 || kept[p.b]));
 
   // does a facade run look onto a street or a square? (backyards and inner courtyards keep the light painted facade)
@@ -289,6 +406,7 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
     return false;
   };
   let tris = 0;
+  const sharp = map.sharedCorner || null; // (corners two houses share: never rounded, solidez.js)
   for (const p of parts) {
     const info = p.info;
     const c = chunkOf(p.c[0], p.c[1]);
@@ -296,22 +414,22 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
     const rings = [p.ring].concat(p.holes || []);
     // (claymation: the walls follow the outline with its corners rounded, as a clay model's — the roof keeps the true
     // outline, its eaves cover the difference; what stops you, the colliders, too)
-    const smooths = LOOK.plastilina ? [] : null;
-    if (smooths) for (let ri = 0; ri < rings.length; ri++) { const rr = roundRing(rings[ri]); rings[ri] = rr.pts; smooths[ri] = rr.nrm; }
+    const smooths = LOOK.plastilina && !p.filler ? [] : null; // (a piece of wall closing a slot: square, flush with both)
+    if (smooths) for (let ri = 0; ri < rings.length; ri++) { const rr = roundRing(rings[ri], sharp); rings[ri] = rr.pts; smooths[ri] = rr.nrm; }
     // ---------------- walls
-    // Each edge is sampled every ~0.5 m: the neighbour part behind it (if any) hides the wall only up to its own
-    // height and only where it really is, so partly covered party walls no longer leave see-through gaps.
+    // Each edge is hidden where a neighbour part stands right behind it (coverOf: exactly as far as it reaches, up to
+    // its own height), so a party wall is drawn nowhere it would be seen through, and left open nowhere.
     const runs = [];
     for (let ri = 0; ri < rings.length; ri++) {
       const r = rings[ri];
       const n = r.length / 2;
       // (claymation) the ring's convex corners — the building's own corners, rounded like a clay model's
-      const convex = LOOK.plastilina ? new Uint8Array(n) : null;
+      const convex = LOOK.plastilina && !p.filler ? new Uint8Array(n) : null;
       if (convex) for (let i = 0; i < n; i++) {
         const h = (i - 1 + n) % n, j = (i + 1) % n;
         const e0x = r[i * 2] - r[h * 2], e0z = r[i * 2 + 1] - r[h * 2 + 1], e1x = r[j * 2] - r[i * 2], e1z = r[j * 2 + 1] - r[i * 2 + 1];
         const l0 = Math.hypot(e0x, e0z), l1 = Math.hypot(e1x, e1z);
-        convex[i] = l0 > 0.05 && l1 > 0.05 && (e0x * e1z - e0z * e1x) / (l0 * l1) > 0.85 ? 1 : 0; // (a sharp corner left: the shader rounds it)
+        convex[i] = l0 > 0.05 && l1 > 0.05 && (e0x * e1z - e0z * e1x) / (l0 * l1) > 0.85 && !(sharp && sharp(r[i * 2], r[i * 2 + 1])) ? 1 : 0; // (a sharp corner left: the shader rounds it)
       }
       // (claymation) the normal at each vertex of a rounded corner: its curve's own (NaN where the outline is straight)
       const vN = smooths ? smooths[ri] : null;
@@ -323,18 +441,8 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
         if (L < 0.05) continue;
         const nx = dz / L, nz = -dx / L; // outward
         const uTot = L < 1.8 ? 0.3 : Math.max(1, Math.round(L / BAY_W));
-        const K = Math.max(1, Math.min(64, Math.ceil(L / 0.5)));
-        let runStart = 0, runC = -1;
-        const cover = (k) => {
-          const t = (k + 0.5) / K;
-          const nb = partIndex.find(ax + dx * t + nx * 0.3, az + dz * t + nz * 0.3);
-          if (!nb || nb.data === p) return 0;
-          const nh = nb.data.H;
-          return nh >= H - 0.05 ? H : Math.round(nh * 10) / 10;
-        };
-        const emit = (k0, k1, cy) => {
+        const emit = (t0, t1, cy) => {
           if (cy >= H - 0.05) return; // fully hidden behind a taller neighbour
-          const t0 = k0 / K, t1 = k1 / K;
           const run = { ax, az, dx, dz, L, nx, nz, uTot, t0, t1, cy, ri, exposed: cy === 0 };
           if (convex) run.code = L + (t0 < 1e-6 && convex[i] ? 1e4 : 0) + (t1 > 1 - 1e-6 && convex[j] ? 2e4 : 0);
           if (vN) { // the normals at the run's two ends (smoothed where the outline bends round a corner)
@@ -348,20 +456,21 @@ export function buildBuildings(map, { chunkSize = 220, skipPart = null, onBuildi
           runs.push(run);
           if (cy === 0 && ri === 0 && (t1 - t0) * L > 1) ao.push(ax + dx * t0, az + dz * t0, ax + dx * t1, az + dz * t1, nx, nz);
         };
-        for (let k = 0; k < K; k++) {
-          const cv = cover(k);
-          if (k === 0) { runC = cv; continue; }
-          if (Math.abs(cv - runC) > 0.05) { emit(runStart, k, runC); runStart = k; runC = cv; }
-        }
-        emit(runStart, K, runC);
+        // what stands behind the wall, exactly: the pieces of it (t0..t1) with the height that hides them
+        for (const [t0, t1, cy] of coverOf(partIndex, p, ax, az, dx, dz, nx, nz, L, H)) emit(t0, t1, cy);
       }
     }
-    planPart(p, info, runs, H, facade && facade.forcedDoors);
+    if (!p.filler) planPart(p, info, runs, H, facade && facade.forcedDoors); // (a filler: plain wall, no doors)
     for (const run of runs) tris += emitRun(c, run, p, info, H, facade);
     // ---------------- roof
     tris += buildRoof(c, p, info, H);
+    if (p.b < 0 || kept[p.b]) {
+      const hc = Math.max(H + 1.5, (p.top || H) + 0.4);
+      map.collider.addRing(p.ring, hc, p.b);
+      if (p.holes) for (const h of p.holes) map.collider.addRing(h, hc, p.b);
+    }
     // runs for the 3D extras (downpipes, cornices)
-    if (facade && facade.runs && info.style !== 'nave') {
+    if (facade && facade.runs && info.style !== 'nave' && !p.filler) {
       for (const run of runs) {
         if (!run.exposed || run.ri !== 0 || (run.t1 - run.t0) * run.L < 1.5) continue;
         const shopEnds = !!info.shop;
@@ -502,7 +611,7 @@ function nearestBuilding(map, x, z, r) {
 function buildRoof(c, p, info, H) {
   const rnd = info.rnd;
   const nave = info.style === 'nave';
-  const r = p.ring;
+  const r = cleanRing(p.ring);
   const area = p.area;
   const ob = orientedRect(r);
   const fill = ob ? area / (4 * ob.hw * ob.hd) : 0;
@@ -526,7 +635,7 @@ function buildRoof(c, p, info, H) {
     const P = (a, b, yy) => [cx + ux * a + vx * b, yy, cz + uz * a + vz * b];
     const c1 = P(-A, -B, y), c2 = P(A, -B, y), c3 = P(A, B, y), c4 = P(-A, B, y);
     const r1 = P(-rl, 0, y + rh), r2 = P(rl, 0, y + rh);
-    p.roofKind = 'hip';
+    p.roofKind = 'hip'; p.top = y + rh;
     const layer = nave ? (rnd() < 0.55 ? ROOF.chapa : ROOF.uralita) : ROOF.teja;
     const tex = [layer, 1, info.seed, 0];
     const S = 3.2; // metres per roof texture tile
@@ -595,6 +704,7 @@ function buildRoof(c, p, info, H) {
     const outer = outsetRing(rr0, 0.2);
     const n = rr0.length / 2;
     const rise = lipD * info.pitch;
+    p.top = H + rise;
     const tex = [ROOF.teja, 1, info.seed, 0];
     const S = 2.6;
     for (let i = 0; i < n; i++) {
@@ -615,8 +725,9 @@ function buildRoof(c, p, info, H) {
   // flat roof with parapet
   p.roofKind = 'flat';
   const parH = p.roofSpec && p.roofSpec.parapet != null ? p.roofSpec.parapet : nave ? 0.35 : 0.8;
+  p.top = H + parH + 0.04;
   const tp = [STYLE[info.style], 2, info.seed, 0];
-  const rings = [r].concat(p.holes || []);
+  const rings = parH > 0.01 ? [r].concat(p.holes || []) : [];
   for (const rr of rings) {
     const n = rr.length / 2;
     for (let i = 0; i < n; i++) {

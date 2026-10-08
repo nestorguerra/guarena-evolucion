@@ -214,7 +214,7 @@ export class Peds {
     for (let a = 0; a < 6; a++) {
       const e = this.walkEdges[Math.floor(Math.random() * this.walkEdges.length)];
       const s = 2 + Math.random() * (e.len - 4);
-      const side = Math.random() < 0.5 ? 1 : -1;
+      const side = e.kerb && e.kerb.regime === 1 ? e.kerb.side : Math.random() < 0.5 ? 1 : -1; // (a street with one pavement: on it)
       const pt = this.sidePoint(e, s, side, this.tmp);
       const dx = pt.x - p.x, dz = pt.z - p.z, d = Math.hypot(dx, dz);
       if (d < 35 || d > 120) continue;
@@ -697,14 +697,23 @@ export class Peds {
     return best;
   }
 
-  // the walking line of one side of a street: the middle of its pavement (never inside the houses: where the pavement
-  // is a mere strip, at the kerb)
+  // the walking line of one side of a street: the middle of its pavement, from its kerb as laid along the houses
+  // (kerbs.js; never inside the houses: where there is no pavement to walk on, in the street along the fronts)
   sidePoint(e, s, side, out) {
     polySample(e.pts, e.cum, clamp(s, 0, e.len), out);
-    let off = e.walkOnly ? (e.w / 2) * 0.6 : e.w / 2 + (e.sw > 0.5 ? e.sw * 0.5 : 0.6);
-    if (!e.walkOnly && e.facade > 0) off = Math.max(e.w / 2 + 0.05, Math.min(off, e.facade / 2 - 0.42));
-    out.x += -out.dz * off * side; out.z += out.dx * off * side;
+    out.off = e.walkOnly ? (e.w / 2) * 0.6 : this.map.kerbAt(e, s, side) + this.walkLine(e, s, side);
+    out.x += -out.dz * out.off * side; out.z += out.dx * out.off * side;
     return out;
+  }
+  // how far out from the kerb they walk there: the middle of the pavement as wide as it is at that point (the houses do
+  // not keep to a line); along the houses of a pavement a mere strip, and in the street by the kerb where there is none
+  // (as people do in the lanes of the old town); a couple of metres out on a square or a wide one
+  walkLine(e, s, side) {
+    const pav = this.map.pavementAt(e, s, side);
+    if (pav == null) return clamp(((side > 0 ? e.swP : e.swM) ?? e.sw ?? 1.2) * 0.5, 0.45, 1.25);
+    if (pav >= 0.85) return Math.min(pav * 0.5, pav - 0.42, 1.6); // (and never nearer the wall than a shoulder)
+    if (pav >= 0.72) return pav - 0.4;
+    return Math.min(-0.35, pav - 0.4); // (no room to walk: by the kerb in the street — or by the house standing on it)
   }
   // the stretch of a street walked between its corners (to the kerb of the street it meets); the place they are going
   // to, if it is on it, is always inside
@@ -790,7 +799,7 @@ export class Peds {
         const tx = this.tmp.dx * ped.dir, tz = this.tmp.dz * ped.dir;
         // keep to the right of whoever comes the other way, round whoever stands in the way, overtake the slow
         let lat = this.avoid(ped, dt);
-        if (lat) { const room = ee.walkOnly ? 1.2 : Math.max(0.3, (ee.sw || 0) * 0.45); lat = clamp(lat, -room, room); } // (a step aside, not off the kerb)
+        if (lat) { const pv = ee.walkOnly ? null : this.map.pavementAt(ee, ped.s, ped.side); const room = ee.walkOnly ? 1.2 : Math.max(0.3, (pv ?? ee.sw ?? 0) * 0.45); lat = clamp(lat, -room, room); } // (a step aside, not off the kerb)
         // and round whatever stands on the pavement
         lat = clamp(lat + this.wayRound(ped, ee, dt), -1.5, 1.5);
         if (lat) { tgt.x += -tz * lat; tgt.z += tx * lat; }
@@ -922,7 +931,7 @@ export class Peds {
         let narrow = false;
         if (le && moving && L.state === 'walk') {
           const q = polySample(le.pts, le.cum, clamp(L.s, 0, le.len), this.tmp2 || (this.tmp2 = {}));
-          if (!le.walkOnly && (le.sw || 0) < 1.3) narrow = true; // a narrow pavement: one behind the other
+          if (!le.walkOnly && (this.map.pavementAt(le, L.s, L.side) ?? le.sw ?? 0) < 1.3) narrow = true; // a narrow pavement: one behind the other
           else if (!le.walkOnly) { ix = -q.dz * L.side; iz = q.dx * L.side; } // the side away from the road (the children too)
         }
         let ox, oz;
@@ -1551,6 +1560,8 @@ export class Peds {
     let best = 1, bd = Infinity;
     for (const side of [1, -1]) { const q = this.sidePoint(e, ped.s, side, this.tmp); const d = Math.hypot(q.x - ped.x, q.z - ped.z); if (d < bd) { bd = d; best = side; } }
     ped.side = best; ped.walkSide = best * dir;
+    // a street with its pavement on one side only (kerbs.js): over to it, at the corner they are at
+    if (e.kerb && e.kerb.regime === 1 && best !== e.kerb.side && ped.state === 'walk' && e.len > 12) this.startCross(ped);
   }
   nextEdge(ped) {
     const e = ped.edge;
@@ -1567,7 +1578,7 @@ export class Peds {
     if (!opts.length) { ped.dir = -ped.dir; ped.s = clamp(ped.s, 0, e.len); return; }
     const ne = opts[Math.floor(Math.random() * opts.length)];
     this.enterEdge(ped, ne, ne.a === nodeId ? 1 : -1);
-    if (Math.random() < 0.08 && !ne.walkOnly && ne.w > 4) this.startCross(ped); // over to the other side (at the corner they are at), looking out for cars
+    if (Math.random() < 0.08 && !ne.walkOnly && ne.w > 4 && ped.state === 'walk' && !(ne.kerb && ne.kerb.regime === 1)) this.startCross(ped); // over to the other side (at the corner they are at), looking out for cars
   }
 
   checkVehicles(ped) {

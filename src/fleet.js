@@ -35,11 +35,15 @@ export class Fleet {
       const na = map.nodes[e.a], nb = map.nodes[e.b];
       const s0 = na.degree > 1 ? na.radius + 9 : 4, s1 = e.len - (nb.degree > 1 ? nb.radius + 9 : 4);
       for (const side of sides) {
+        if (e.kerb && (e.kerb.regime === 2 || (e.kerb.regime === 1 && e.kerb.side !== side))) continue; // (no kerb that side: none parked against the houses)
         let s = s0 + rnd() * 3;
         while (s < s1 - 4) {
           if (rnd() < 0.72) {
             polySample(e.pts, e.cum, s, tmp);
-            const off = w / 2 - 1.05;
+            // (at the kerb as laid along the houses, kerbs.js — and not where it comes in: the lanes need the room)
+            const kb = map.kerbAt(e, s, side);
+            if (kb < w / 2 - 0.3) { s += 5.6 + rnd() * 1.2; continue; }
+            const off = kb - 1.05;
             // right side of the edge direction: right = (-dz, dx)
             const x = tmp.x + -tmp.dz * off * side, z = tmp.z + tmp.dx * off * side;
             const heading = Math.atan2(tmp.dx, tmp.dz) + (side > 0 ? 0 : Math.PI);
@@ -86,7 +90,7 @@ export class Fleet {
       if (s < 1 || s > e.len - 1) continue;
       map.sample(e, s, tmp);
       const heading = Math.atan2(tmp.dx, tmp.dz);
-      for (const off of [e.w / 2 - spec.W / 2 - 0.25, 0, -(e.w / 2 - spec.W / 2 - 0.25)]) {
+      for (const off of [map.kerbAt(e, s, 1) - spec.W / 2 - 0.25, 0, -(map.kerbAt(e, s, -1) - spec.W / 2 - 0.25)]) {
         const px = tmp.x - tmp.dz * off, pz = tmp.z + tmp.dx * off;
         if (this.boxFree(px, pz, heading, spec, 0.15) && !this.nearest(px, pz, spec.L)) return { x: px, z: pz, heading };
       }

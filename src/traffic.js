@@ -11,6 +11,7 @@
 import { TRAFFIC_MIX, MODELS } from './vehicles.js';
 import { randomDesc } from './characters.js';
 import { polySample, polyNearest, clamp, wrapAngle } from './util.js';
+import { kerbAt } from './kerbs.js';
 
 const KMH = 3.6;
 // lane geometry: parked cars take 2.2 m on their side, lanes share what is left
@@ -40,7 +41,7 @@ export function legalLimit(map, e) {
   let k;
   if (e.dirt || e.cls === 'track') k = 30;
   else if (!town) k = e.cls === 'primary' || e.cls === 'secondary' || e.cls === 'tertiary' ? 90 : 50;
-  else if (e.cls === 'living_street' || (e.w < 5.5 && (e.sw || 0) < 0.4)) k = 20; // single platform: no kerb to speak of
+  else if (e.cls === 'living_street' || (e.kerb && e.kerb.regime === 2) || (e.w < 5.5 && (e.sw || 0) < 0.4)) k = 20; // single platform: no kerb to speak of (kerbs.js)
   else if (e.cls === 'primary' || e.cls === 'secondary' || e.cls === 'tertiary') k = 50; // the travesía (signed at the town entries)
   else k = 30;
   return (e._lim = k / KMH);
@@ -55,6 +56,10 @@ export function lanePoint(map, e, dir, s, out = {}, offMul = 1, extra = 0) {
   // lateral position measured along the edge's own right vector (-dz, dx)
   let lat = lg.shift + dir * (lg.off * offMul + extra);
   if (extra) lat = clamp(lat, -e.w / 2 + 0.6, e.w / 2 - 0.6); // (a bicycle keeps clear of the kerb)
+  if (e.kerb) { // (the kerbs as laid along the houses, kerbs.js: the lanes moved and narrowed with the carriageway there)
+    const kp = kerbAt(e, sp, 1), km = kerbAt(e, sp, -1), hw = e.w / 2;
+    lat = (kp - km) / 2 + lat * Math.min(1.25, (kp + km) / 2 / Math.max(0.5, hw));
+  }
   out.x += -out.dz * lat; out.z += out.dx * lat;
   out.dx *= dir; out.dz *= dir;
   return out;
