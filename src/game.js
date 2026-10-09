@@ -400,8 +400,8 @@ export class Game {
       if (p.vehicle) p.exitVehicle(true);
       p.mode = 'dead'; p.char.object.visible = true; this.collapse(p);
       this.audio.sfx('wasted');
-      const Z = this.zombieSys, k = Z.kills;
-      const kills = k === 0 ? 'sin abatir a ningún zombi' : k === 1 ? 'con un zombi abatido' : `con ${k} zombis abatidos`;
+      const Z = this.zombieSys, k = Z.kills, gk = Z.giantKills || 0;
+      const kills = (k === 0 ? 'sin abatir a ningún zombi' : k === 1 ? 'con un zombi abatido' : `con ${k} zombis abatidos`) + (gk === 1 ? ' (uno, gigante)' : gk > 1 ? ` (${gk} gigantes)` : '');
       this.showEnd('TE HAN MORDIDO', Z.wave > 0 ? `Aguantaste hasta la oleada ${Z.wave}, ${kills}.` : `No llegaste ni a la primera oleada.`, false, 'zombis');
       return;
     }
@@ -686,7 +686,7 @@ export class Game {
       if (this.saveT > 10) { this.saveT = 0; if (!this.interior && !this.map.buildingAt(p.pos.x, p.pos.z)) this.save.pos = { x: p.pos.x, z: p.pos.z }; this.persist(); }
     }
     if (this.weather) this.weather.update(dtReal, this);
-    const night = this.sky.update(dt, this.camera.position);
+    const night = this.sky.update(dt, this.camera.position, false, this.camera);
     if (this.rain) this.rain.update(dt, this.sky.wx, this.camera, !!this.interior);
     if (this.grade) this.grade.uniforms.uSat.value = PLASTILINA.grade.sat * (1 - 0.14 * this.sky.wx.over); // (a grey day: the clay a little less bright)
     // cutscenes are lit like a film at night: a little more exposure and sky fill so you can see what it shows

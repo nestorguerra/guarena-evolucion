@@ -282,7 +282,7 @@ export class Weapons {
   assist(p, o, dir, range) {
     const g = this.game;
     let best = null, ba = 0.07;
-    const test = (x, z, y0, y1) => {
+    const test = (x, z, y0, y1, rad = 0.3) => {
       const cy = (y0 + y1) / 2;
       const vx = x - o.x, vy = cy - o.y, vz = z - o.z;
       const along = vx * dir.x + vy * dir.y + vz * dir.z;
@@ -290,12 +290,12 @@ export class Weapons {
       const px = vx - dir.x * along, py = vy - dir.y * along, pz = vz - dir.z * along;
       // the plain ray already hits the body: keep it (head shots stay possible)
       const ry = o.y + dir.y * along;
-      if (Math.hypot(px, pz) < 0.3 && ry > y0 && ry < y1 + 0.1) return 'hit';
+      if (Math.hypot(px, pz) < rad && ry > y0 && ry < y1 + 0.1) return 'hit';
       const ang = Math.hypot(px, py, pz) / along;
       if (ang < ba && g.map.collider.raycast(p.pos.x, p.pos.z, x, z, 1.3, 1.1) > 0.97) { ba = ang; best = { x, y: cy, z }; }
     };
     for (const o2 of g.police.officers) if (o2.state !== 'ko' && o2.state !== 'dead' && test(o2.x, o2.z, 0.9, 1.6) === 'hit') return null;
-    if (g.zombies) for (const zz of g.zombies.list) if (zz.alive && !zz.low && test(zz.x, zz.z, 0.9, 1.6) === 'hit') return null;
+    if (g.zombies) for (const zz of g.zombies.list) if (zz.alive && !zz.low && test(zz.x, zz.z, 0.9 * zz.S, 1.6 * zz.S, zz.R) === 'hit') return null; // (S, R: a giant's size)
     for (const ped of g.peds.list) {
       if (ped.state === 'dead' || ped.state === 'fly' || ped.state === 'lie') continue;
       const top = (ped.state === 'sit' ? 1.3 : 1.7) * ped.char.scale;
@@ -318,7 +318,7 @@ export class Weapons {
       const sc = cosA * 2 - dd / d.range + pri;
       if (sc > bs) { bs = sc; best = { x, y, z }; }
     };
-    if (g.zombies) for (const zz of g.zombies.list) if (zz.alive) consider(zz.x, zz.z, zz.low ? 0.3 : zz.state === 'rise' ? 0.8 : 1.45, 2);
+    if (g.zombies) for (const zz of g.zombies.list) if (zz.alive) consider(zz.x, zz.z, (zz.low ? 0.3 : zz.state === 'rise' ? 0.8 : 1.45) * zz.S, 2);
     for (const o of g.police.officers) if (o.state !== 'ko' && o.state !== 'dead') consider(o.x, o.z, 1.25, g.police.wanted > 0 ? 1 : 0);
     for (const ped of g.peds.list) if (ped.state !== 'dead' && ped.state !== 'fly') consider(ped.x, ped.z, ped.state === 'lie' ? 0.25 : ped.state === 'sit' ? 0.8 : 1.25, ped.state === 'fight' ? 1.2 : 0);
     if (g.interior && g.interiors.life) for (const o of g.interiors.life.people) if (o.state !== 'dead' && Math.abs(o.y - p.pos.y) < 1.2) consider(o.x, o.z, o.y + (o.state === 'ko' || o.state === 'sleep' ? 0.3 : 1.25), o.kind === 'cop' || o.state === 'fight' ? 1.2 : 0);
@@ -400,7 +400,7 @@ export class Weapons {
     }
     for (const o of g.police.officers) testCyl(o.x, o.z, o.state === 'ko' || o.state === 'dead' ? 0.55 : 0.36, 0, o.state === 'ko' || o.state === 'dead' ? 0.45 : 1.85, o, 'cop');
     if (g.interior && g.interiors.life) for (const o of g.interiors.life.people) { const down = o.state === 'ko' || o.state === 'dead' || o.state === 'sleep'; testCyl(o.x, o.z, down ? 0.55 : 0.34, o.y, o.y + (down ? 0.6 : o.state === 'sit' ? 1.3 : 1.8), o, 'resident'); }
-    if (g.zombies) for (const zz of g.zombies.list) { const down = !zz.alive || zz.low || zz.state === 'rise'; testCyl(zz.x, zz.z, down ? 0.5 : 0.36, 0, down ? 0.45 : 1.75, zz, 'zombie'); }
+    if (g.zombies) for (const zz of g.zombies.list) { const down = !zz.alive || zz.low || zz.state === 'rise', S = zz.S; testCyl(zz.x, zz.z, (down ? 0.5 : 0.36) * S, 0, (down ? 0.45 : 1.75) * S, zz, 'zombie'); }
     for (const v of g.fleet.vehicles) {
       if (Math.abs(v.x - ox) > range + 5 || Math.abs(v.z - oz) > range + 5 || v.driver === 'player') continue;
       // slab test in the car's frame
@@ -433,7 +433,7 @@ export class Weapons {
       return true;
     }
     if (h.kind === 'zombie') {
-      const head = h.y > 1.45 && h.obj.alive && !h.obj.low;
+      const head = h.y > 1.45 * h.obj.S && h.obj.alive && !h.obj.low;
       g.zombies.damage(h.obj, d.dmg * (head ? 2.4 : 1), dx * (d.knock || 3), dz * (d.knock || 3), head ? 'head' : d.pellets ? 'blast' : d.id === 'rifle' ? 'rifle' : 'bullet');
       fx.blood(x, y, z, dx, dz);
       g.audio.sfx('bullet_flesh', { x, z });

@@ -577,8 +577,10 @@ class Remote {
       if (pose !== this.pose) { this.pose = pose; ch.setBase(pose); ch.object.rotation.x = 0; }
       ch.object.rotation.y = h;
       if (s.w !== this.gunId) this.setGun(s.w);
-      ch.update(dt, pose ? 0 : sp, { grounded: !!s.g, vy: s.vy, turn: s.tr, fidget: s.w === 'punos' && !s.a && !s.cr, crouch: !!s.cr, moveDir: s.md || 0 });
-      if (this.gun && !this.gunMelee) this.rig.update(dt, ch, this.gun, !!s.a || now - this.lastShot < 1, s.pi || 0, {});
+      const posed = ch.update(dt, pose ? 0 : sp, { grounded: !!s.g, vy: s.vy, turn: s.tr, fidget: s.w === 'punos' && !s.a && !s.cr, crouch: !!s.cr, moveDir: s.md || 0 });
+      // (the aim on top of the pose, only when the pose was worked out: claymation poses 12 times a second)
+      this.rigDt = (this.rigDt || 0) + dt;
+      if (posed !== false) { if (this.gun && !this.gunMelee) this.rig.update(this.rigDt, ch, this.gun, !!s.a || now - this.lastShot < 1, s.pi || 0, {}); this.rigDt = 0; }
       }
     }
     // (how fast they were going, for a fall)

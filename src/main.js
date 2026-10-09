@@ -163,7 +163,7 @@ function menuFrame(dt) {
     preview.lookAt(g.camera.position);
     preview.update(dt, 0, {});
   }
-  g.sky.update(dt, g.camera.position);
+  g.sky.update(dt, g.camera.position, false, g.camera);
   const night = g.sky.night;
   g.world.update(dt, night, g.camera.position);
   g.fleet.streamParked(g.camera.position.x, g.camera.position.z);
@@ -539,7 +539,8 @@ function settingsHtml() {
     <div class="setting"><span>Resolución <small style="opacity:.6">(automática: baja un poco solo si el juego va a tirones)</small></span><span class="seg" id="sR"><button data-r="auto" class="${game.save.dynRes !== false ? 'on' : ''}">Automática</button><button data-r="fija" class="${game.save.dynRes === false ? 'on' : ''}">Fija</button></span></div>
     <div class="setting"><span>Tiempo de Guareña <small style="opacity:.6">(en directo: el tiempo reciente del pueblo, una estimación por cuartos de hora de <a href="https://open-meteo.com/" target="_blank" rel="noopener" style="color:inherit">Open-Meteo.com</a>, CC BY 4.0; se consulta cada 10 min)</small></span><span class="seg" id="sWx"><button data-wx="1" class="${game.save.weatherLive !== false ? 'on' : ''}">En directo</button><button data-wx="0" class="${game.save.weatherLive === false ? 'on' : ''}">Del juego</button></span></div>
     <div class="setting"><span>Hora del día</span><span class="seg" id="sT">${times.map(([n, h]) => `<button data-h="${h}">${n}</button>`).join('')}</span></div>
-    <div class="setting"><span>Música (radio)</span><input id="sMus" type="range" min="0" max="1" step="0.05" value="${game.save.music ?? 0.55}"></div>
+    <div class="setting"><span>Música de fondo</span><span class="seg" id="sBg"><button data-bg="1" class="${game.save.bgMusic !== false ? 'on' : ''}">Liminal</button><button data-bg="0" class="${game.save.bgMusic === false ? 'on' : ''}">Apagada</button></span></div>
+    <div class="setting"><span>Música (radio y fondo)</span><input id="sMus" type="range" min="0" max="1" step="0.05" value="${game.save.music ?? 0.55}"></div>
     <div class="setting"><span>Efectos</span><input id="sSfx" type="range" min="0" max="1" step="0.05" value="${game.save.sfx ?? 0.9}"></div>
     <div class="setting"><span>Sensibilidad del ratón</span><input id="sSens" type="range" min="0.3" max="2.5" step="0.1" value="${game.cam.sens}"></div>`;
 }
@@ -567,6 +568,7 @@ function bindSettings() {
     offerReload('sLook', b.dataset.look !== STYLE.name);
   }));
   document.querySelectorAll('#sR button').forEach((b) => (b.onclick = () => { game.save.dynRes = b.dataset.r === 'auto'; game.persist(); pickIn('sR', b); }));
+  document.querySelectorAll('#sBg button').forEach((b) => (b.onclick = () => { game.save.bgMusic = b.dataset.bg === '1'; game.persist(); audio.bgMusic(game.save.bgMusic); pickIn('sBg', b); }));
   document.querySelectorAll('#sWx button').forEach((b) => (b.onclick = () => {
     const on = b.dataset.wx === '1';
     if (game.weather) game.weather.setOn(on); else { game.save.weatherLive = on; game.persist(); }
@@ -632,7 +634,7 @@ function controlsHtml() {
 // ------------------------------------------------------------ wiring
 const MODE_DESC = {
   normal: 'El Guareña de siempre: misiones, coches, armas, bares, taxi y patrulla por sus calles reales.',
-  zombis: 'Anochece y los muertos salen a las calles de Guareña. Sobrevive a oleadas cada vez más grandes con lo que encuentres. Ganas 10 € por cada zombi.',
+  zombis: 'Anochece y los muertos salen a las calles de Guareña. Sobrevive a oleadas cada vez más grandes y más rabiosas, y desde la segunda, a zombis gigantes, el triple de grandes. Ganas 10 € por cada zombi (y mucho más por un gigante).',
 };
 let selMode = 'normal';
 function setModeSel(m) {
@@ -804,6 +806,7 @@ function wire() {
   addEventListener('pagehide', savePos);
   const sens = game.save.sens; if (sens) game.cam.sens = sens;
   audio.setVolumes({ music: game.save.music ?? 0.55, sfx: game.save.sfx ?? 0.9 });
+  audio.bgMusic(game.save.bgMusic !== false); // (the background music: it starts with the first click, as all sound does)
 }
 function openPauseLike(html, title) {
   mode = 'menu';

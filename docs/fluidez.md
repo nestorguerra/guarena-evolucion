@@ -186,9 +186,8 @@ tamaño normal y en recortes a 1:1:
 
 ```bash
 # un Chrome propio, sin ventana, con la GPU (fuera del repositorio: .cache/perf)
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --remote-debugging-port=9333 \
-  --user-data-dir=.cache/perf/chrome --no-first-run --use-angle=metal --enable-gpu --ignore-gpu-blocklist \
-  --autoplay-policy=no-user-gesture-required about:blank &
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --mute-audio --remote-debugging-port=9333 \
+  --user-data-dir=.cache/perf/chrome --no-first-run --use-angle=metal --enable-gpu --ignore-gpu-blocklist about:blank &
 python3 tools/devserver.py 8918
 sh tools/perf/antes.sh da54db9            # la versión de antes, en .snaps/antes (fuera del repositorio)
 python3 tools/perf/ab.py --rounds 3       # antes y después por turnos → .cache/perf/ab_*.json

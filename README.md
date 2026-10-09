@@ -13,7 +13,8 @@ España, el Pantano de San Roque, los naranjos y plátanos de sus calles, los ol
 geranios de las ventanas y las amapolas de los solares… Misiones, coches, motos y bicis, tráfico, peatones, policía, bares, trabajos,
 casas por dentro (sus ventanas dan a la calle de verdad), las tiendas del pueblo para entrar y comprar, un
 inventario, tu casa para decorarla y con caja fuerte, la armería, la pesca en el pantano, radio, un modo
-zombis y multijugador con tus amigos.
+zombis (oleadas cada vez más grandes y más rabiosas, y zombis gigantes, el triple de grandes) y multijugador con tus
+amigos.
 
 Se ve de dos formas (*Ajustes › Estética*; el cambio se aplica al recargar):
 - **Plastilina**, con la que arranca siempre: Guareña como una película de stop motion de plastilina.
@@ -158,6 +159,24 @@ sin y con el esculpido de muñeco.
   que Álex no usa.
 - `tools/perf/` repite las medidas (un Chrome sin ventana, antes y después por turnos) y `tools/perflab.js` las hace
   en la página.
+
+**Música y sonido**:
+- **Música de fondo «Liminal»**, la de los sitios vacíos de madrugada: acordes largos y difusos que no acaban de
+  resolverse, alguna campana lejana con su eco, una sala grande y una cinta que ondula y sisea un poco. Se hace en el
+  propio juego mientras suena (nunca igual, sin grabaciones), va bajita y se aparta cuando pones la radio. *Ajustes ›
+  Música de fondo* la apaga; el volumen es el de *Música*.
+- **Los coches, más bajos y tranquilos**: el motor suena de 8 a 11 dB más bajo y más suave (menos saturado y menos
+  áspero, sin petardeos del escape) y el chirrido de las ruedas, más bajo.
+
+**El modo zombis**: cada oleada trae más zombis (9, 16, 25, 36, 49…) y más rabiosos (más rápidos, más que corren,
+muerden más fuerte y más a menudo y un disparo los frena menos). Desde la segunda, **zombis gigantes**, el triple de
+grandes: lentos y durísimos, el suelo tiembla a cada paso, cargan de lejos y de cerca dan un mazazo con los dos brazos
+que te tumba o aplasta tu coche; se enfurecen a media vida. Tienen su barra de vida arriba y tumbar uno da 150 € y
+50 más por oleada.
+
+**Las sombras, quietas**: la caja de sombras del sol se encaja en su propia rejilla y se centra donde mira la cámara;
+al moverse ya no parpadean ni dejan trozos de calle saltando de la sombra a la luz (se veía sobre todo en el vuelo del
+menú).
 
 ![Guareña desde el aire: la Iglesia de Santa María y la Plaza de España con el Ayuntamiento](docs/portada.jpg)
 

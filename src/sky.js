@@ -51,6 +51,7 @@ const CLAY = {
 };
 const REAL = { fill: new THREE.Color(0.86, 0.84, 0.8), walls: new THREE.Color(0.9, 0.84, 0.72), haze: new THREE.Color(0.8, 0.77, 0.72) };
 const _c = new THREE.Color(), _sunCol = new THREE.Color();
+const _lx = new THREE.Vector3(), _ly = new THREE.Vector3(), _lz = new THREE.Vector3(), _sf = new THREE.Vector3(), _fw = new THREE.Vector3();
 function paletteAt(alt, key, out) {
   const K = STYLE.plastilina ? KEYS_CLAY : KEYS;
   let i = 0;
@@ -388,13 +389,33 @@ export class SkySystem {
     if (!this.lightDir) return;
     this.dome.position.copy(focus); if (this.phys) this.phys.position.copy(focus); this.stars.position.copy(focus); if (this.cotton) this.cotton.position.set(focus.x, 0, focus.z);
     this.moon.position.copy(focus).addScaledVector(this.moonDir, 3500);
-    const texel = (this.shadowSize * 2) / this.sun.shadow.mapSize.x;
-    this.sun.target.position.set(Math.round(focus.x / texel) * texel, 0, Math.round(focus.z / texel) * texel);
-    this.sun.position.copy(this.sun.target.position).addScaledVector(this.lightDir, 250);
+    this.shadowBox(focus, this.lightDir, null);
+  }
+  // The sun's shadow box: centred where the camera looks (ahead of it along the ground — further ahead from a camera
+  // high up, like the menu's flyover), and held on its own texel grid, in the light's frame: a move of the camera shifts
+  // the shadow map by whole texels only, so the edges of the shadows and the pattern of their filtering stay where they
+  // are. (It was centred on the camera and snapped on the town's x/z grid, which is not the shadow map's: every move
+  // slid the map by a fraction of a texel, and the shadows on the ground flickered — patches of street going from shade
+  // to light and back, white specks; and seen from above, most of the street in view lay at the box's edge.)
+  shadowBox(focus, ld, view) {
+    const S = this.shadowSize, texel = (S * 2) / this.sun.shadow.mapSize.x;
+    const c = _sf.set(focus.x, 0, focus.z);
+    if (view) {
+      view.getWorldDirection(_fw); _fw.y = 0;
+      const l = _fw.length();
+      if (l > 1e-3) c.addScaledVector(_fw, Math.min(S * 0.8, S * 0.3 + Math.max(0, focus.y) * 1.5) / l);
+    }
+    const z = _lz.copy(ld).normalize(), x = _lx.set(0, 1, 0).cross(z);
+    if (x.lengthSq() < 1e-6) x.set(1, 0, 0); else x.normalize();
+    const y = _ly.copy(z).cross(x);
+    const px = Math.round(c.dot(x) / texel) * texel, py = Math.round(c.dot(y) / texel) * texel;
+    this.sun.target.position.set(0, 0, 0).addScaledVector(x, px).addScaledVector(y, py).addScaledVector(z, c.dot(z));
+    this.sun.position.copy(this.sun.target.position).addScaledVector(z, 250);
     this.sun.target.updateMatrixWorld();
   }
 
-  update(dt, focus, forceEnv = false) {
+  // view: the camera, to put the shadows where it looks
+  update(dt, focus, forceEnv = false, view = null) {
     const d = sunDirection(this.hour, this.sunDir);
     const alt = d.y;
     const U = this.uniforms;
@@ -460,10 +481,7 @@ export class SkySystem {
       this.lightDir = (this.lightDir || new THREE.Vector3()).copy(md);
     }
     this.sun.intensity *= 1 - 0.82 * ov; // (behind the clouds: hardly any direct sun, and its shadows fade with it)
-    const texel = (this.shadowSize * 2) / this.sun.shadow.mapSize.x;
-    this.sun.target.position.set(Math.round(focus.x / texel) * texel, 0, Math.round(focus.z / texel) * texel);
-    this.sun.position.sub(focus).add(this.sun.target.position);
-    this.sun.target.updateMatrixWorld();
+    this.shadowBox(focus, this.lightDir, view);
     // hemisphere: sky & ground bounce
     // at night the moon and the glow of the town on the haze keep every street readable (never pitch black)
     if (!STYLE.plastilina) {

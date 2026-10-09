@@ -1,9 +1,9 @@
 # A Chrome of its own for measuring the game, driven over the DevTools protocol (Python's standard library only).
 # Why: the app's browser pane, out of focus, gives a page an animation frame every 2 s — nothing measured there is the
 # game's. A headless Chrome with the real GPU (ANGLE on Metal on a Mac) runs at the display's rate:
-#   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --remote-debugging-port=9333 \
-#     --user-data-dir=.cache/perf/chrome --no-first-run --use-angle=metal --enable-gpu --ignore-gpu-blocklist \
-#     --autoplay-policy=no-user-gesture-required about:blank &
+#   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --mute-audio --remote-debugging-port=9333 \
+#     --user-data-dir=.cache/perf/chrome --no-first-run --use-angle=metal --enable-gpu --ignore-gpu-blocklist about:blank &
+# (always --mute-audio: the tests play the game, and its engines, zombies and radio would come out of the speakers)
 # Tab(port, url) opens a fresh tab (1440×900 at 2×, a laptop's retina screen) with the page's errors collected from
 # the start (window.__errs); tab.ev(js) runs JavaScript there and waits for its promise.
 import base64, json, os, socket, struct, urllib.request

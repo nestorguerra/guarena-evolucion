@@ -1373,7 +1373,7 @@ export class CharacterFactory {
     const k = 13 / this.lodNear;
     for (const c of this.live) {
       const d = c.object.position.distanceTo(camPos);
-      c.setDistance((alt ? Math.min(d, c.object.position.distanceTo(alt)) : d) * k, shadows);
+      c.setDistance((alt ? Math.min(d, c.object.position.distanceTo(alt)) : d) * k * (c.lodScale || 1), shadows); // (lodScale: a giant, seen as if nearer)
     }
   }
 }
@@ -1867,8 +1867,9 @@ export class Character {
   update(dt, speed, opts = {}) {
     // claymation: a puppet is only seen at the stop motion's poses (12 a second, SM): between two of them its time is
     // kept and the pose worked out once, at the next — the same pose, a fifth of the work. (Not its first one, nor a
-    // ragdoll, whose fall is worked out step by step)
-    if (STYLE.plastilina && !SM.tick && this._posed && !this.rag && SM.items.has(this.object)) { this._smDt = (this._smDt || 0) + dt; return; }
+    // ragdoll, whose fall is worked out step by step.) Returns false then: whoever touches up the bones after the update
+    // (a zombie's lurch, a remote player's aim) must not, or the touches would pile up pose after pose
+    if (STYLE.plastilina && !SM.tick && this._posed && !this.rag && SM.items.has(this.object)) { this._smDt = (this._smDt || 0) + dt; return false; }
     if (this._smDt) { dt += this._smDt; this._smDt = 0; }
     this._posed = true; this.poseN++;
     this.t += dt;

@@ -370,6 +370,17 @@ function renderIR(sr, dur = 2.2) {
   return out;
 }
 
+// The background music's room: long (5 s), dark and soft-edged — a big empty hall.
+function renderIRLong(sr, dur = 5) {
+  const n = Math.floor(sr * dur), out = [];
+  for (let c = 0; c < 2; c++) {
+    const a = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const t = i / sr; a[i] = (Math.random() * 2 - 1) * Math.exp((-6.9 * t) / 4.2) * Math.min(1, t / 0.08); }
+    out.push(biquad(a, 'lp', 2600, 0.5, sr));
+  }
+  return out;
+}
+
 // Recipes rendered on demand by the bank (arrays: mono; array of arrays: stereo).
 const RECIPES = {
   white: (sr) => white(sr * 2),
@@ -404,12 +415,13 @@ const RECIPES = {
   stork: (sr) => renderStork(sr),
   gravel: (sr) => renderGravel(sr),
   ir: (sr) => renderIR(sr),
+  irLong: (sr) => renderIRLong(sr),
 };
 
 // ───────────────────────────── 3. Sound bank ─────────────────────────────
 
 // Dark or band-limited material is rendered at half rate: half the memory and render time.
-const HALF_RATE = new Set(['brown', 'bell', 'bellSmall', 'crickets', 'cicadas', 'stork']);
+const HALF_RATE = new Set(['brown', 'bell', 'bellSmall', 'crickets', 'cicadas', 'stork']); // (never an IR: a convolver takes only the context's rate)
 
 class Bank {
   constructor(ctx) { this.ctx = ctx; this.sr = ctx.sampleRate; this.cache = new Map(); this.queue = []; }
@@ -428,7 +440,7 @@ class Bank {
     let b = this.cache.get(name);
     if (!b && RECIPES[name]) {
       const sr = HALF_RATE.has(name) ? this.sr / 2 : this.sr;
-      b = this._make(RECIPES[name](sr), name === 'ir' ? 0 : 0.9, sr); // the IR keeps its level (the convolver normalises)
+      b = this._make(RECIPES[name](sr), name === 'ir' || name === 'irLong' ? 0 : 0.9, sr); // the IRs keep their level (the convolver normalises)
       this.cache.set(name, b);
     }
     return b || null;
@@ -526,6 +538,16 @@ const ENGINES = {
   sport:   { cyl: 6, idle: 950, red: 8200, lp: [650, 6500], drive: 3.2, tilt: 0.85, rough: 0.4, noise: 1.5, nf: [900, 5200], nq: 1.4, am: 0.65, sub: 0.25, whine: 0.015, res: [220, 700], vol: 0.5, pops: 0.9 },
 };
 
+// Calmer than they were (the testers: «too loud, rough and harsh»): every engine played softer and smoother — less
+// drive into the clipper, a smoother wave, less intake rasp, a lower ceiling to its brightness, lower revs at the top,
+// no exhaust pops, and slower changes from one note of the engine to the next.
+const CALM = { vol: 0.75, drive: 0.55, rough: 0.45, noise: 0.4, lpLo: 0.85, lpHi: 0.5, whine: 0.6, knock: 0.4, span: 0.8 };
+function calmEngine(s) {
+  return { ...s, vol: s.vol * CALM.vol, drive: 1 + (s.drive - 1) * CALM.drive, rough: s.rough * CALM.rough, noise: s.noise * CALM.noise,
+    lp: [s.lp[0] * CALM.lpLo, s.lp[1] * CALM.lpHi], whine: s.whine * CALM.whine, knock: (s.knock || 0) * CALM.knock, pops: 0,
+    red: s.idle + (s.red - s.idle) * CALM.span };
+}
+
 function engineWave(ctx, s) {
   const N = 96, re = new Float32Array(N + 1), im = new Float32Array(N + 1), r = makeRng(s.cyl * 7919 + s.idle);
   for (let k = 1; k <= N; k++) {
@@ -547,16 +569,16 @@ function pulseWave(ctx, duty = 0.3, N = 24) {
 
 class Engine {
   constructor(A, type) {
-    const c = A.ctx, s = (this.spec = ENGINES[type] || ENGINES.car), k = (this.k = new Kit(c)), t = c.currentTime;
+    const c = A.ctx, s = (this.spec = calmEngine(ENGINES[type] || ENGINES.car)), k = (this.k = new Kit(c)), t = c.currentTime;
     this.type = type;
     this.out = k.gain(0);
     this.out.connect(A.engineBus);
     // Combustion core
-    this.osc = k.osc('custom', s.idle / 120, t, undefined, A.wave(type, () => engineWave(c, s)));
+    this.osc = k.osc('custom', s.idle / 120, t, undefined, A.wave('calm_' + type, () => engineWave(c, s)));
     this.drive = k.gain(0.5);
-    const shaper = k.shaper(A.curve('eng_' + type, () => satCurve(s.drive, 0.18))), post = (this.post = k.gain(1)), hp = k.filter('highpass', 28);
-    this.lp = k.filter('lowpass', s.lp[0], 1.1);
-    const r1 = k.filter('peaking', s.res[0], 1.4, 5), r2 = k.filter('peaking', s.res[1], 2, 4);
+    const shaper = k.shaper(A.curve('calm_eng_' + type, () => satCurve(s.drive, 0.12))), post = (this.post = k.gain(1)), hp = k.filter('highpass', 28);
+    this.lp = k.filter('lowpass', s.lp[0], 0.8);
+    const r1 = k.filter('peaking', s.res[0], 1.4, 2.5), r2 = k.filter('peaking', s.res[1], 2, 1.5);
     this.main = k.gain(0.6);
     this.osc.connect(this.drive); this.drive.connect(shaper); shaper.connect(post); post.connect(hp);
     hp.connect(this.lp); this.lp.connect(r1); r1.connect(r2); r2.connect(this.main); this.main.connect(this.out);
@@ -574,7 +596,7 @@ class Engine {
     this.wh = k.osc('triangle', 60, t); this.wg = k.gain(0);
     this.wh.connect(this.wg); this.wg.connect(this.out);
     // Cycle-to-cycle jitter (slow brown noise into detune, in cents)
-    const jit = k.buf(A.bank.get('brown'), t, undefined, 1, true, Math.random() * 3), jg = k.gain(10 + 30 * s.rough);
+    const jit = k.buf(A.bank.get('brown'), t, undefined, 1, true, Math.random() * 3), jg = k.gain(6 + 15 * s.rough);
     jit.connect(jg); jg.connect(this.osc.detune); jg.connect(this.pulse.detune); jg.connect(this.sub.detune);
   }
 
@@ -582,19 +604,19 @@ class Engine {
     const s = this.spec, rpm = clamp(num(st.rpm), 0, 1.1), th = clamp(num(st.throttle), 0, 1);
     const load = clamp(num(st.load, th), 0, 1), spd = Math.abs(num(st.speed));
     const cyc = (s.idle + (s.red - s.idle) * rpm) / 120, fire = cyc * s.cyl;
-    glide(this.osc.frequency, cyc, t, 0.045, 0.01);
-    glide(this.pulse.frequency, fire, t, 0.045, 0.01);
-    glide(this.sub.frequency, fire, t, 0.045, 0.01);
+    glide(this.osc.frequency, cyc, t, 0.09, 0.01);
+    glide(this.pulse.frequency, fire, t, 0.09, 0.01);
+    glide(this.sub.frequency, fire, t, 0.09, 0.01);
     const open = clamp(0.12 + 0.4 * rpm + 0.55 * th * (0.35 + 0.65 * rpm), 0, 1);
-    glide(this.lp.frequency, s.lp[0] * Math.pow(s.lp[1] / s.lp[0], open), t, 0.06, 1);
-    const dr = 0.4 + 0.45 * th + 0.15 * load; // stays within the curve: soft, never hard clipping
-    glide(this.drive.gain, dr, t, 0.06);
-    glide(this.post.gain, 1 / (0.55 + 0.45 * dr), t, 0.06);
+    glide(this.lp.frequency, s.lp[0] * Math.pow(s.lp[1] / s.lp[0], open), t, 0.12, 1);
+    const dr = 0.4 + 0.35 * th + 0.1 * load; // stays within the curve: soft, never hard clipping
+    glide(this.drive.gain, dr, t, 0.12);
+    glide(this.post.gain, 1 / (0.55 + 0.45 * dr), t, 0.12);
     const overrun = (1 - th) * smooth(0.25, 0.7, rpm); // lifting off at high revs
-    glide(this.main.gain, 0.55 + 0.25 * rpm + 0.35 * th - 0.25 * overrun, t, 0.05);
-    glide(this.nbp.frequency, lerp(s.nf[0], s.nf[1], rpm), t, 0.06, 1);
-    glide(this.ng.gain, s.noise * ((0.25 + 0.75 * th) * (0.45 + 0.55 * rpm) + 0.3 * overrun + (s.knock || 0)), t, 0.05); // knock: diesel clatter
-    glide(this.sg.gain, s.sub * (0.6 + 0.4 * load) * (1 - 0.55 * rpm), t, 0.06);
+    glide(this.main.gain, 0.6 + 0.15 * rpm + 0.15 * th - 0.12 * overrun, t, 0.12); // (the pedal changes the voice only a little: calm)
+    glide(this.nbp.frequency, lerp(s.nf[0], s.nf[1], rpm), t, 0.12, 1);
+    glide(this.ng.gain, s.noise * ((0.25 + 0.75 * th) * (0.45 + 0.55 * rpm) + 0.3 * overrun + (s.knock || 0)), t, 0.1); // knock: diesel clatter
+    glide(this.sg.gain, s.sub * (0.6 + 0.4 * load) * (1 - 0.55 * rpm), t, 0.12);
     glide(this.wh.frequency, 40 + spd * 55, t, 0.08, 0.5);
     glide(this.wg.gain, s.whine * clamp(spd / 35, 0, 1) * (0.6 + 0.4 * (1 - th)), t, 0.1);
     glide(this.out.gain, s.vol, t, 0.12);
@@ -632,7 +654,7 @@ function bedSkid(A, t) {
   out.connect(A.world);
   return { k, apply(v, t) {
     const sp = clamp(A._speed / 30, 0, 1);
-    glide(out.gain, Math.pow(v, 1.4) * 0.3, t, 0.04);
+    glide(out.gain, Math.pow(v, 1.4) * 0.2, t, 0.06);
     glide(b1.frequency, 1300 + 400 * Math.random() + 300 * sp, t, 0.06, 1);
     glide(b2.frequency, 2100 + 500 * Math.random(), t, 0.06, 1);
     glide(tone.frequency, 950 + 250 * sp + 60 * Math.random(), t, 0.08, 1);
@@ -733,6 +755,96 @@ class Siren {
 // ───────────────────────────── 6. GameAudio core ─────────────────────────────
 
 // Guitar notes worth rendering ahead of time: A-minor open chords (strums) and the melody register.
+// ─────────────────────── 6. Background music: «Liminal» ───────────────────────
+// Music for empty places at the edge of things (the «liminal» of the internet: an empty mall at night, a pool with
+// the lights on and nobody there): long hazy chords that never quite resolve — major sevenths and ninths —, a few soft
+// bell notes far off with their echoes, all of it in a big dark room, through a tape that wobbles a little and hisses
+// faintly. Made here as it plays, never the same twice and never a recording: nothing to download, nobody's music.
+// It plays under everything, low, and steps aside while the car radio (or the phone's) plays.
+const LIMINAL_CHORDS = [
+  [49, 56, 60, 65, 75], // D♭maj9
+  [46, 53, 56, 61, 72], // B♭m9
+  [42, 49, 53, 58, 72], // G♭maj7♯11
+  [51, 58, 61, 66, 68], // E♭m11
+  [44, 51, 55, 60, 70], // A♭add9 (now and then, a step aside)
+  [41, 48, 53, 56, 63], // Fm7add11
+];
+class Liminal {
+  constructor(A) {
+    const c = A.ctx;
+    this.A = A; this.want = false; this.timer = null; this.nextT = 0; this.i = 3;
+    this.out = c.createGain(); this.out.gain.value = 0; this.out.connect(A.musicDuck);
+    // the room, and an echo for the bells (its repeats darkening)
+    const verb = c.createConvolver(); verb.buffer = A.bank.get('irLong');
+    const wet = c.createGain(); wet.gain.value = 0.9; verb.connect(wet); wet.connect(this.out);
+    this.send = c.createGain(); this.send.connect(verb);
+    this.dry = c.createGain(); this.dry.gain.value = 0.45; this.dry.connect(this.out);
+    const dly = c.createDelay(2), fb = c.createGain(), dl = c.createBiquadFilter();
+    dly.delayTime.value = 0.62; fb.gain.value = 0.42; dl.type = 'lowpass'; dl.frequency.value = 2200;
+    dly.connect(dl); dl.connect(fb); fb.connect(dly); dl.connect(this.send); dl.connect(this.dry);
+    this.echo = c.createGain(); this.echo.gain.value = 0.5; this.echo.connect(dly);
+    // the tape: a slow wow and a quicker flutter on every pitch (cents), and its hiss
+    const wow = c.createOscillator(), flut = c.createOscillator();
+    wow.frequency.value = 0.31; flut.frequency.value = 5.3;
+    this.wow = c.createGain(); this.wow.gain.value = 9; this.flut = c.createGain(); this.flut.gain.value = 2.2;
+    wow.connect(this.wow); flut.connect(this.flut); wow.start(); flut.start();
+    const hiss = c.createBufferSource(), hh = c.createBiquadFilter(), hg = c.createGain();
+    hiss.buffer = A.bank.get('pink'); hiss.loop = true; hh.type = 'highpass'; hh.frequency.value = 2500; hg.gain.value = 0.006;
+    hiss.connect(hh); hh.connect(hg); hg.connect(this.out); hiss.start();
+  }
+  set(on) { this.want = !!on; this.level(); }
+  // up while wanted and no radio plays; the chords are written 2.5 s ahead on a timer of their own (menus included)
+  level() {
+    const A = this.A, t = A.ctx.currentTime, on = this.want && !A._radioOn;
+    glide(this.out.gain, on ? 0.34 : 0, t, on ? 1.5 : 0.6);
+    if (this.want && !this.timer) { this.nextT = Math.max(this.nextT, t + 0.2); this.timer = setInterval(() => this.tick(), 250); this.tick(); }
+    else if (!this.want && this.timer) { clearInterval(this.timer); this.timer = null; }
+  }
+  tick() {
+    const c = this.A.ctx;
+    if (c.state !== 'running') return;
+    const t = c.currentTime;
+    if (this.nextT < t - 1) this.nextT = t + 0.1; // (the page was asleep: carry on from now)
+    try { while (this.nextT < t + 2.5) this.chord(this.nextT); } catch (e) { this.A._warn(e); }
+  }
+  // a chord: each note two detuned saws through a soft low-pass that opens and closes, the root an octave down on a
+  // triangle; slow to come in and to go (the next one comes in over it); a few bell notes of it on top
+  chord(t) {
+    const c = this.A.ctx, C = LIMINAL_CHORDS;
+    this.i = Math.random() < 0.75 ? (this.i + 1) % 4 : Math.floor(Math.random() * C.length);
+    const notes = C[this.i], dur = 8 + Math.random() * 3, end = t + dur + 4.6;
+    const g = c.createGain(), lp = c.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 0.5;
+    lp.frequency.setValueAtTime(700, t); lp.frequency.linearRampToValueAtTime(1100 + Math.random() * 300, t + dur * 0.5); lp.frequency.linearRampToValueAtTime(650, end);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.055, t + 2.8); g.gain.setValueAtTime(0.055, t + dur); g.gain.linearRampToValueAtTime(0, t + dur + 4.5);
+    lp.connect(g); g.connect(this.dry); g.connect(this.send);
+    const nodes = [];
+    const voice = (type, f, det, vol) => {
+      const o = c.createOscillator(), og = c.createGain();
+      o.type = type; o.frequency.value = f; o.detune.value = det; og.gain.value = vol;
+      this.wow.connect(o.detune); this.flut.connect(o.detune);
+      o.connect(og); og.connect(lp); o.start(t); o.stop(end);
+      nodes.push([o, og]);
+    };
+    notes.forEach((m, k) => { const v = k === 0 ? 0.7 : 0.45; voice('sawtooth', mtof(m), -6, v); voice('sawtooth', mtof(m), 7, v); });
+    voice('triangle', mtof(notes[0] - 12), 0, 0.9);
+    nodes[0][0].onended = () => { for (const [o, og] of nodes) { this.wow.disconnect(o.detune); this.flut.disconnect(o.detune); o.disconnect(); og.disconnect(); } lp.disconnect(); g.disconnect(); };
+    const n = Math.random() < 0.15 ? 0 : 1 + Math.floor(Math.random() * 3);
+    for (let k = 0; k < n; k++) this.bell(t + 1 + Math.random() * (dur - 2), notes[1 + Math.floor(Math.random() * (notes.length - 1))] + 12 + (Math.random() < 0.3 ? 12 : 0));
+    this.nextT = t + dur;
+  }
+  // a soft bell far off: a sine and its octave, quick to strike, slow to fade, into the echo
+  bell(t, m) {
+    const c = this.A.ctx, f = mtof(m), o = c.createOscillator(), o2 = c.createOscillator(), g = c.createGain(), g2 = c.createGain();
+    o.frequency.value = f; o2.frequency.value = f * 2.01; g2.gain.value = 0.18;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t + 0.012); g.gain.setTargetAtTime(0, t + 0.02, 0.9);
+    this.wow.connect(o.detune); this.wow.connect(o2.detune);
+    o.connect(g); o2.connect(g2); g2.connect(g); g.connect(this.dry); g.connect(this.echo); g.connect(this.send);
+    o.start(t); o2.start(t); o.stop(t + 6); o2.stop(t + 6);
+    o.onended = () => { this.wow.disconnect(o.detune); this.wow.disconnect(o2.detune); o.disconnect(); o2.disconnect(); g2.disconnect(); g.disconnect(); };
+  }
+}
+
 const GUITAR_WARM = [40, 41, 43, 45, 46, 47, 48, 50, 52, 53, 55, 56, 57, 59, 60, 61, 62, 64, 65, 67, 69].map((m) => [m, 0.5])
   .concat(Array.from({ length: 16 }, (_, i) => [64 + i, 0.75]));
 
@@ -781,6 +893,7 @@ export class GameAudio {
     try { this._graph(c); } catch (e) { try { c.close(); } catch (e2) { /* ignore */ } throw e; }
     this.ctx = c;
     if (this._radioOn) this._radio.setOn(true);
+    if (this._bgWant) this.bgMusic(true);
     if (this._paused) this.pauseAll(true);
     this._warmUp();
   }
@@ -807,7 +920,7 @@ export class GameAudio {
     this.musicVol = g(this._vol.music, this.master);
     this.world = g(1, this.sfxVol);      // everything in the game world (ducked on pause)
     this.ui = g(1, this.sfxVol);         // menu sounds: never ducked
-    this.engineBus = g(0.75, this.world);
+    this.engineBus = g(0.45, this.world); // (the engine under the rest, not over it)
     this.ambBus = g(0.25, this.world);
     // Shared reverb send
     this.revIn = g(1);
@@ -1118,7 +1231,12 @@ export class GameAudio {
   }
 
   // ── Radio ──
-  radioOn(on, level = 1) { this._radioOn = !!on; this._radioLevel = level; this._safe(() => this._radio.setOn(this._radioOn)); }
+  radioOn(on, level = 1) { this._radioOn = !!on; this._radioLevel = level; this._safe(() => { this._radio.setOn(this._radioOn); if (this._liminal) this._liminal.level(); }); }
+  // the background music («Liminal»): on or off (it waits for the sound to be unlocked by a first click)
+  bgMusic(on) {
+    this._bgWant = !!on;
+    this._safe(() => { if (!this._liminal && this._bgWant) this._liminal = new Liminal(this); if (this._liminal) this._liminal.set(this._bgWant); });
+  }
   tuneNoise() { this._safe(() => this._static(this.ctx.currentTime)); } // the hiss of turning the dial
   radioNext() { this.stationIndex = this._station + 1; return this.stationName; }
   radioPrev() { this.stationIndex = this._station - 1; return this.stationName; }
